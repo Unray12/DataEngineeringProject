@@ -1,0 +1,243 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex.fmt)
+ restricted \write18 enabled.
+entering extended mode
+(main.tex
+LaTeX2e <2025-11-01>
+L3 programming layer <2025-12-24>
+(D:\App\Miktex\App\tex/latex/base\report.cls
+Document Class: report 2025/01/22 v1.4n Standard LaTeX document class
+(D:\App\Miktex\App\tex/latex/base\size11.clo)) (setup/packages.tex
+(D:\App\Miktex\App\tex/latex/vntex\vietnam.sty
+(D:\App\Miktex\App\tex/latex/base\ifthen.sty)
+(D:\App\Miktex\App\tex/latex/base\fontenc.sty
+(D:\App\Miktex\App\tex/latex/vntex\t5enc.def
+(D:\App\Miktex\App\tex/latex/vntex\t5enc.dfu))
+(D:\App\Miktex\App\tex/latex/vntex\t5cmr.fd))
+(D:\App\Miktex\App\tex/latex/base\inputenc.sty)
+(D:\App\Miktex\App\tex/latex/vntex\vncaps.tex))
+(D:\App\Miktex\App\tex/latex/tools\array.sty)
+(D:\App\Miktex\App\tex/latex/listings\listings.sty
+(D:\App\Miktex\App\tex/latex/graphics\keyval.sty)
+(D:\App\Miktex\App\tex/latex/listings\lstpatch.sty)
+(D:\App\Miktex\App\tex/latex/listings\lstmisc.sty)
+(D:\App\Miktex\App\tex/latex/listings\listings.cfg))
+==> First Aid for listings.sty no longer applied!
+    Expected:
+        2024/09/23 1.10c (Carsten Heinz)
+    but found:
+        2025/11/14 1.11b (Carsten Heinz)
+    so I'm assuming it got fixed.
+(D:\App\Miktex\App\tex/latex/tools\indentfirst.sty)
+(D:\App\Miktex\App\tex/latex/amsmath\amsmath.sty
+For additional information on amsmath, use the `?' option.
+(D:\App\Miktex\App\tex/latex/amsmath\amstext.sty
+(D:\App\Miktex\App\tex/latex/amsmath\amsgen.sty))
+(D:\App\Miktex\App\tex/latex/amsmath\amsbsy.sty)
+(D:\App\Miktex\App\tex/latex/amsmath\amsopn.sty))
+(D:\App\Miktex\App\tex/latex/amsfonts\amsfonts.sty)
+(D:\App\Miktex\App\tex/latex/amsfonts\amssymb.sty)
+(D:\App\Miktex\App\tex/latex/geometry\geometry.sty
+(D:\App\Miktex\App\tex/generic/iftex\ifvtex.sty
+(D:\App\Miktex\App\tex/generic/iftex\iftex.sty))
+(D:\App\Miktex\App\tex/latex/geometry\geometry.cfg))
+(D:\App\Miktex\App\tex/latex/graphics\graphicx.sty
+(D:\App\Miktex\App\tex/latex/graphics\graphics.sty
+(D:\App\Miktex\App\tex/latex/graphics\trig.sty)
+(D:\App\Miktex\App\tex/latex/graphics-cfg\graphics.cfg)
+(D:\App\Miktex\App\tex/latex/graphics-def\pdftex.def)))
+(D:\App\Miktex\App\tex/latex/titlesec\titlesec.sty)
+(D:\App\Miktex\App\tex/latex/xcolor\xcolor.sty
+(D:\App\Miktex\App\tex/latex/graphics-cfg\color.cfg)
+(D:\App\Miktex\App\tex/latex/graphics\mathcolor.ltx))
+(D:\App\Miktex\App\tex/latex/colortbl\colortbl.sty)
+(D:\App\Miktex\App\tex/latex/caption\subcaption.sty
+(D:\App\Miktex\App\tex/latex/caption\caption.sty
+(D:\App\Miktex\App\tex/latex/caption\caption3.sty)))
+(D:\App\Miktex\App\tex/latex/float\float.sty)
+(D:\App\Miktex\App\tex/latex/enumitem\enumitem.sty)
+(D:\App\Miktex\App\tex/latex/tabularray\tabularray.sty
+(D:\App\Miktex\App\tex/latex/ninecolors\ninecolors.sty
+(D:\App\Miktex\App\tex/latex/l3packages/xparse\xparse.sty
+(D:\App\Miktex\App\tex/latex/l3kernel\expl3.sty
+(D:\App\Miktex\App\tex/latex/l3backend\l3backend-pdftex.def)))))
+(D:\App\Miktex\App\tex/latex/booktabs\booktabs.sty)
+(D:\App\Miktex\App\tex/latex/etoolbox\etoolbox.sty)
+(D:\App\Miktex\App\tex/latex/pgf/frontendlayer\tikz.sty
+(D:\App\Miktex\App\tex/latex/pgf/basiclayer\pgf.sty
+(D:\App\Miktex\App\tex/latex/pgf/utilities\pgfrcs.sty
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgfutil-common.tex)
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgfutil-latex.def)
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgfrcs.code.tex
+(D:\App\Miktex\App\tex/generic/pgf\pgf.revision.tex)))
+(D:\App\Miktex\App\tex/latex/pgf/basiclayer\pgfcore.sty
+(D:\App\Miktex\App\tex/latex/pgf/systemlayer\pgfsys.sty
+(D:\App\Miktex\App\tex/generic/pgf/systemlayer\pgfsys.code.tex
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgfkeys.code.tex
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgfkeyslibraryfiltered.code.tex))
+(D:\App\Miktex\App\tex/generic/pgf/systemlayer\pgf.cfg)
+(D:\App\Miktex\App\tex/generic/pgf/systemlayer\pgfsys-pdftex.def
+(D:\App\Miktex\App\tex/generic/pgf/systemlayer\pgfsys-common-pdf.def)))
+(D:\App\Miktex\App\tex/generic/pgf/systemlayer\pgfsyssoftpath.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/systemlayer\pgfsysprotocol.code.tex))
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcore.code.tex
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmath.code.tex
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathutil.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathparser.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.basic.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.trigonometric.code.tex
+) (D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.random.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.comparison.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.base.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.round.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.misc.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfunctions.integerarithmetics.cod
+e.tex) (D:\App\Miktex\App\tex/generic/pgf/math\pgfmathcalc.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmathfloat.code.tex))
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfint.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorepoints.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorepathconstruct.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorepathusage.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorescopes.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoregraphicstate.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoretransformations.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorequick.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoreobjects.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorepathprocessing.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorearrows.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoreshade.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoreimage.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoreexternal.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorelayers.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcoretransparency.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorepatterns.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/basiclayer\pgfcorerdf.code.tex)))
+(D:\App\Miktex\App\tex/generic/pgf/modules\pgfmoduleshapes.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/modules\pgfmoduleplot.code.tex)
+(D:\App\Miktex\App\tex/latex/pgf/compatibility\pgfcomp-version-0-65.sty)
+(D:\App\Miktex\App\tex/latex/pgf/compatibility\pgfcomp-version-1-18.sty))
+(D:\App\Miktex\App\tex/latex/pgf/utilities\pgffor.sty
+(D:\App\Miktex\App\tex/latex/pgf/utilities\pgfkeys.sty
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgfkeys.code.tex))
+(D:\App\Miktex\App\tex/latex/pgf/math\pgfmath.sty
+(D:\App\Miktex\App\tex/generic/pgf/math\pgfmath.code.tex))
+(D:\App\Miktex\App\tex/generic/pgf/utilities\pgffor.code.tex))
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz\tikz.code.tex
+(D:\App\Miktex\App\tex/generic/pgf/libraries\pgflibraryplothandlers.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/modules\pgfmodulematrix.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibrarytopa
+ths.code.tex)))
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshap
+es.geometric.code.tex
+(D:\App\Miktex\App\tex/generic/pgf/libraries/shapes\pgflibraryshapes.geometric.
+code.tex))
+(D:\App\Miktex\App\tex/generic/pgf/libraries\pgflibraryarrows.meta.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryposi
+tioning.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryfit.
+code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryback
+grounds.code.tex)
+(D:\App\Miktex\App\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibrarycalc
+.code.tex) (D:\App\Miktex\App\tex/latex/fancyhdr\fancyhdr.sty)
+(D:\App\Miktex\App\tex/latex/titlesec\titletoc.sty)
+(D:\App\Miktex\App\tex/latex/hyperref\hyperref.sty
+(D:\App\Miktex\App\tex/latex/kvsetkeys\kvsetkeys.sty)
+(D:\App\Miktex\App\tex/generic/kvdefinekeys\kvdefinekeys.sty)
+(D:\App\Miktex\App\tex/generic/pdfescape\pdfescape.sty
+(D:\App\Miktex\App\tex/generic/ltxcmds\ltxcmds.sty)
+(D:\App\Miktex\App\tex/generic/pdftexcmds\pdftexcmds.sty
+(D:\App\Miktex\App\tex/generic/infwarerr\infwarerr.sty)))
+(D:\App\Miktex\App\tex/latex/hycolor\hycolor.sty)
+(D:\App\Miktex\App\tex/latex/hyperref\nameref.sty
+(D:\App\Miktex\App\tex/latex/refcount\refcount.sty)
+(D:\App\Miktex\App\tex/generic/gettitlestring\gettitlestring.sty
+(D:\App\Miktex\App\tex/latex/kvoptions\kvoptions.sty)))
+(D:\App\Miktex\App\tex/generic/stringenc\stringenc.sty)
+(D:\App\Miktex\App\tex/latex/hyperref\pd1enc.def)
+(D:\App\Miktex\App\tex/generic/intcalc\intcalc.sty)
+(D:\App\Miktex\App\tex/latex/hyperref\puenc.def)
+(D:\App\Miktex\App\tex/latex/url\url.sty)
+(D:\App\Miktex\App\tex/generic/bitset\bitset.sty
+(D:\App\Miktex\App\tex/generic/bigintcalc\bigintcalc.sty)))
+(D:\App\Miktex\App\tex/latex/hyperref\hpdftex.def
+(D:\App\Miktex\App\tex/latex/rerunfilecheck\rerunfilecheck.sty
+(D:\App\Miktex\App\tex/generic/uniquecounter\uniquecounter.sty)))
+(D:\App\Miktex\App\tex/latex/biblatex\biblatex.sty
+(D:\App\Miktex\App\tex/latex/logreq\logreq.sty
+(D:\App\Miktex\App\tex/latex/logreq\logreq.def))
+(D:\App\Miktex\App\tex/latex/biblatex\blx-dm.def)
+(D:\App\Miktex\App\tex/latex/biblatex\blx-compat.def)
+(D:\App\Miktex\App\tex/latex/biblatex\biblatex.def)
+(D:\App\Miktex\App\tex/latex/biblatex-ieee\ieee.bbx
+(D:\App\Miktex\App\tex/latex/biblatex/bbx\numeric-comp.bbx
+(D:\App\Miktex\App\tex/latex/biblatex/bbx\numeric.bbx
+(D:\App\Miktex\App\tex/latex/biblatex/bbx\standard.bbx))))
+(D:\App\Miktex\App\tex/latex/biblatex-ieee\ieee.cbx
+(D:\App\Miktex\App\tex/latex/biblatex/cbx\numeric-verb.cbx))
+(D:\App\Miktex\App\tex/latex/biblatex\biblatex.cfg)
+(D:\App\Miktex\App\tex/latex/biblatex\blx-case-expl3.sty))) (setup/layout.tex)
+(setup/listings.tex) (setup/macros.tex) (main.aux (frontmatter/commitment.aux)
+(frontmatter/abstract.aux) (glossary/glossary.aux)
+(chapters/1-introduction/main.aux) (chapters/2-background/main.aux)
+(chapters/3-requirements/main.aux) (chapters/4-design-implementation/main.aux)
+(chapters/5-evaluation/main.aux) (chapters/6-conclusion/main.aux))
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+(D:\App\Miktex\App\tex/context/base/mkii\supp-pdf.mkii
+[Loading MPS to PDF converter (version 2006.09.02).]
+) (D:\App\Miktex\App\tex/latex/epstopdf-pkg\epstopdf-base.sty
+(D:\App\Miktex\App\tex/latex/00miktex\epstopdf-sys.cfg)) (main.out) (main.out)
+(D:\App\Miktex\App\tex/latex/biblatex/lbx\english.lbx) (main.bbl)
+(frontmatter/cover.tex (D:\App\Miktex\App\tex/latex/amsfonts\umsa.fd)
+(D:\App\Miktex\App\tex/latex/amsfonts\umsb.fd) [1{C:/Users/admins/AppData/Local
+/MiKTeX/fonts/map/pdftex/pdftex.map}{D:/App/Miktex/App/fonts/enc/dvips/lm/lm-t5
+.enc} <./img/logoBK.png>]) (frontmatter/commitment.tex) [1]
+(frontmatter/abstract.tex) [2] (main.toc [3]) [4] (main.lof) [5] (main.lot)
+[6] (glossary/glossary.tex) [7] (chapters/1-introduction/main.tex
+Ch\uhorn \ohorn ng 1.
+)
+pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has 
+been already used, duplicate ignored
+<to be read again> 
+                   \relax 
+l.25 \include{chapters/1-introduction/main}
+                                            [1] (chapters/2-background/main.tex
+
+Ch\uhorn \ohorn ng 2.
+(chapters/2-background/2.1-challenges.tex)
+(chapters/2-background/2.2-definition.tex [2])
+(chapters/2-background/2.3-mechanism.tex [3] [4])
+(chapters/2-background/2.4-technologies.tex
+(D:\App\Miktex\App\tex/latex/vntex\t5cmtt.fd) [5]
+(D:\App\Miktex\App\tex/latex/listings\lstlang1.sty) [6])
+(chapters/2-background/2.5-comparison.tex [7])) [8]
+(chapters/3-requirements/main.tex
+Ch\uhorn \ohorn ng 3.
+[9]
+Overfull \vbox (102.18213pt too high) has occurred while \output is active
+[10]) [11] (chapters/4-design-implementation/main.tex
+Ch\uhorn \ohorn ng 4.
+) [12]
+Overfull \vbox (193.71716pt too high) has occurred while \output is active
+[13] (chapters/5-evaluation/main.tex
+Ch\uhorn \ohorn ng 5.
+) [14] (chapters/6-conclusion/main.tex
+Ch\uhorn \ohorn ng 6.
+) [15] [16] (main.aux (frontmatter/commitment.aux) (frontmatter/abstract.aux)
+(glossary/glossary.aux) (chapters/1-introduction/main.aux)
+(chapters/2-background/main.aux) (chapters/3-requirements/main.aux)
+(chapters/4-design-implementation/main.aux) (chapters/5-evaluation/main.aux)
+(chapters/6-conclusion/main.aux)) )
+(see the transcript file for additional information) <C:\Users\admins\AppData\L
+ocal\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\tcrm1200.pk><D:/App/Miktex/App/f
+onts/type1/public/amsfonts/cm/cmmi12.pfb><D:/App/Miktex/App/fonts/type1/public/
+amsfonts/cm/cmsy10.pfb><D:/App/Miktex/App/fonts/type1/public/lm/lmb10.pfb><D:/A
+pp/Miktex/App/fonts/type1/vntex/vnr/vnbx10.pfb><D:/App/Miktex/App/fonts/type1/v
+ntex/vnr/vnbx12.pfb><D:/App/Miktex/App/fonts/type1/vntex/vnr/vnr10.pfb><D:/App/
+Miktex/App/fonts/type1/vntex/vnr/vnr12.pfb><D:/App/Miktex/App/fonts/type1/vntex
+/vnr/vnr6.pfb><D:/App/Miktex/App/fonts/type1/vntex/vnr/vnti10.pfb><D:/App/Mikte
+x/App/fonts/type1/vntex/vnr/vnti12.pfb><D:/App/Miktex/App/fonts/type1/vntex/vnr
+/vntt10.pfb><D:/App/Miktex/App/fonts/type1/vntex/vnr/vntt9.pfb>
+Output written on main.pdf (24 pages, 373182 bytes).
+Transcript written on main.log.

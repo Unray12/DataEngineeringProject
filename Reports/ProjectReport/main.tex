@@ -1,0 +1,33 @@
+% ==================================================================
+%  Báo cáo bài tập lớn môn Data Engineering: micro-batch trong nông nghiệp
+%  Build: ./build.sh  (pdflatex -> biber -> pdflatex x2)
+% ==================================================================
+\documentclass[11pt,a4paper]{report}
+\input{setup/packages}
+\input{setup/layout}
+\input{setup/listings}
+\input{setup/macros}
+
+\begin{document}
+\renewcommand{\baselinestretch}{1.5}
+\fontsize{12pt}{12pt}\selectfont
+
+\input{frontmatter/cover}
+\pagenumbering{roman}
+\include{frontmatter/commitment}
+\include{frontmatter/abstract}
+\tableofcontents
+\listoffigures
+\listoftables
+\include{glossary/glossary}
+
+\pagenumbering{arabic}
+\include{chapters/1-introduction/main}
+\include{chapters/2-background/main}
+\include{chapters/3-requirements/main}
+\include{chapters/4-design-implementation/main}
+\include{chapters/5-evaluation/main}
+\include{chapters/6-conclusion/main}
+
+\printbibliography[heading=bibintoc, title=Tài liệu tham khảo]
+\end{document}

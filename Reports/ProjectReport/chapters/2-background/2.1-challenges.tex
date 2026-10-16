@@ -1,0 +1,13 @@
+\section{Thách thức của xử lý luồng thuần túy}
+\label{sec:2-challenges}
+
+Trong xử lý luồng thuần túy (pure stream processing), mỗi sự kiện được xử lý ngay khi đến. Cách làm này cho độ trễ thấp, nhưng khi áp dụng cho dữ liệu cảm biến nông nghiệp thì nảy sinh ba khó khăn chính.
+
+\subsection{Khôi phục trạng thái đang xử lý}
+Khi một nút xử lý gặp sự cố giữa chừng, hệ thống phải dựng lại trạng thái phức tạp của hàng nghìn sự kiện chưa được đệm. Ví dụ, một nút bị lỗi khi đang nhận đợt dữ liệu dồn kéo dài 4 giờ từ cổng LoRaWAN sẽ rơi vào vòng lặp khởi động lại liên tục vì phải khôi phục dữ liệu đất chưa được đệm.
+
+\subsection{Ghi trùng khi ghi dở dang}
+Xử lý từng sự kiện không có ranh giới thực thi rõ ràng. Khi mạng đứt giữa chừng, việc tránh ghi trùng đòi hỏi cơ chế khóa phân tán tốn kém. Ví dụ, kết nối LoRaWAN đứt giữa lúc đồng bộ dữ liệu tưới khiến gói tin gửi lại bị cộng hai lần vào nhật ký lượng nước.
+
+\subsection{Độ phức tạp trạng thái ở mức dưới một giây}
+Xử lý luồng liên tục cần cơ chế watermark cho dữ liệu đến sai thứ tự và tiêu tốn nhiều bộ nhớ, làm tăng chi phí cho những tác vụ không cần độ trễ dưới một giây. Ví dụ, chạy vòng đánh giá dưới một giây trên nhiệt độ đất vốn biến thiên chậm là lãng phí, vì chu kỳ cập nhật 30 giây đã đáp ứng nhu cầu canh tác.

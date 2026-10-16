@@ -1,0 +1,59 @@
+\section{Công nghệ hiện thực}
+\label{sec:2-tech}
+
+Bộ ba công nghệ được dùng để hiện thực micro-batch gồm Apache Kafka làm nguồn, Spark Structured Streaming làm engine xử lý và checkpoint bảo đảm độ tin cậy.
+
+\subsection{Apache Kafka làm nguồn dữ liệu}
+\label{sec:2-kafka}
+
+Kafka là nhật ký sự kiện bền vững và có thể phát lại \cite{kafka_docs}. Dữ liệu được tổ chức theo \emph{topic}, mỗi topic chia thành các \emph{partition}; mỗi thông điệp trong partition có một \emph{offset} tăng dần. Thông điệp được giữ trong một thời gian lưu trữ (retention) kể cả sau khi đã đọc, nên Spark có thể đọc lại bất kỳ khoảng offset nào. Kafka cũng tách bên sinh dữ liệu khỏi bên xử lý. Một partition Kafka tương ứng một tác vụ (task) Spark.
+
+Ở đầu mỗi lô, Spark hỏi Kafka offset mới nhất của từng partition, rồi xác định khoảng offset cần đọc (ví dụ partition 0: 1000--1500, partition 1: 980--1420). Khoảng offset này chính là micro-batch. Các partition được đọc song song, và offset được theo dõi bằng checkpoint của Spark chứ không dùng consumer group. Tùy chọn \code{maxOffsetsPerTrigger} giới hạn số bản ghi mỗi lô, bảo vệ tác vụ khỏi các đợt tăng đột biến.
+
+\subsection{Spark Structured Streaming}
+\label{sec:2-spark}
+
+Spark Structured Streaming coi luồng là một \emph{bảng không giới hạn}: mỗi bản ghi mới là một dòng được nối vào bảng đầu vào. Ở mỗi trigger, Spark chạy truy vấn chỉ trên các dòng mới và cập nhật kết quả \cite{spark_ss}. Nhờ đó cùng một API DataFrame/SQL dùng được cho cả xử lý theo lô và xử lý luồng. Ba khái niệm cấu hình chính:
+
+\begin{itemize}
+  \item \textbf{Trigger} (khi nào chạy): \code{processingTime} chạy theo chu kỳ cố định, ví dụ mỗi 10 giây; mặc định là các lô nối tiếp nhau; \code{availableNow} xử lý hết dữ liệu hiện có rồi dừng.
+  \item \textbf{Output mode} (ghi gì): \emph{append} chỉ ghi dòng mới, \emph{update} chỉ ghi dòng thay đổi, \emph{complete} ghi lại toàn bộ bảng kết quả.
+  \item \textbf{Watermark} (xử lý dữ liệu muộn): ví dụ ``chờ tối đa 2 phút rồi chốt cửa sổ''; trạng thái cũ bị xóa nên bộ nhớ không tăng vô hạn.
+\end{itemize}
+
+\subsection{Checkpoint}
+\label{sec:2-checkpoint}
+
+Thư mục checkpoint lưu bốn thành phần:
+\begin{itemize}
+  \item \code{offsets/}: nhật ký ghi trước (write-ahead log). \emph{Trước} khi lô $N$ chạy, Spark ghi phạm vi offset sẽ đọc.
+  \item \code{commits/}: \emph{sau} khi lô $N$ được ghi vào sink, Spark đánh dấu lô đã xong.
+  \item \code{state/}: kho trạng thái cho cửa sổ, tổng hợp và khử trùng lặp.
+  \item \code{metadata}: mã định danh duy nhất của truy vấn. Khi đổi lớn logic truy vấn, cần dùng vị trí checkpoint mới.
+\end{itemize}
+
+Quy trình phục hồi như sau: ghi offset vào \code{offsets/}, xử lý và ghi vào sink, rồi ghi \code{commits/}. Nếu hệ thống sập khi lô $N$ đã có trong \code{offsets/} nhưng chưa có trong \code{commits/}, lô $N$ được phát lại với \emph{cùng} khoảng offset. Để kết quả đúng một lần, sink phải idempotent hoặc transactional, ví dụ Delta Lake hoặc upsert theo mã lô.
+
+\subsection{Ví dụ mã nguồn}
+\label{sec:2-code}
+
+Đoạn mã dưới đây đọc luồng đơn hàng từ Kafka, tính doanh thu theo sản phẩm trong cửa sổ 1 phút và cập nhật kết quả mỗi 10 giây. Cùng mẫu này sẽ được áp dụng cho số đo cảm biến trong Chương~\ref{chap:4-design}.
+
+\begin{lstlisting}[language=Python, caption={Kafka $\rightarrow$ Spark $\rightarrow$ sink với trigger 10 giây}, label={lst:2-example}]
+orders = (spark.readStream.format("kafka")
+    .option("subscribe", "orders")
+    .option("maxOffsetsPerTrigger", 10000)
+    .load())
+
+revenue = (orders
+    .select(from_json("value", schema).alias("o")).select("o.*")
+    .withWatermark("event_time", "2 minutes")
+    .groupBy(window("event_time", "1 minute"), "product")
+    .agg(sum("amount")))
+
+(revenue.writeStream
+    .outputMode("update")
+    .trigger(processingTime="10 seconds")
+    .option("checkpointLocation", "/tmp/chk/orders")
+    .start())
+\end{lstlisting}

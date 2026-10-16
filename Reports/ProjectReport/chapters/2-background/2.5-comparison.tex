@@ -1,0 +1,50 @@
+\section{So sánh, trường hợp sử dụng và đánh đổi}
+\label{sec:2-compare}
+
+\subsection{So sánh ba mô hình xử lý}
+\label{sec:2-three-models}
+
+\begin{table}[H]
+\centering
+\caption{So sánh xử lý theo lô, micro-batch và xử lý luồng}
+\label{tab:2-compare}
+\small
+\begin{tblr}{
+  colspec = {X[1.2,l]X[2,l]X[2,l]X[2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí & Xử lý theo lô & Micro-batch & Xử lý luồng \\
+Đơn vị xử lý & Khối dữ liệu lớn & Lô nhỏ, thường xuyên & Từng sự kiện liên tục \\
+Độ trễ & Phút đến giờ & Giây đến phút & Mili giây đến giây \\
+Thông lượng & Cao, hiệu quả & Tốt, độ phức tạp vừa phải & Phụ thuộc thiết kế \\
+Độ phức tạp & Đơn giản & Cân bằng độ trễ và hiệu quả & Cao hơn, chi phí vận hành lớn \\
+Phù hợp với & ETL, báo cáo, phân tích lịch sử & Dashboard, ETL tăng dần, phân tích gần thời gian thực & Phát hiện gian lận, cảnh báo, quyết định thời gian thực \\
+\end{tblr}
+\end{table}
+
+\subsection{Trường hợp sử dụng}
+\label{sec:2-usecases}
+Micro-batch thường dùng cho: phân tích gần thời gian thực, xử lý nhật ký, giám sát IoT, phát hiện gian lận, gợi ý và cá nhân hóa, và các pipeline học máy.
+
+\subsection{Được và mất}
+\label{sec:2-tradeoffs}
+
+\begin{table}[H]
+\centering
+\caption{Lợi ích và chi phí của micro-batch}
+\label{tab:2-tradeoffs}
+\small
+\begin{tblr}{
+  colspec = {X[1,l]X[1,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Lợi ích & Chi phí \\
+Dữ liệu mới trong vài phút với công cụ theo lô quen thuộc & Độ trễ không thể thấp hơn chu kỳ lô \\
+Thử lại dễ dàng, cam kết idempotent và transactional & Cam kết thường xuyên tạo nhiều tệp nhỏ và snapshot, cần gộp tệp (compaction) và dọn snapshot \\
+Rẻ và đơn giản hơn xử lý luồng thực sự & Chu kỳ càng ngắn thì chi phí lập lịch và siêu dữ liệu càng cao \\
+\end{tblr}
+\end{table}
+
+\subsection{Liên hệ với đề tài}
+\label{sec:2-link}
+Dữ liệu nông nghiệp như độ ẩm đất hay nhiệt độ biến thiên chậm, kết nối LoRaWAN dễ gián đoạn, và yêu cầu nghiệp vụ thường chấp nhận độ trễ từ vài giây đến vài chục giây. Các đặc điểm này phù hợp với micro-batch: tránh chi phí của xử lý luồng thuần túy mà vẫn bảo đảm tính liên tục và đúng đắn của dữ liệu. Việc áp dụng cụ thể được trình bày ở Chương~\ref{chap:4-design}.

@@ -1,0 +1,205 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}CƠ SỞ LÝ THUYẾT}{2}{chapter.2}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{chap:2-background}{{2}{2}{CƠ SỞ LÝ THUYẾT}{chapter.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Thách thức của xử lý luồng thuần túy}{2}{section.2.1}\protected@file@percent }
+\newlabel{sec:2-challenges}{{2.1}{2}{Thách thức của xử lý luồng thuần túy}{section.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.1}Khôi phục trạng thái đang xử lý}{2}{subsection.2.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.2}Ghi trùng khi ghi dở dang}{2}{subsection.2.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.3}Độ phức tạp trạng thái ở mức dưới một giây}{3}{subsection.2.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Khái niệm xử lý micro-batch}{3}{section.2.2}\protected@file@percent }
+\newlabel{sec:2-definition}{{2.2}{3}{Khái niệm xử lý micro-batch}{section.2.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1}{\ignorespaces Rời rạc hóa luồng dữ liệu thành các micro-batch}}{3}{figure.caption.5}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:2-microbatch-concept}{{2.1}{3}{Rời rạc hóa luồng dữ liệu thành các micro-batch}{figure.caption.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Cơ chế hoạt động}{3}{section.2.3}\protected@file@percent }
+\newlabel{sec:2-mechanism}{{2.3}{3}{Cơ chế hoạt động}{section.2.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}Kiến trúc pipeline}{3}{subsection.2.3.1}\protected@file@percent }
+\newlabel{sec:2-pipeline}{{2.3.1}{3}{Kiến trúc pipeline}{subsection.2.3.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.2}{\ignorespaces Kiến trúc pipeline micro-batch từ cảm biến đến bảng điều khiển}}{4}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:2-pipeline}{{2.2}{4}{Kiến trúc pipeline micro-batch từ cảm biến đến bảng điều khiển}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}Vòng đời xử lý của một micro-batch}{4}{subsection.2.3.2}\protected@file@percent }
+\newlabel{sec:2-lifecycle}{{2.3.2}{4}{Vòng đời xử lý của một micro-batch}{subsection.2.3.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Chu kỳ trigger và ví dụ dữ liệu nông nghiệp}{4}{subsection.2.3.3}\protected@file@percent }
+\newlabel{sec:2-trigger}{{2.3.3}{4}{Chu kỳ trigger và ví dụ dữ liệu nông nghiệp}{subsection.2.3.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces Ví dụ hai micro-batch 5 giây của một cảm biến độ ẩm đất}}{4}{table.caption.7}\protected@file@percent }
+\newlabel{tab:2-example}{{2.1}{4}{Ví dụ hai micro-batch 5 giây của một cảm biến độ ẩm đất}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}Độ tin cậy: phục hồi sau lỗi và dữ liệu đến muộn}{4}{subsection.2.3.4}\protected@file@percent }
+\newlabel{sec:2-reliability}{{2.3.4}{4}{Độ tin cậy: phục hồi sau lỗi và dữ liệu đến muộn}{subsection.2.3.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Phục hồi sau lỗi.}{4}{paragraph*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Dữ liệu đến muộn.}{5}{paragraph*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Điều kiện exactly-once.}{5}{paragraph*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Công nghệ hiện thực}{5}{section.2.4}\protected@file@percent }
+\newlabel{sec:2-tech}{{2.4}{5}{Công nghệ hiện thực}{section.2.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Apache Kafka làm nguồn dữ liệu}{5}{subsection.2.4.1}\protected@file@percent }
+\newlabel{sec:2-kafka}{{2.4.1}{5}{Apache Kafka làm nguồn dữ liệu}{subsection.2.4.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Spark Structured Streaming}{5}{subsection.2.4.2}\protected@file@percent }
+\newlabel{sec:2-spark}{{2.4.2}{5}{Spark Structured Streaming}{subsection.2.4.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}Checkpoint}{6}{subsection.2.4.3}\protected@file@percent }
+\newlabel{sec:2-checkpoint}{{2.4.3}{6}{Checkpoint}{subsection.2.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.4}Ví dụ mã nguồn}{6}{subsection.2.4.4}\protected@file@percent }
+\newlabel{sec:2-code}{{2.4.4}{6}{Ví dụ mã nguồn}{subsection.2.4.4}{}}
+\newlabel{lst:2-example}{{2.1}{6}{Kafka $\rightarrow $ Spark $\rightarrow $ sink với trigger 10 giây}{lstlisting.2.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.1}{\ignorespaces Kafka $\rightarrow $ Spark $\rightarrow $ sink với trigger 10 giây}}{6}{lstlisting.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}So sánh, trường hợp sử dụng và đánh đổi}{7}{section.2.5}\protected@file@percent }
+\newlabel{sec:2-compare}{{2.5}{7}{So sánh, trường hợp sử dụng và đánh đổi}{section.2.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}So sánh ba mô hình xử lý}{7}{subsection.2.5.1}\protected@file@percent }
+\newlabel{sec:2-three-models}{{2.5.1}{7}{So sánh ba mô hình xử lý}{subsection.2.5.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.2}{\ignorespaces So sánh xử lý theo lô, micro-batch và xử lý luồng}}{7}{table.caption.11}\protected@file@percent }
+\newlabel{tab:2-compare}{{2.2}{7}{So sánh xử lý theo lô, micro-batch và xử lý luồng}{table.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Trường hợp sử dụng}{7}{subsection.2.5.2}\protected@file@percent }
+\newlabel{sec:2-usecases}{{2.5.2}{7}{Trường hợp sử dụng}{subsection.2.5.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Được và mất}{8}{subsection.2.5.3}\protected@file@percent }
+\newlabel{sec:2-tradeoffs}{{2.5.3}{8}{Được và mất}{subsection.2.5.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.3}{\ignorespaces Lợi ích và chi phí của micro-batch}}{8}{table.caption.12}\protected@file@percent }
+\newlabel{tab:2-tradeoffs}{{2.3}{8}{Lợi ích và chi phí của micro-batch}{table.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.4}Liên hệ với đề tài}{8}{subsection.2.5.4}\protected@file@percent }
+\newlabel{sec:2-link}{{2.5.4}{8}{Liên hệ với đề tài}{subsection.2.5.4}{}}
+\@setckpt{chapters/2-background/main}{
+\setcounter{page}{9}
+\setcounter{equation}{0}
+\setcounter{enumi}{6}
+\setcounter{enumii}{0}
+\setcounter{enumiii}{0}
+\setcounter{enumiv}{0}
+\setcounter{footnote}{0}
+\setcounter{mpfootnote}{0}
+\setcounter{part}{0}
+\setcounter{chapter}{2}
+\setcounter{section}{5}
+\setcounter{subsection}{4}
+\setcounter{subsubsection}{0}
+\setcounter{paragraph}{0}
+\setcounter{subparagraph}{0}
+\setcounter{figure}{2}
+\setcounter{table}{3}
+\setcounter{lstnumber}{17}
+\setcounter{parentequation}{0}
+\setcounter{caption@flags}{2}
+\setcounter{continuedfloat}{0}
+\setcounter{subfigure}{0}
+\setcounter{subtable}{0}
+\setcounter{float@type}{8}
+\setcounter{tblrcount}{5}
+\setcounter{section@level}{0}
+\setcounter{Item}{6}
+\setcounter{Hfootnote}{0}
+\setcounter{bookmark@seq@number}{28}
+\setcounter{tabx@nest}{0}
+\setcounter{listtotal}{0}
+\setcounter{listcount}{0}
+\setcounter{liststart}{0}
+\setcounter{liststop}{0}
+\setcounter{citecount}{0}
+\setcounter{citetotal}{0}
+\setcounter{multicitecount}{0}
+\setcounter{multicitetotal}{0}
+\setcounter{instcount}{4}
+\setcounter{maxnames}{2}
+\setcounter{minnames}{1}
+\setcounter{maxitems}{3}
+\setcounter{minitems}{1}
+\setcounter{citecounter}{0}
+\setcounter{maxcitecounter}{0}
+\setcounter{savedcitecounter}{0}
+\setcounter{uniquelist}{0}
+\setcounter{uniquename}{0}
+\setcounter{refsection}{0}
+\setcounter{refsegment}{0}
+\setcounter{maxextratitle}{0}
+\setcounter{maxextratitleyear}{0}
+\setcounter{maxextraname}{2}
+\setcounter{maxextradate}{0}
+\setcounter{maxextraalpha}{0}
+\setcounter{abbrvpenalty}{50}
+\setcounter{highnamepenalty}{50}
+\setcounter{lownamepenalty}{25}
+\setcounter{maxparens}{3}
+\setcounter{parenlevel}{0}
+\setcounter{blx@maxsection}{0}
+\setcounter{mincomprange}{10}
+\setcounter{maxcomprange}{100000}
+\setcounter{mincompwidth}{1}
+\setcounter{afterword}{0}
+\setcounter{savedafterword}{0}
+\setcounter{annotator}{0}
+\setcounter{savedannotator}{0}
+\setcounter{author}{0}
+\setcounter{savedauthor}{0}
+\setcounter{bookauthor}{0}
+\setcounter{savedbookauthor}{0}
+\setcounter{commentator}{0}
+\setcounter{savedcommentator}{0}
+\setcounter{editor}{0}
+\setcounter{savededitor}{0}
+\setcounter{editora}{0}
+\setcounter{savededitora}{0}
+\setcounter{editorb}{0}
+\setcounter{savededitorb}{0}
+\setcounter{editorc}{0}
+\setcounter{savededitorc}{0}
+\setcounter{foreword}{0}
+\setcounter{savedforeword}{0}
+\setcounter{holder}{0}
+\setcounter{savedholder}{0}
+\setcounter{introduction}{0}
+\setcounter{savedintroduction}{0}
+\setcounter{namea}{0}
+\setcounter{savednamea}{0}
+\setcounter{nameb}{0}
+\setcounter{savednameb}{0}
+\setcounter{namec}{0}
+\setcounter{savednamec}{0}
+\setcounter{translator}{0}
+\setcounter{savedtranslator}{0}
+\setcounter{shortauthor}{0}
+\setcounter{savedshortauthor}{0}
+\setcounter{shorteditor}{0}
+\setcounter{savedshorteditor}{0}
+\setcounter{labelname}{0}
+\setcounter{savedlabelname}{0}
+\setcounter{institution}{0}
+\setcounter{savedinstitution}{0}
+\setcounter{lista}{0}
+\setcounter{savedlista}{0}
+\setcounter{listb}{0}
+\setcounter{savedlistb}{0}
+\setcounter{listc}{0}
+\setcounter{savedlistc}{0}
+\setcounter{listd}{0}
+\setcounter{savedlistd}{0}
+\setcounter{liste}{0}
+\setcounter{savedliste}{0}
+\setcounter{listf}{0}
+\setcounter{savedlistf}{0}
+\setcounter{location}{0}
+\setcounter{savedlocation}{0}
+\setcounter{organization}{0}
+\setcounter{savedorganization}{0}
+\setcounter{origlocation}{0}
+\setcounter{savedoriglocation}{0}
+\setcounter{origpublisher}{0}
+\setcounter{savedorigpublisher}{0}
+\setcounter{publisher}{0}
+\setcounter{savedpublisher}{0}
+\setcounter{language}{0}
+\setcounter{savedlanguage}{0}
+\setcounter{origlanguage}{0}
+\setcounter{savedoriglanguage}{0}
+\setcounter{pageref}{0}
+\setcounter{savedpageref}{0}
+\setcounter{textcitecount}{0}
+\setcounter{textcitetotal}{0}
+\setcounter{textcitemaxnames}{0}
+\setcounter{biburlbigbreakpenalty}{100}
+\setcounter{biburlbreakpenalty}{200}
+\setcounter{biburlnumpenalty}{0}
+\setcounter{biburlucpenalty}{0}
+\setcounter{biburllcpenalty}{0}
+\setcounter{smartand}{1}
+\setcounter{bbx:relatedcount}{0}
+\setcounter{bbx:relatedtotal}{0}
+\setcounter{lstlisting}{1}
+}

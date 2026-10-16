@@ -1,0 +1,34 @@
+\graphicspath{{img/}}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+\titleformat{\chapter}[display]
+  {\bfseries\Large}
+  {\filright\MakeUppercase{\chaptertitlename} \Huge\thechapter}
+  {1ex}
+  {\titlerule\vspace{1ex}\filleft}
+  [\vspace{1ex}\titlerule]
+\titleformat*{\section}{\LARGE\bfseries}
+\titleformat*{\subsection}{\Large\bfseries}
+\titleformat*{\subsubsection}{\large\bfseries}
+\renewcommand{\theequation}{\thechapter.\arabic{equation}}
+\numberwithin{subsection}{section}
+\setlength{\headheight}{17pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\textbf{\nouppercase{\rightmark}}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\DefTblrTemplate{contfoot-text}{default}{Tiếp tục ở trang sau}
+\DefTblrTemplate{conthead-text}{default}{(Tiếp theo)}
+\titlecontents{chapter}
+  [0pt]
+  {\addvspace{2pt}}
+  {\bfseries\chaptername\ \thecontentslabel\quad}
+  {\bfseries}
+  {\bfseries\hfill\contentspage}
+\setlength{\emergencystretch}{2em}
+\widowpenalty=10000
+\clubpenalty=10000
+\raggedbottom
+\setlist[itemize]{itemsep=2pt, topsep=4pt}
+\setlist[enumerate]{itemsep=2pt, topsep=4pt}

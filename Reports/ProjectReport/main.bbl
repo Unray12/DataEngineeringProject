@@ -1,0 +1,138 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global/global}
+    \entry{kleppmann2017ddia}{book}{}{}
+      \name{author}{1}{}{%
+        {{hash=34b8d5b1d29d175527a6642f3ec8a76d}{%
+           family={Kleppmann},
+           familyi={K\bibinitperiod},
+           given={Martin},
+           giveni={M\bibinitperiod}}}%
+      }
+      \list{location}{1}{%
+        {Sebastopol, CA, USA}%
+      }
+      \list{publisher}{1}{%
+        {O'Reilly Media}%
+      }
+      \strng{namehash}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{fullhash}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{fullhashraw}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{bibnamehash}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{authorbibnamehash}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{authornamehash}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{authorfullhash}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \strng{authorfullhashraw}{34b8d5b1d29d175527a6642f3ec8a76d}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{edition}{1st}
+      \field{title}{Designing Data-Intensive Applications: The Big Ideas Behind Reliable, Scalable, and Maintainable Systems}
+      \field{year}{2017}
+    \endentry
+    \entry{conduktor_microbatch}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=64cf79ab42aee35d4dd1f4cc61ab5d9f}{%
+           family={{Conduktor}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{fullhash}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{fullhashraw}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{bibnamehash}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{authorbibnamehash}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{authornamehash}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{authorfullhash}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \strng{authorfullhashraw}{64cf79ab42aee35d4dd1f4cc61ab5d9f}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{Conduktor Glossary}
+      \field{note}{Truy cập: 10/2026}
+      \field{title}{Micro-Batching: Near-Real-Time Stream Processing}
+      \verb{urlraw}
+      \verb https://www.conduktor.io/glossary/micro-batching-streaming
+      \endverb
+      \verb{url}
+      \verb https://www.conduktor.io/glossary/micro-batching-streaming
+      \endverb
+    \endentry
+    \entry{kafka_docs}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=8b499b5be8914246b406785e1327dbb3}{%
+           family={{Apache Software Foundation}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{fullhash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{fullhashraw}{8b499b5be8914246b406785e1327dbb3}
+      \strng{bibnamehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authorbibnamehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authornamehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authorfullhash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authorfullhashraw}{8b499b5be8914246b406785e1327dbb3}
+      \field{extraname}{1}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Apache Kafka Documentation}
+      \verb{urlraw}
+      \verb https://kafka.apache.org/documentation/
+      \endverb
+      \verb{url}
+      \verb https://kafka.apache.org/documentation/
+      \endverb
+    \endentry
+    \entry{spark_ss}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=8b499b5be8914246b406785e1327dbb3}{%
+           family={{Apache Software Foundation}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{fullhash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{fullhashraw}{8b499b5be8914246b406785e1327dbb3}
+      \strng{bibnamehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authorbibnamehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authornamehash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authorfullhash}{8b499b5be8914246b406785e1327dbb3}
+      \strng{authorfullhashraw}{8b499b5be8914246b406785e1327dbb3}
+      \field{extraname}{2}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{Apache Spark Documentation}
+      \field{title}{Structured Streaming Programming Guide}
+      \verb{urlraw}
+      \verb https://spark.apache.org/docs/latest/streaming/
+      \endverb
+      \verb{url}
+      \verb https://spark.apache.org/docs/latest/streaming/
+      \endverb
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+

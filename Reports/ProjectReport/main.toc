@@ -1,0 +1,72 @@
+\contentsline {chapter}{Danh mục từ viết tắt}{vii}{chapter*.4}%
+\contentsline {chapter}{\numberline {1}GIỚI THIỆU TỔNG QUAN}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Bối cảnh đề tài}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Mục tiêu của đề tài}{1}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Phạm vi của đề tài}{1}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Phân công công việc}{1}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Bố cục báo cáo}{1}{section.1.5}%
+\contentsline {chapter}{\numberline {2}CƠ SỞ LÝ THUYẾT}{2}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Thách thức của xử lý luồng thuần túy}{2}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Khôi phục trạng thái đang xử lý}{2}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Ghi trùng khi ghi dở dang}{2}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}Độ phức tạp trạng thái ở mức dưới một giây}{3}{subsection.2.1.3}%
+\contentsline {section}{\numberline {2.2}Khái niệm xử lý micro-batch}{3}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Cơ chế hoạt động}{3}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Kiến trúc pipeline}{3}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Vòng đời xử lý của một micro-batch}{4}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Chu kỳ trigger và ví dụ dữ liệu nông nghiệp}{4}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}Độ tin cậy: phục hồi sau lỗi và dữ liệu đến muộn}{4}{subsection.2.3.4}%
+\contentsline {paragraph}{Phục hồi sau lỗi.}{4}{paragraph*.8}%
+\contentsline {paragraph}{Dữ liệu đến muộn.}{5}{paragraph*.9}%
+\contentsline {paragraph}{Điều kiện exactly-once.}{5}{paragraph*.10}%
+\contentsline {section}{\numberline {2.4}Công nghệ hiện thực}{5}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Apache Kafka làm nguồn dữ liệu}{5}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Spark Structured Streaming}{5}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Checkpoint}{6}{subsection.2.4.3}%
+\contentsline {subsection}{\numberline {2.4.4}Ví dụ mã nguồn}{6}{subsection.2.4.4}%
+\contentsline {section}{\numberline {2.5}So sánh, trường hợp sử dụng và đánh đổi}{7}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}So sánh ba mô hình xử lý}{7}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Trường hợp sử dụng}{7}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}Được và mất}{8}{subsection.2.5.3}%
+\contentsline {subsection}{\numberline {2.5.4}Liên hệ với đề tài}{8}{subsection.2.5.4}%
+\contentsline {chapter}{\numberline {3}PHÂN TÍCH YÊU CẦU VÀ DỮ LIỆU}{9}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Lĩnh vực ứng dụng: giám sát nông nghiệp}{10}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Các bên liên quan}{10}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Yêu cầu nghiệp vụ}{10}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Nhu cầu sử dụng dữ liệu}{11}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Nguồn dữ liệu và đặc trưng dữ liệu}{11}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Nguồn dữ liệu}{11}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Đặc trưng dữ liệu}{11}{subsection.3.5.2}%
+\contentsline {section}{\numberline {3.6}Ánh xạ yêu cầu nghiệp vụ sang yêu cầu xử lý dữ liệu}{11}{section.3.6}%
+\contentsline {chapter}{\numberline {4}THIẾT KẾ GIẢI PHÁP VÀ HIỆN THỰC ỨNG DỤNG}{12}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Kiến trúc tổng thể}{13}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Công nghệ quản lý dữ liệu}{13}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Công nghệ xử lý dữ liệu}{13}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Thiết kế mô hình dữ liệu}{13}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Pipeline micro-batch theo từng yêu cầu nghiệp vụ}{13}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}BR01 -- Tập trung hóa giám sát nông nghiệp}{13}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}BR02 -- Nâng cao nhận biết điều kiện đồng ruộng}{13}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}BR03 -- Duy trì tính liên tục của giám sát}{13}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}BR04 -- Thiết lập dữ liệu đáng tin cậy}{13}{subsection.4.5.4}%
+\contentsline {subsection}{\numberline {4.5.5}BR05 -- Hỗ trợ quản lý dựa trên dữ liệu}{13}{subsection.4.5.5}%
+\contentsline {subsection}{\numberline {4.5.6}BR06 -- Đánh giá lịch sử và lập kế hoạch}{13}{subsection.4.5.6}%
+\contentsline {subsection}{\numberline {4.5.7}BR07 -- Làm cho thông tin dễ tiếp cận}{13}{subsection.4.5.7}%
+\contentsline {subsection}{\numberline {4.5.8}BR08 -- Hỗ trợ ứng phó sớm với rủi ro}{13}{subsection.4.5.8}%
+\contentsline {section}{\numberline {4.6}Giải pháp thay thế để so sánh}{13}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Hiện thực ứng dụng}{13}{section.4.7}%
+\contentsline {subsection}{\numberline {4.7.1}Mô phỏng và thu thập dữ liệu}{13}{subsection.4.7.1}%
+\contentsline {subsection}{\numberline {4.7.2}Giao diện người dùng}{13}{subsection.4.7.2}%
+\contentsline {subsection}{\numberline {4.7.3}Triển khai và cấu hình}{13}{subsection.4.7.3}%
+\contentsline {chapter}{\numberline {5}ĐÁNH GIÁ}{14}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Thiết lập thực nghiệm}{14}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Tính đúng đắn của dữ liệu}{14}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Hiệu năng của giải pháp}{14}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Hiệu quả hỗ trợ khai thác dữ liệu qua ứng dụng}{14}{section.5.4}%
+\contentsline {section}{\numberline {5.5}So sánh với giải pháp thay thế}{14}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Thảo luận}{14}{section.5.6}%
+\contentsline {chapter}{\numberline {6}KẾT LUẬN}{15}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Kết quả đạt được}{15}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Hạn chế}{15}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Hướng phát triển}{15}{section.6.3}%
+\contentsline {chapter}{Tài liệu tham khảo}{16}{chapter*.14}%
+\contentsfinish 
