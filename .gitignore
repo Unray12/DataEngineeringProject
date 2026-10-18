@@ -1,1 +1,32 @@
 .claude/
+
+# Local environment and editor files
+.env
+.DS_Store
+
+# Python environments, caches, and build artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# Generated LaTeX report artifacts
+Reports/ProjectReport/**/*.aux
+Reports/ProjectReport/**/*.bbl
+Reports/ProjectReport/**/*.bcf
+Reports/ProjectReport/**/*.blg
+Reports/ProjectReport/**/*.lof
+Reports/ProjectReport/**/*.lot
+Reports/ProjectReport/**/*.out
+Reports/ProjectReport/**/*.pdf
+Reports/ProjectReport/**/*.run.xml
+Reports/ProjectReport/**/*.toc
