@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  Client-side HDFS configuration, shared by every service in the platform:
+  NameNode, DataNode, Spark, Hive Metastore and Trino.
+
+  The NameNode bootstrap script turns `fs.defaultFS` into the host:port pair it
+  must bind and advertise, so a single value drives the whole cluster.
+-->
+<configuration>
+
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://namenode:8020</value>
+  </property>
+
+  <!-- Hadoop 3 RPC + web ports. The bootstrap script reads these out of this
+       file so the daemon and the advertised address never drift apart. -->
+  <property>
+    <name>dfs.namenode.rpc-address</name>
+    <value>namenode:8020</value>
+  </property>
+
+  <!-- Pseudo-distributed Compose setup: resolve DataNodes by IP so the NameNode
+       can reach container addresses directly. -->
+  <property>
+    <name>dfs.client.use.datanode.hostname</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.datanode.registration.ip-hostname-check</name>
+    <value>false</value>
+  </property>
+
+  <!-- Containers run as different UIDs (hadoop=1000, spark=185, hive=1000);
+       POSIX permissions would otherwise break cross-service access. -->
+  <property>
+    <name>dfs.permissions.enabled</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/tmp/hadoop</value>
+  </property>
+
+</configuration>
