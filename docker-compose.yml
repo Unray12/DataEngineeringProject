@@ -1,0 +1,457 @@
+# Docker Compose for the agriculture data engineering platform.
+#
+# Profiles (see `just up-*` recipes):
+#   core        HDFS + Kafka + Hive Metastore + Trino + ingest   (needed by everything)
+#   processing  Spark job runners (streaming, batch, dbt-spark, tests)
+#   serving     Cassandra + FastAPI
+#   app         web frontend (planned; the API is the only data source)
+#
+# Rule from AGENTS.md: each profile runs on its own. `core` never depends on
+# `serving`.
+
+name: ${COMPOSE_PROJECT_NAME:-agri-platform}
+
+x-hadoop-conf: &hadoop-conf ./hadoop/conf:/opt/hadoop/conf:ro
+
+x-hadoop-env: &hadoop-env
+  HADOOP_CONF_DIR: /opt/hadoop/conf
+  HADOOP_HOME: /opt/hadoop
+  HDFS_NAMENODE_URI: ${HDFS_NAMENODE_URI:-hdfs://namenode:8020}
+  HIVE_METASTORE_URI: ${HIVE_METASTORE_URI:-thrift://hive-metastore:9083}
+
+x-spark-env: &spark-env
+  # --- Spark session ---
+  SPARK_MASTER: ${SPARK_MASTER:-local[*]}
+  SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-2g}
+  SPARK_DRIVER_CORES: ${SPARK_DRIVER_CORES:-4}
+  SPARK_SHUFFLE_PARTITIONS: ${SPARK_SHUFFLE_PARTITIONS:-4}
+  # --- Iceberg catalog + warehouse (HDFS) ---
+  SPARK_CATALOG: lakehouse
+  SPARK_WAREHOUSE: ${HDFS_WAREHOUSE_PATH:-/warehouse}
+  SPARK_HIVE_METASTORE_URIS: ${HIVE_METASTORE_URI:-thrift://hive-metastore:9083}
+  SPARK_ICEBERG_VERSION: ${ICEBERG_VERSION:-1.7.1}
+  # --- Kafka ---
+  KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka:29092}
+  KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-sensor.readings.v1}
+  # --- Streaming ---
+  TRIGGER_INTERVAL: ${TRIGGER_INTERVAL:-30s}
+  STARTING_OFFSETS: ${STARTING_OFFSETS:-earliest}
+  MAX_OFFSETS_PER_TRIGGER: ${MAX_OFFSETS_PER_TRIGGER:-20000}
+  WATERMARK_S: ${WATERMARK_S:-3600}
+  LATE_AFTER_S: ${LATE_AFTER_S:-600}
+  CHECKPOINT_ROOT: ${CHECKPOINT_ROOT:-sensor_pipeline}
+  CHECKPOINT_URI: ${HDFS_NAMENODE_URI:-hdfs://namenode:8020}${HDFS_CHECKPOINTS_PATH:-/checkpoints}
+  # --- Cassandra ---
+  CASSANDRA_CONTACT_POINTS: ${CASSANDRA_CONTACT_POINTS:-cassandra:9042}
+  CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-agri}
+  CASSANDRA_WAIT_S: ${CASSANDRA_WAIT_S:-180}
+  # --- Alerts + quality rules (FR4.2, FR8.1, FR8.2, FR8.5) ---
+  ALERT_DEBOUNCE_BATCHES: ${ALERT_DEBOUNCE_BATCHES:-2}
+  ALERT_COOLDOWN_S: ${ALERT_COOLDOWN_S:-300}
+  DEVICE_OFFLINE_MULTIPLIER: ${DEVICE_OFFLINE_MULTIPLIER:-4}
+  BATTERY_LOW_PCT: ${BATTERY_LOW_PCT:-20}
+  SIGNAL_POOR_MAX: ${SIGNAL_POOR_MAX:-0.3}
+  # --- Master data + Trino ---
+  REFERENCE_DATA_PATH: ${REFERENCE_DATA_PATH:-/app/reference/reference_data.json}
+  TRINO_URI: ${TRINO_URI:-trino://trino:8080}
+  TRINO_CATALOG: ${TRINO_CATALOG:-lakehouse}
+  TRINO_SCHEMA: ${TRINO_SCHEMA:-gold}
+  TRINO_USER: ${TRINO_USER:-agri}
+  HADOOP_CONF_DIR: /opt/hadoop/conf
+  HADOOP_HOME: /opt/hadoop
+  PYTHONPATH: /app/common/src:/app/streaming/src:/app/batch/src
+
+x-spark-build: &spark-build
+  context: .
+  dockerfile: images/spark/Dockerfile
+  args:
+    SPARK_VERSION: ${SPARK_VERSION:-3.5.3}
+    ICEBERG_VERSION: ${ICEBERG_VERSION:-1.7.1}
+
+services:
+  # =========================================================================
+  # core: storage, messaging, catalog, query engine and the ingest edge
+  # =========================================================================
+
+  namenode:
+    profiles: ["core"]
+    image: apache/hadoop:3.3.6
+    # Apache Hadoop 3.3.6 publishes amd64 here; run it explicitly through
+    # Docker Desktop/OrbStack emulation on Apple Silicon.
+    platform: linux/amd64
+    hostname: namenode
+    # The image ships an entrypoint that runs daemons as uid 1000, which cannot
+    # write to the root-owned named volumes. The bootstrap script is run as
+    # root instead; HDFS itself still authenticates nobody (dfs.permissions).
+    user: "0:0"
+    entrypoint: ["/bin/bash", "/opt/dep/bootstrap-namenode.sh"]
+    environment:
+      <<: *hadoop-env
+      HADOOP_NAMENODE_HEAP_MB: ${HADOOP_NAMENODE_HEAP_MB:-1024}
+      HDFS_WAREHOUSE_PATH: ${HDFS_WAREHOUSE_PATH:-/warehouse}
+      HDFS_CHECKPOINTS_PATH: ${HDFS_CHECKPOINTS_PATH:-/checkpoints}
+      HDFS_DBT_PATH: ${HDFS_DBT_PATH:-/dbt}
+      HDFS_NAMENODE_HTTP_PORT: ${HDFS_NAMENODE_HTTP_PORT:-9870}
+    volumes:
+      - *hadoop-conf
+      - ./hadoop/scripts:/opt/dep:ro
+      - namenode-name:/var/lib/hadoop/name
+    ports:
+      - "${HDFS_NAMENODE_HTTP_PORT:-9870}:9870"
+    healthcheck:
+      test: ["CMD-SHELL", "bash /opt/dep/healthcheck-namenode.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 20s
+    networks: ["platform"]
+
+  datanode:
+    profiles: ["core"]
+    image: apache/hadoop:3.3.6
+    platform: linux/amd64
+    user: "0:0"
+    entrypoint: ["/bin/bash", "/opt/dep/bootstrap-datanode.sh"]
+    environment:
+      <<: *hadoop-env
+      HADOOP_DATANODE_HEAP_MB: ${HADOOP_DATANODE_HEAP_MB:-512}
+    volumes:
+      - *hadoop-conf
+      - ./hadoop/scripts:/opt/dep:ro
+      - datanode-data:/var/lib/hadoop/data
+    depends_on:
+      namenode:
+        condition: service_healthy
+    networks: ["platform"]
+
+  kafka:
+    profiles: ["core"]
+    image: apache/kafka:3.8.0
+    environment:
+      # Single-node KRaft: one process is both broker and controller.
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # INTERNAL is used inside the Compose network, PLAINTEXT_HOST from the host.
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+      # Single broker: every replication factor must be 1.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_NUM_PARTITIONS: ${KAFKA_TOPIC_PARTITIONS:-3}
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx768m}
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    ports:
+      - "${KAFKA_EXTERNAL_PORT:-9092}:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 20s
+    networks: ["platform"]
+
+  # HTTP push receiver: sensors/gateways POST readings, this writes them to Kafka
+  # (AGENTS.md ingestion decision). It validates nothing; the streaming job
+  # quarantines malformed documents with full lineage (FR4.1).
+  ingest:
+    profiles: ["core"]
+    build:
+      context: .
+      dockerfile: images/service/Dockerfile
+    image: agri/service:latest
+    command: ["python", "-m", "ingest"]
+    environment:
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka:29092}
+      KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-sensor.readings.v1}
+      INGEST_PORT: ${INGEST_PORT:-8081}
+    ports:
+      - "${INGEST_PORT:-8081}:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8081/health')\""]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+    networks: ["platform"]
+
+  hive-metastore:
+    profiles: ["core"]
+    platform: linux/amd64
+    # The named volume holding the Derby metastore is root-owned on first use;
+    # run the service as root so it can create /opt/hive/data/metastore_db
+    # (same volume-ownership workaround as the NameNode/DataNode).
+    user: "0:0"
+    build:
+      context: ./images/hive-metastore
+      args:
+        ICEBERG_VERSION: ${ICEBERG_VERSION:-1.7.1}
+    image: agri/hive-metastore:3.1.3-iceberg1.7.1
+    environment:
+      SERVICE_NAME: metastore
+      SERVICE_OPTS: >-
+        -Dhive.metastore.schema.verification=true
+        -Dhive.metastore.schema.verification.record.version=false
+        -Dhive.metastore.warehouse.dir=${HDFS_NAMENODE_URI:-hdfs://namenode:8020}${HDFS_WAREHOUSE_PATH:-/warehouse}
+        -Dhive.metastore.uris=
+        -Dmetastore.thrift.port=${HIVE_METASTORE_PORT:-9083}
+        -Dhive.metastore.event.db.notification.api.auth=false
+        -Djavax.jdo.option.ConnectionURL=jdbc:derby:;databaseName=/opt/hive/data/metastore_db;create=true
+        -Djavax.jdo.option.ConnectionDriverName=org.apache.derby.jdbc.EmbeddedDriver
+        -Djavax.jdo.option.ConnectionUserName=APP
+        -Djavax.jdo.option.ConnectionPassword=mine
+        -Dfs.defaultFS=${HDFS_NAMENODE_URI:-hdfs://namenode:8020}
+      HADOOP_HEAPSIZE: ${HIVE_METASTORE_HEAP:-1024}
+      HADOOP_CLIENT_OPTS: -Dhive.metastore.event.db.notification.api.auth=false
+      <<: *hadoop-env
+    volumes:
+      - *hadoop-conf
+      - hive-metastore-db:/opt/hive/data
+    ports:
+      - "${HIVE_METASTORE_PORT:-9083}:9083"
+    depends_on:
+      namenode:
+        condition: service_healthy
+      datanode:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9083' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 60s
+    networks: ["platform"]
+
+  trino:
+    profiles: ["core"]
+    image: trinodb/trino:438
+    volumes:
+      - ./trino/config.properties:/etc/trino/config.properties:ro
+      - ./trino/node.properties:/etc/trino/node.properties:ro
+      - ./trino/jvm.config:/etc/trino/jvm.config:ro
+      - ./trino/catalog:/etc/trino/catalog:ro
+      - ./hadoop/conf:/etc/hadoop/conf:ro
+    ports:
+      - "${TRINO_PORT:-8080}:8080"
+    depends_on:
+      hive-metastore:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/info >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 30s
+    networks: ["platform"]
+
+  # =========================================================================
+  # processing: Spark job runners and the simulator
+  # =========================================================================
+
+  # One-off runner for the streaming micro-batch job (`just run-stream`).
+  spark-stream:
+    profiles: ["processing"]
+    build: *spark-build
+    image: agri/spark:3.5.3
+    command: ["python", "-m", "streaming"]
+    environment:
+      <<: *spark-env
+    volumes:
+      - *hadoop-conf
+      - ./common:/app/common:ro
+      - ./streaming:/app/streaming:ro
+      - ./batch:/app/batch:ro
+      - ./reference:/app/reference:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      hive-metastore:
+        condition: service_healthy
+    networks: ["platform"]
+
+  # One-off runner for batch helpers (`just lakehouse-init`); default command
+  # creates the medallion namespaces.
+  spark-batch:
+    profiles: ["processing"]
+    build: *spark-build
+    image: agri/spark:3.5.3
+    command: ["python", "-m", "batch.iceberg_init"]
+    environment:
+      <<: *spark-env
+    volumes:
+      - *hadoop-conf
+      - ./common:/app/common:ro
+      - ./streaming:/app/streaming:ro
+      - ./batch:/app/batch:ro
+      - ./reference:/app/reference:ro
+    depends_on:
+      hive-metastore:
+        condition: service_healthy
+    networks: ["platform"]
+
+  # dbt runs bronze -> silver -> gold on Iceberg through the Spark Thrift Server
+  # (deferred: see README "Deferred work").
+  dbt:
+    profiles: ["processing"]
+    build: *spark-build
+    image: agri/spark:3.5.3
+    command: ["dbt", "build", "--project-dir", "/app/dbt", "--profiles-dir", "/app/dbt"]
+    environment:
+      <<: *spark-env
+    volumes:
+      - *hadoop-conf
+      - ./dbt:/app/dbt
+      - ./reference:/app/reference:ro
+    depends_on:
+      hive-metastore:
+        condition: service_healthy
+    networks: ["platform"]
+
+  # Test runner (`just test`): replays fixtures against the live stack.
+  spark-tests:
+    profiles: ["processing"]
+    build: *spark-build
+    image: agri/spark:3.5.3
+    command: ["pytest", "-v", "/app/tests"]
+    environment:
+      <<: *spark-env
+    volumes:
+      - *hadoop-conf
+      - ./common:/app/common:ro
+      - ./streaming:/app/streaming:ro
+      - ./batch:/app/batch:ro
+      - ./reference:/app/reference:ro
+      - ./tests:/app/tests:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      hive-metastore:
+        condition: service_healthy
+    networks: ["platform"]
+
+  # Sensor/gateway simulator: pushes readings through the HTTP ingest service
+  # (`just run-simulator`). Run in the foreground; stop with Ctrl-C.
+  simulator:
+    profiles: ["processing"]
+    build:
+      context: .
+      dockerfile: images/service/Dockerfile
+    image: agri/service:latest
+    command: ["python", "-m", "simulator"]
+    environment:
+      SIM_TRANSPORT: ${SIM_TRANSPORT:-http}
+      INGEST_URL: ${INGEST_URL:-http://ingest:8081}
+      KAFKA_BOOTSTRAP_HOST: ${KAFKA_BOOTSTRAP:-kafka:29092}
+      KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-sensor.readings.v1}
+      REFERENCE_DATA_PATH: ${REFERENCE_DATA_PATH:-/app/reference/reference_data.json}
+      SIM_RATE_HZ: ${SIM_RATE_HZ:-1}
+      SIM_DURATION_SECONDS: ${SIM_DURATION_SECONDS:-0}
+      SIM_SEED: ${SIM_SEED:-42}
+      SIM_FAULT_RATE: ${SIM_FAULT_RATE:-0.05}
+      SIM_GAP_RATE: ${SIM_GAP_RATE:-0.002}
+      SIM_GAP_SECONDS_MIN: ${SIM_GAP_SECONDS_MIN:-45}
+      SIM_GAP_SECONDS_MAX: ${SIM_GAP_SECONDS_MAX:-90}
+    volumes:
+      - ./reference:/app/reference:ro
+    depends_on:
+      ingest:
+        condition: service_healthy
+    networks: ["platform"]
+
+  # =========================================================================
+  # serving: Cassandra + FastAPI
+  # =========================================================================
+
+  cassandra:
+    profiles: ["serving"]
+    image: cassandra:5.0.3
+    environment:
+      MAX_HEAP_SIZE: ${CASSANDRA_HEAP:-1G}
+      HEAP_NEWSIZE: 128M
+      CASSANDRA_NUM_TOKENS: ${CASSANDRA_NUM_TOKENS:-16}
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      CASSANDRA_DC: dc1
+      CASSANDRA_RACK: rack1
+      # Single node: no other node can own half the ring.
+      CASSANDRA_NUM_FAILURES: 1000
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    ports:
+      - "${CASSANDRA_PORT:-9042}:9042"
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' 127.0.0.1 9042 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 20s
+      retries: 20
+      start_period: 60s
+    networks: ["platform"]
+
+  # Applies cassandra/schema.cql once, then exits.
+  cassandra-init:
+    profiles: ["serving"]
+    image: cassandra:5.0.3
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        echo "[cassandra-init] applying schema.cql"
+        cqlsh cassandra 9042 -f /schema/schema.cql
+        echo "[cassandra-init] done"
+    volumes:
+      - ./cassandra:/schema:ro
+    restart: "no"
+    networks: ["platform"]
+
+  api:
+    profiles: ["serving"]
+    build:
+      context: .
+      dockerfile: images/service/Dockerfile
+    image: agri/service:latest
+    command: ["python", "-m", "api"]
+    environment:
+      CASSANDRA_CONTACT_POINTS: ${CASSANDRA_CONTACT_POINTS:-cassandra:9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-agri}
+      CASSANDRA_WAIT_S: ${CASSANDRA_WAIT_S:-180}
+      REFERENCE_DATA_PATH: ${REFERENCE_DATA_PATH:-/app/reference/reference_data.json}
+      API_PORT: ${API_PORT:-8000}
+    volumes:
+      - ./reference:/app/reference:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      cassandra-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health/ready')\""]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+    networks: ["platform"]
+
+networks:
+  platform:
+    driver: bridge
+
+volumes:
+  namenode-name:
+  datanode-data:
+  kafka-data:
+  hive-metastore-db:
+  cassandra-data:
