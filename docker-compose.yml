@@ -279,6 +279,8 @@ services:
         condition: service_healthy
       hive-metastore:
         condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
     networks: ["platform"]
 
   # One-off runner for batch helpers (`just lakehouse-init`); default command
@@ -375,7 +377,7 @@ services:
   # =========================================================================
 
   cassandra:
-    profiles: ["serving"]
+    profiles: ["processing", "serving"]
     image: cassandra:5.0.3
     environment:
       MAX_HEAP_SIZE: ${CASSANDRA_HEAP:-1G}
@@ -400,7 +402,7 @@ services:
 
   # Applies cassandra/schema.cql once, then exits.
   cassandra-init:
-    profiles: ["serving"]
+    profiles: ["processing", "serving"]
     image: cassandra:5.0.3
     depends_on:
       cassandra:

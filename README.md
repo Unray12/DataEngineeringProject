@@ -73,24 +73,150 @@ There is no Airflow, Prometheus or Grafana. Batch jobs are `just` recipes trigge
 
 ## Quick start
 
-> Target workflow. The compose file and justfile are still to be created.
+The local development stack runs through Docker Compose. Use the `justfile` as
+the entry point rather than invoking individual containers directly.
 
-Prerequisites: Docker, [`uv`](https://docs.astral.sh/uv/) and [`just`](https://github.com/casey/just).
+### Prerequisites
+
+- Docker Desktop, OrbStack, or another Docker Engine that supports Docker
+  Compose profiles
+- [`just`](https://github.com/casey/just)
+- [`uv`](https://docs.astral.sh/uv/) for local Python tooling and tests
+- At least 8 GB of memory available to Docker is recommended for HDFS,
+  Cassandra, Spark, Trino and the Hive Metastore
+
+Check the installation and make sure the Docker daemon is running:
 
 ```bash
-cp .env.example .env
-uv sync                # install Python dependencies from uv.lock
-just --list            # show all recipes
-just up-core           # Kafka, HDFS, Hive Metastore, Trino
-just up-serving        # Cassandra, FastAPI
-just run-simulator     # publish sensor events
-just run-stream        # start Spark micro-batch jobs
-just dbt-run           # build silver and gold models with dbt
-just dbt-test          # run dbt tests
-just compact           # compact small Iceberg files
+just init              # create .env from .env.example if it does not exist
+uv sync                # install local Python dependencies
+just doctor
 ```
 
-API docs once running: `http://localhost:8000/docs`
+`just init` never overwrites an existing `.env`. Adjust `.env` only for local
+resource limits, ports, or simulator settings; do not commit it.
+
+### Start the platform
+
+For a complete local run, start the profiles in this order:
+
+```bash
+just up-core           # HDFS, Kafka, Hive Metastore, Trino and ingest
+just up-serving        # Cassandra and FastAPI
+just up-processing     # build Spark, dbt, test and simulator images
+just lakehouse-init    # create Iceberg namespaces and streaming tables
+```
+
+`just up` is a convenience command that starts the core and serving profiles
+and builds the processing images. The explicit commands above make it easier
+to identify which stage failed.
+
+Check the running services with:
+
+```bash
+just ps
+just ingest-check
+just hdfs-warehouse
+```
+
+API documentation is available at <http://localhost:8000/docs>. Other useful
+local endpoints are the Trino UI at <http://localhost:8080> and the HDFS
+NameNode UI at <http://localhost:9870>.
+
+### Run the streaming demo
+
+Start Spark in the background, then send simulated readings through the normal
+HTTP ingest path:
+
+```bash
+just run-stream-bg          # default: 30-second micro-batches
+just sim-for 60             # send readings for 60 seconds
+just verify-pipeline        # query Cassandra and bronze Iceberg outputs
+```
+
+For a faster development loop, override the trigger and maximum Kafka records
+per batch with positional arguments:
+
+```bash
+just run-stream-bg 10s 20000
+just sim-for 30
+```
+
+The stream writes near real-time results to Cassandra and raw, validated
+records to HDFS/Iceberg. `just verify-pipeline` reports counts from both sink
+families, including quarantined records and quality flags.
+
+To follow the Spark logs or stop the stream:
+
+```bash
+just logs spark-stream
+just stop-stream
+```
+
+The simulator injects faults by default. This is intentional: malformed,
+unknown or out-of-range readings should be visible in the quarantine and
+quality-count tables rather than stopping the streaming job.
+
+### Batch models and tests
+
+After bronze data exists, build and test the dbt models:
+
+```bash
+just dbt-run
+just dbt-test
+just compact bronze.sensor_readings
+```
+
+Run the pure-Python unit tests without the platform stack:
+
+```bash
+just test-unit
+```
+
+The containerised integration tests use the running stack:
+
+```bash
+just test
+```
+
+### Stop or reset the stack
+
+```bash
+just down                # stop containers; preserve volumes and data
+just clean               # stop containers and delete all Compose volumes
+```
+
+`just clean` is destructive. To replay Kafka data while preserving the
+lakehouse, remove only the Spark checkpoints:
+
+```bash
+just streaming-reset
+```
+
+To inspect or reset Kafka:
+
+```bash
+just kafka-topics
+just kafka-tail 10
+just kafka-reset         # deletes and recreates the sensor topic
+```
+
+After resetting Kafka or checkpoints, restart the stream before sending new
+simulator data.
+
+### Common startup issues
+
+- **Docker socket or daemon error:** start Docker Desktop or OrbStack, then
+  rerun `just doctor`.
+- **Missing `.env`:** run `just init`.
+- **Build permission prompt:** grant the Docker application filesystem access
+  to this repository, or approve the requested path in the Docker runtime.
+- **Stream cannot connect to Cassandra:** use `just run-stream-bg`, which
+  enables the core, processing and serving profiles and waits for the
+  Cassandra schema initializer.
+- **No rows in verification:** confirm that `spark-stream` is running with
+  `just ps`, send data with `just sim-for 60`, and allow at least one
+  micro-batch to complete.
 
 ## Planned API (examples)
 

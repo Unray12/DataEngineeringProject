@@ -190,7 +190,7 @@ compact table="bronze.sensor_readings":
 # Run the Spark Structured Streaming micro-batch job in the foreground
 run-stream trigger='' max_offsets='' reset_checkpoint='no':
     @just _hdfs-ready
-    {{compose}} --profile core --profile processing run --rm \
+    {{compose}} --profile core --profile processing --profile serving run --rm \
       -e TRIGGER_INTERVAL="{{trigger}}" \
       -e MAX_OFFSETS_PER_TRIGGER="{{max_offsets}}" \
       -e RESET_CHECKPOINT={{reset_checkpoint}} \
@@ -202,7 +202,7 @@ run-stream trigger='' max_offsets='' reset_checkpoint='no':
 run-stream-bg trigger='' max_offsets='':
     @just _hdfs-ready
     TRIGGER_INTERVAL="{{trigger}}" MAX_OFFSETS_PER_TRIGGER="{{max_offsets}}" \
-      {{compose}} --profile core --profile processing up -d spark-stream
+      {{compose}} --profile core --profile processing --profile serving up -d spark-stream
 
 # Stop the streaming job
 stop-stream:
@@ -219,7 +219,8 @@ sim-for seconds="60":
 
 # Check the ingest service health and the topic end offsets
 ingest-check:
-    @{{compose}} exec -T ingest curl -fsS http://localhost:8081/health
+    @{{compose}} exec -T ingest python -c \
+      "import urllib.request; print(urllib.request.urlopen('http://localhost:8081/health').read().decode())"
     @{{compose}} exec -T kafka /opt/kafka/bin/kafka-get-offsets.sh \
       --bootstrap-server ${KAFKA_BOOTSTRAP} --topic ${KAFKA_SENSOR_TOPIC}
 
@@ -326,4 +327,3 @@ bench-compaction:
 bench-replay:
     @echo "NOT IMPLEMENTED: kill/replay the streaming job, assert no loss/duplicates"
     @echo "implement benchmarks/run_replay_benchmark.py (record offsets, batch counts)"
-
