@@ -1,0 +1,86 @@
+{
+  "_comment": "Master (reference) data for the platform: farms, fields, devices, crop targets and metric definitions. Consumed by the simulator (what to simulate), the streaming job (device/field resolution, validation ranges, alert thresholds) and the API (farm -> field -> device hierarchy). This is master data, not sensor data.",
+  "farms": [
+    {"farm_id": "FM001", "name": "Suoi Tien Farm", "location": "HCMC"},
+    {"farm_id": "FM002", "name": "Tan Lap Farm", "location": "Dong Nai"},
+    {"farm_id": "FM003", "name": "Binh Minh Farm", "location": "Long An"},
+    {"farm_id": "FM004", "name": "My Tho Farm", "location": "Tien Giang"}
+  ],
+  "fields": [
+    {"field_id": "F001", "farm_id": "FM001", "name": "F001 North Paddy", "crop_code": "RICE", "area_ha": 2.4},
+    {"field_id": "F002", "farm_id": "FM001", "name": "F002 East Maize", "crop_code": "MAIZE", "area_ha": 1.8},
+    {"field_id": "F003", "farm_id": "FM002", "name": "F003 Tomato Glasshouse", "crop_code": "TOMATO", "area_ha": 0.9},
+    {"field_id": "F004", "farm_id": "FM003", "name": "F004 Coffee Slope", "crop_code": "COFFEE", "area_ha": 3.1},
+    {"field_id": "F005", "farm_id": "FM003", "name": "F005 South Paddy", "crop_code": "RICE", "area_ha": 2.7},
+    {"field_id": "F006", "farm_id": "FM004", "name": "F006 Riverbank Maize", "crop_code": "MAIZE", "area_ha": 1.5},
+    {"field_id": "F007", "farm_id": "FM004", "name": "F007 Shade Tomato", "crop_code": "TOMATO", "area_ha": 1.1},
+    {"field_id": "F008", "farm_id": "FM002", "name": "F008 Hill Coffee", "crop_code": "COFFEE", "area_ha": 2.2}
+  ],
+  "devices": [
+    {"device_id": "F001-S01", "field_id": "F001", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 92.0, "signal_quality": 0.91},
+    {"device_id": "F001-S02", "field_id": "F001", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 84.0, "signal_quality": 0.78},
+    {"device_id": "F001-S03", "field_id": "F001", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 76.0, "signal_quality": 0.83},
+    {"device_id": "F002-S01", "field_id": "F002", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 88.0, "signal_quality": 0.86},
+    {"device_id": "F002-S02", "field_id": "F002", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 71.0, "signal_quality": 0.74},
+    {"device_id": "F002-S03", "field_id": "F002", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 95.0, "signal_quality": 0.88},
+    {"device_id": "F003-S01", "field_id": "F003", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 67.0, "signal_quality": 0.69},
+    {"device_id": "F003-S02", "field_id": "F003", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 12.0, "signal_quality": 0.81},
+    {"device_id": "F003-S03", "field_id": "F003", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 80.0, "signal_quality": 0.77},
+    {"device_id": "F004-S01", "field_id": "F004", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 90.0, "signal_quality": 0.93},
+    {"device_id": "F004-S02", "field_id": "F004", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 62.0, "signal_quality": 0.72},
+    {"device_id": "F004-S03", "field_id": "F004", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 74.0, "signal_quality": 0.18},
+    {"device_id": "F005-S01", "field_id": "F005", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 86.0, "signal_quality": 0.85},
+    {"device_id": "F005-S02", "field_id": "F005", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 58.0, "signal_quality": 0.66},
+    {"device_id": "F005-S03", "field_id": "F005", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 82.0, "signal_quality": 0.79},
+    {"device_id": "F006-S01", "field_id": "F006", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 91.0, "signal_quality": 0.9},
+    {"device_id": "F006-S02", "field_id": "F006", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 69.0, "signal_quality": 0.75},
+    {"device_id": "F006-S03", "field_id": "F006", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 78.0, "signal_quality": 0.82},
+    {"device_id": "F007-S01", "field_id": "F007", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 87.0, "signal_quality": 0.84},
+    {"device_id": "F007-S02", "field_id": "F007", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 73.0, "signal_quality": 0.8},
+    {"device_id": "F007-S03", "field_id": "F007", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 64.0, "signal_quality": 0.7},
+    {"device_id": "F008-S01", "field_id": "F008", "metrics": ["soil_moisture", "soil_temperature"], "reporting_interval_s": 5, "battery_pct": 93.0, "signal_quality": 0.92},
+    {"device_id": "F008-S02", "field_id": "F008", "metrics": ["air_temperature", "relative_humidity"], "reporting_interval_s": 5, "battery_pct": 70.0, "signal_quality": 0.76},
+    {"device_id": "F008-S03", "field_id": "F008", "metrics": ["rainfall"], "reporting_interval_s": 5, "battery_pct": 85.0, "signal_quality": 0.87}
+  ],
+  "crops": [
+    {
+      "crop_code": "RICE",
+      "name": "Rice",
+      "targets": {
+        "soil_moisture": {"min": 30.0, "max": 60.0, "alert_below": 32.0},
+        "air_temperature": {"min": 10.0, "max": 38.0, "alert_below": 5.0, "alert_above": 38.0}
+      }
+    },
+    {
+      "crop_code": "MAIZE",
+      "name": "Maize",
+      "targets": {
+        "soil_moisture": {"min": 25.0, "max": 55.0, "alert_below": 28.0},
+        "air_temperature": {"min": 8.0, "max": 35.0, "alert_below": 3.0, "alert_above": 42.0}
+      }
+    },
+    {
+      "crop_code": "TOMATO",
+      "name": "Tomato",
+      "targets": {
+        "soil_moisture": {"min": 35.0, "max": 65.0, "alert_below": 35.0},
+        "air_temperature": {"min": 12.0, "max": 36.0, "alert_below": 4.0, "alert_above": 40.0}
+      }
+    },
+    {
+      "crop_code": "COFFEE",
+      "name": "Coffee",
+      "targets": {
+        "soil_moisture": {"min": 35.0, "max": 70.0, "alert_below": 40.0},
+        "air_temperature": {"min": 14.0, "max": 30.0, "alert_below": 8.0, "alert_above": 34.0}
+      }
+    }
+  ],
+  "metrics": [
+    {"metric": "soil_moisture", "unit": "%", "min": 0.0, "max": 100.0, "max_jump": 25.0, "description": "Volumetric water content of the topsoil"},
+    {"metric": "soil_temperature", "unit": "degC", "min": -10.0, "max": 50.0, "max_jump": 12.0, "description": "Soil temperature at 10 cm depth"},
+    {"metric": "air_temperature", "unit": "degC", "min": -30.0, "max": 60.0, "max_jump": 15.0, "description": "Air temperature at crop height"},
+    {"metric": "relative_humidity", "unit": "%", "min": 0.0, "max": 100.0, "max_jump": 30.0, "description": "Relative humidity of the air"},
+    {"metric": "rainfall", "unit": "mm/h", "min": 0.0, "max": 200.0, "max_jump": 40.0, "description": "Rainfall rate in the last hour"}
+  ]
+}
