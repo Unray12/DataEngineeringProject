@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
-    PYTHONPATH=/app/common/src:/app/streaming/src:/app/api/src:/app/ingest/src:/app/simulator/src
+    PYTHONPATH=/app/src
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
@@ -21,11 +21,7 @@ RUN uv export --locked --no-dev --no-emit-project --no-hashes --format requireme
     && rm /tmp/requirements*.txt
 
 # Shared code. `reference/` is master data, mounted read-only at runtime too.
-COPY common /app/common
-COPY streaming /app/streaming
-COPY api /app/api
-COPY ingest /app/ingest
-COPY simulator /app/simulator
+COPY src /app/src
 COPY reference /app/reference
 
 ENV REFERENCE_DATA_PATH=/app/reference/reference_data.json

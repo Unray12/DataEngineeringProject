@@ -40,7 +40,7 @@ ignore = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["common/src", "streaming/src", "batch/src", "api/src", "ingest/src", "simulator/src"]
+pythonpath = ["src"]
 markers = [
     "integration: needs the running Docker Compose stack",
     "slow: takes more than a few seconds",

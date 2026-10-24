@@ -61,12 +61,15 @@ Open decision: the web frontend framework (keep it thin; all data comes from Fas
 ├── pyproject.toml         # dependencies, managed with uv
 ├── uv.lock
 ├── .env.example
-├── simulator/             # LoRaWAN-style sensor and gateway payload generator, with fault injection
-├── ingest/                # HTTP push receiver → Kafka producer
-├── streaming/             # Spark micro-batch jobs (validation, Cassandra write, bronze write)
+├── src/                   # Unified Python source root
+│   ├── simulator/         # LoRaWAN-style sensor and gateway payload generator, with fault injection
+│   ├── ingest/            # HTTP push receiver → Kafka producer
+│   ├── streaming/         # Spark micro-batch jobs (validation, Cassandra write, bronze write)
+│   ├── batch/             # Iceberg initialization helpers
+│   ├── api/               # FastAPI application
+│   └── common/            # Shared reference-data helpers
 ├── dbt/                   # dbt project (dbt-spark): silver and gold models, tests, compaction macros, quality summary
 ├── cassandra/             # CQL schema
-├── api/                   # FastAPI app
 ├── web/                   # dashboards
 ├── benchmarks/            # scripts and results
 └── docs/

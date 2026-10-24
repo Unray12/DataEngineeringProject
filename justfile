@@ -282,7 +282,7 @@ test:
 # Pure-Python unit tests (eval rules), no containers needed
 test-unit:
     docker run --rm -v "${PWD}:/app" -w /app \
-      -e PYTHONPATH=/app/common/src:/app/streaming/src \
+      -e PYTHONPATH=/app/src \
       python:3.11-slim sh -c "pip install -q pytest && pytest -q tests/unit"
 
 # Lint with ruff
