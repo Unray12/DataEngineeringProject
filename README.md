@@ -98,6 +98,19 @@ resource limits, ports, or simulator settings; do not commit it.
 
 ### Start the platform
 
+On a new checkout, build the local images before starting the platform:
+
+```bash
+just build
+```
+
+Docker/OrbStack may ask for permission to read this repository during the
+first build. Grant read access to the project directory when prompted. Repeat
+`just build` after changing `pyproject.toml`, `uv.lock`, a Dockerfile, or any
+other image-level dependency. Python source changes under `src/` do not need a
+rebuild because the development containers mount that directory; restart the
+affected service or job after saving changes.
+
 For a complete local run, start the profiles in this order:
 
 ```bash
@@ -107,9 +120,20 @@ just up-processing     # build Spark, dbt, test and simulator images
 just lakehouse-init    # create Iceberg namespaces and streaming tables
 ```
 
-`just up` is a convenience command that starts the core and serving profiles
-and builds the processing images. The explicit commands above make it easier
-to identify which stage failed.
+The three profile commands can be replaced with the single convenience
+command:
+
+```bash
+just up
+just lakehouse-init
+```
+
+`just up` runs `up-core`, `up-serving`, and `up-processing` in order.
+`up-processing` builds the Spark, dbt, test and simulator images, so a new
+checkout may require Docker/OrbStack permission to read the repository.
+Running the individual commands remains useful when diagnosing a failed stage.
+Run `just build` separately when dependencies or Dockerfiles change and you
+want to rebuild all images explicitly.
 
 Check the running services with:
 
