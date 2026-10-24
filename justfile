@@ -62,12 +62,13 @@ up-serving:
     {{compose}} --profile core --profile serving up -d --wait
     @echo "serving is up -> http://localhost:${API_PORT}/docs"
 
-# Start the core + serving profiles
+# Start core, serving and processing profiles.
 up:
-    {{compose}} --profile core --profile serving up -d --wait
-    {{compose}} --profile core --profile processing build
+    @just up-core
+    @just up-serving
+    @just up-processing
     @just _hdfs-ready
-    @echo "core+serving up -> API http://localhost:${API_PORT}/docs, ingress :${INGEST_PORT}"
+    @echo "all profiles are up -> API http://localhost:${API_PORT}/docs, ingress :${INGEST_PORT}"
 
 # Stop all containers (volumes and lakehouse data are kept)
 down:
