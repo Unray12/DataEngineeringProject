@@ -1,0 +1,11 @@
+.git
+.env
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.venv
+dbt/target
+dbt/logs
+benchmarks/results
+docs

@@ -1,0 +1,47 @@
+[project]
+name = "agri-platform"
+version = "0.1.0"
+description = "Agriculture data engineering platform: streaming + batch lakehouse on HDFS with Iceberg, served through Cassandra and Trino"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pyspark==3.5.3",
+    "dbt-spark>=1.9,<1.10",
+    "cassandra-driver>=3.29,<4",
+    "trino>=0.336,<0.340",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2.7,<3",
+    "confluent-kafka>=2.6,<3",
+    "pandas>=2.2,<3",
+    "pyarrow>=18,<19",
+    "requests>=2.32,<3",
+    "httpx>=0.28,<1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "ruff>=0.9,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = ["dbt/target", "benchmarks/results"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["common/src", "streaming/src", "batch/src", "api/src", "ingest/src", "simulator/src"]
+markers = [
+    "integration: needs the running Docker Compose stack",
+    "slow: takes more than a few seconds",
+]

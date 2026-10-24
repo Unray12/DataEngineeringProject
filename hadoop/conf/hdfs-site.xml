@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  NameNode + DataNode configuration. Client-side Spark/Trino reads are harmless:
+  they only need core-site.xml (fs.defaultFS) plus these defaults.
+-->
+<configuration>
+
+  <!-- Local directories. Compose backs these with named volumes. -->
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>file:///var/lib/hadoop/name</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>/var/lib/hadoop/data</value>
+  </property>
+
+  <!-- One DataNode in Compose, so one replica. Set to 3 on a real cluster. -->
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+
+  <!-- Keep the NameNode heap small; the metadata set here is tiny. -->
+  <property>
+    <name>dfs.namenode.checkpoint.period</name>
+    <value>300</value>
+  </property>
+
+  <!-- Fast fail instead of hanging forever when a DataNode is missing. -->
+  <property>
+    <name>dfs.client.block.write.replace-datanode-on-failure.enable</name>
+    <value>true</value>
+  </property>
+
+</configuration>

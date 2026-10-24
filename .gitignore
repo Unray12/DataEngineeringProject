@@ -1,1 +1,20 @@
 .claude/
+
+# Local environment and editor files
+.env
+.DS_Store
+
+# Python environments, caches, and build artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
