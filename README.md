@@ -245,7 +245,12 @@ Scripts and results go in `benchmarks/`.
 ## Repository layout
 
 ```
-simulator/   ingest/   streaming/   dbt/   cassandra/   api/   web/   benchmarks/   docs/   justfile   pyproject.toml
+src/         dbt/   cassandra/   web/   benchmarks/   docs/   justfile   pyproject.toml
 ```
+
+All Python packages live under the unified [`src/`](src/) directory:
+`src/api`, `src/batch`, `src/common`, `src/ingest`, `src/simulator`, and
+`src/streaming`. The Compose services mount this directory at `/app/src` and
+use it as their Python path.
 
 See [`AGENTS.md`](AGENTS.md) for conventions and rules for contributors and coding agents.

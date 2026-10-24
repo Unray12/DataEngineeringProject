@@ -59,7 +59,7 @@ x-spark-env: &spark-env
   TRINO_USER: ${TRINO_USER:-agri}
   HADOOP_CONF_DIR: /opt/hadoop/conf
   HADOOP_HOME: /opt/hadoop
-  PYTHONPATH: /app/common/src:/app/streaming/src:/app/batch/src
+  PYTHONPATH: /app/src
 
 x-spark-build: &spark-build
   context: .
@@ -270,9 +270,7 @@ services:
       <<: *spark-env
     volumes:
       - *hadoop-conf
-      - ./common:/app/common:ro
-      - ./streaming:/app/streaming:ro
-      - ./batch:/app/batch:ro
+      - ./src:/app/src:ro
       - ./reference:/app/reference:ro
     depends_on:
       kafka:
@@ -294,9 +292,7 @@ services:
       <<: *spark-env
     volumes:
       - *hadoop-conf
-      - ./common:/app/common:ro
-      - ./streaming:/app/streaming:ro
-      - ./batch:/app/batch:ro
+      - ./src:/app/src:ro
       - ./reference:/app/reference:ro
     depends_on:
       hive-metastore:
@@ -331,9 +327,7 @@ services:
       <<: *spark-env
     volumes:
       - *hadoop-conf
-      - ./common:/app/common:ro
-      - ./streaming:/app/streaming:ro
-      - ./batch:/app/batch:ro
+      - ./src:/app/src:ro
       - ./reference:/app/reference:ro
       - ./tests:/app/tests:ro
     depends_on:
