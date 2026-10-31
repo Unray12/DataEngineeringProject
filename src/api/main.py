@@ -20,6 +20,7 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from common.reference import ReferenceData, load_reference
+from api.analytics import AnalyticsReader
 from streaming.alerts import ALLOWED_TRANSITIONS, STATUS_ACKNOWLEDGED, STATUS_OPEN, STATUS_RESOLVED
 from streaming.cassandra_io import CassandraWriter
 
@@ -27,11 +28,12 @@ log = logging.getLogger("api")
 
 writer: CassandraWriter | None = None
 reference: ReferenceData | None = None
+analytics: AnalyticsReader | None = None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global writer, reference
+    global writer, reference, analytics
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-5s %(name)s - %(message)s",
@@ -43,6 +45,11 @@ async def lifespan(_app: FastAPI):
         os.environ.get("CASSANDRA_KEYSPACE", "agri"),
         int(os.environ.get("CASSANDRA_WAIT_S", "180")),
     )
+    try:
+        analytics = AnalyticsReader()
+    except Exception as exc:
+        analytics = None
+        log.warning("analytical query path unavailable until Trino/dbt is ready: %s", exc)
     log.info(
         "api ready: %d farms, %d fields, %d devices",
         len(reference.farms),
@@ -52,6 +59,8 @@ async def lifespan(_app: FastAPI):
     yield
     if writer is not None:
         writer.close()
+    if analytics is not None:
+        analytics.close()
 
 
 app = FastAPI(title="Agriculture Data Platform", version="0.1.0", lifespan=lifespan)
@@ -67,6 +76,12 @@ def _session():
     if writer is None:  # pragma: no cover - lifespan always runs
         raise HTTPException(status_code=503, detail="cassandra not connected")
     return writer.session
+
+
+def _analytics() -> AnalyticsReader:
+    if analytics is None:
+        raise HTTPException(status_code=503, detail="analytical tables are not ready; run the batch flow first")
+    return analytics
 
 
 def _json_value(value: Any) -> Any:
@@ -135,6 +150,24 @@ def list_fields(farm_id: str) -> list[dict[str, Any]]:
         }
         for field in sorted(ref.fields_of_farm(farm_id), key=lambda f: f.field_id)
     ]
+
+
+@app.get("/devices")
+def list_devices() -> list[dict[str, Any]]:
+    ref = _ref()
+    rows = []
+    for device in ref.devices.values():
+        row = _session().execute("SELECT * FROM device_status WHERE device_id = %s", (device.device_id,)).one()
+        rows.append(_rows([row])[0] if row is not None else {
+            "device_id": device.device_id,
+            "field_id": device.field_id,
+            "status": "unknown",
+            "last_seen": None,
+            "battery_pct": device.battery_pct,
+            "signal_quality": device.signal_quality,
+            "gap_count_24h": 0,
+        })
+    return rows
 
 
 # --------------------------------------------------------------------------------------
@@ -209,6 +242,79 @@ def list_alerts(
         raise HTTPException(status_code=400, detail=f"invalid status {status}")
     rows = _session().execute("SELECT * FROM alerts_by_status WHERE status = %s LIMIT %s", (status, limit))
     return _rows(rows)
+
+
+# --------------------------------------------------------------------------------------
+# analytical serving path (BR5, BR6, BR7)
+# --------------------------------------------------------------------------------------
+
+
+def _date(value: str | None, fallback_days: int = 7) -> str:
+    if value:
+        try:
+            return datetime.fromisoformat(value).date().isoformat()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="dates must be ISO-8601") from exc
+    return (datetime.now(UTC) - timedelta(days=fallback_days)).date().isoformat()
+
+
+@app.get("/fields/{field_id}/indicators")
+def field_indicators(
+    field_id: str,
+    start: str | None = Query(None, alias="from"),
+    end: str | None = Query(None, alias="to"),
+    granularity: Literal["hourly", "daily"] = "daily",
+) -> dict[str, Any]:
+    _require_field(field_id)
+    return {"field_id": field_id, "rows": _analytics().indicators(field_id, _date(start), _date(end, 0), granularity)}
+
+
+@app.get("/fields/{field_id}/history")
+def field_history(
+    field_id: str,
+    start: str | None = Query(None, alias="from"),
+    end: str | None = Query(None, alias="to"),
+    granularity: Literal["hourly", "daily"] = "daily",
+    metric: str = Query("soil_moisture"),
+) -> dict[str, Any]:
+    _require_field(field_id)
+    if metric not in _ref().metrics:
+        raise HTTPException(status_code=400, detail=f"unknown metric {metric}")
+    return {"field_id": field_id, "rows": _analytics().history(field_id, _date(start), _date(end, 0), metric, granularity)}
+
+
+@app.get("/summary")
+def analytical_summary(
+    start: str | None = Query(None, alias="from"),
+    end: str | None = Query(None, alias="to"),
+) -> dict[str, Any]:
+    return {"rows": _analytics().summary(_date(start), _date(end, 0))}
+
+
+@app.get("/compare")
+def analytical_compare(
+    field_ids: str = Query(..., description="comma-separated field IDs"),
+    metric: str = Query("soil_moisture"),
+    start: str | None = Query(None, alias="from"),
+    end: str | None = Query(None, alias="to"),
+) -> dict[str, Any]:
+    ids = [item.strip() for item in field_ids.split(",") if item.strip()]
+    if not ids or any(item not in _ref().fields for item in ids):
+        raise HTTPException(status_code=400, detail="field_ids must contain known fields")
+    return {"rows": _analytics().compare(ids, metric, _date(start), _date(end, 0))}
+
+
+@app.get("/quality/summary")
+def quality_summary(
+    start: str | None = Query(None, alias="from"),
+    end: str | None = Query(None, alias="to"),
+) -> dict[str, Any]:
+    return {"rows": _analytics().quality_summary(_date(start), _date(end, 0))}
+
+
+@app.get("/quality/devices")
+def quality_devices() -> dict[str, Any]:
+    return {"rows": _analytics().quality_devices()}
 
 
 class AlertTransition(BaseModel):

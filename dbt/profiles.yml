@@ -1,0 +1,17 @@
+agri:
+  target: dev
+  outputs:
+    dev:
+      type: spark
+      method: session
+      schema: gold
+      host: localhost
+      user: agri
+      server_side_parameters:
+        spark.sql.session.timeZone: UTC
+        spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+        spark.sql.catalog.lakehouse: org.apache.iceberg.spark.SparkCatalog
+        spark.sql.catalog.lakehouse.catalog-impl: org.apache.iceberg.hive.HiveCatalog
+        spark.sql.catalog.lakehouse.uri: thrift://hive-metastore:9083
+        spark.sql.catalog.lakehouse.warehouse: hdfs://namenode:8020/warehouse
+        spark.sql.defaultCatalog: lakehouse

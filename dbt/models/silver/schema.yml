@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: sensor_readings
+    description: Clean, schema-valid and deduplicated sensor readings from the bronze Iceberg table.
+    tests:
+      - unique:
+          column_name: "concat(device_id, '|', metric, '|', cast(measured_at as string))"
+    columns:
+      - name: device_id
+        tests: [not_null]
+      - name: field_id
+        tests: [not_null]
+      - name: metric
+        tests:
+          - not_null
+          - accepted_values:
+              values: [soil_moisture, soil_temperature, air_temperature, air_humidity, relative_humidity, rainfall]
+      - name: measured_at
+        tests: [not_null]

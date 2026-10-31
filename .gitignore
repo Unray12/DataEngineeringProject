@@ -1,8 +1,13 @@
 .claude/
 
-# Local environment and editor files
+# Local environment, editor, and OS files
 .env
+.env.local
+.env.*.local
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
 
 # Python environments, caches, and build artifacts
 .venv/
@@ -12,9 +17,34 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
 *.egg-info/
 dist/
 build/
 
-# Logs
+# dbt generated artifacts
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+
+# Next.js, Bun, and frontend test artifacts
+web/node_modules/
+web/.next/
+web/out/
+web/coverage/
+web/playwright-report/
+web/test-results/
+web/.turbo/
+web/*.tsbuildinfo
+.bun/
+
+# Logs and local runtime output
 *.log
+*.pid
+*.tmp
+
+# Local data and service state
+data/
+tmp/

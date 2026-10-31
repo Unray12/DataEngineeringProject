@@ -4,7 +4,7 @@
 #   core        HDFS + Kafka + Hive Metastore + Trino + ingest   (needed by everything)
 #   processing  Spark job runners (streaming, batch, dbt-spark, tests)
 #   serving     Cassandra + FastAPI
-#   app         web frontend (planned; the API is the only data source)
+#   app         Next.js web frontend (the API is the only data source)
 #
 # Rule from AGENTS.md: each profile runs on its own. `core` never depends on
 # `serving`.
@@ -437,12 +437,33 @@ services:
     depends_on:
       cassandra-init:
         condition: service_completed_successfully
+      trino:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health/ready')\""]
       interval: 10s
       timeout: 10s
       retries: 12
       start_period: 15s
+    networks: ["platform"]
+
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: images/web/Dockerfile
+    image: agri/web:latest
+    environment:
+      DATA_MODE: ${DATA_MODE:-api}
+      API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+      API_KEY: ${API_KEY:-}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-AgriMonitor}
+      NEXT_PUBLIC_TIMEZONE: ${NEXT_PUBLIC_TIMEZONE:-Asia/Ho_Chi_Minh}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
     networks: ["platform"]
 
 networks:

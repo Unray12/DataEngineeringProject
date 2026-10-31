@@ -1,0 +1,9 @@
+export type Metric = "soil_moisture" | "soil_temperature" | "air_temperature" | "air_humidity" | "rainfall";
+export type Status = "ok" | "attention" | "critical";
+export type Farm = { id: string; name: string; region: string; fieldCount: number; deviceCount: number; status: Status };
+export type Field = { id: string; farmId: string; name: string; crop: string; growthStage: string; areaHa: number; status: Status; moisture: number; temperature: number; humidity: number; };
+export type Device = { id: string; fieldId: string; name: string; status: "online" | "stale" | "offline"; lastSeen: string; batteryPct: number; rssi: number; gapCount24h: number };
+export type Alert = { id: string; type: "threshold" | "rate_of_change" | "device_outage" | "low_battery"; severity: "info" | "warning" | "critical"; fieldId: string; deviceId?: string; status: "open" | "acknowledged" | "resolved"; openedAt: string; message: string; note?: string };
+export type Point = { t: string; value: number | null };
+export type Series = { metric: Metric; unit: string; points: Point[]; gaps: { start: string; end: string }[] };
+export type Envelope<T> = { data: T; meta: { asOf: string; source: "cassandra" | "trino" } };

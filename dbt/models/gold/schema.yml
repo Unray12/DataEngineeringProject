@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: field_daily
+    description: Daily min, max, average and quality counts per field and metric.
+    columns:
+      - name: field_id
+        tests: [not_null]
+      - name: metric
+        tests: [not_null]
+      - name: day
+        tests: [not_null]
+  - name: field_indicators
+    description: Analytical indicators used by the historical dashboard.
+    columns:
+      - name: field_id
+        tests: [not_null]
+      - name: data_quality_pct
+        tests:
+          - not_null
+  - name: quality_daily
+    description: Daily data quality counts from streaming quality counters and quarantine.
+    columns:
+      - name: day
+        tests: [not_null]
