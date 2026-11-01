@@ -29,13 +29,14 @@ export async function getAnalyticsFields(): Promise<{ fields: AnalyticsField[]; 
 
 export async function getAnalytics(params: { fieldId: string; metric: Metric; granularity: Granularity; from: string; to: string }): Promise<AnalyticsResponse> {
   if (env.DATA_MODE === "mock") return mockAnalytics(params.metric, params.from, params.to);
-  const query = new URLSearchParams({ from: params.from, to: params.to, granularity: params.granularity, metric: params.metric });
+  const apiMetric = params.metric === "air_humidity" ? "relative_humidity" : params.metric;
+  const query = new URLSearchParams({ from: params.from, to: params.to, granularity: params.granularity, metric: apiMetric });
   const [history, indicators] = await Promise.all([
     apiFetch(`/fields/${params.fieldId}/history?${query}`, z.object({ rows: z.array(z.object({ bucket: z.string(), metric: z.string(), min: z.number(), max: z.number(), avg: z.number(), count: z.number() })) })),
     apiFetch(`/fields/${params.fieldId}/indicators?${query}`, z.object({ rows: z.array(z.record(z.unknown())) })),
   ]);
   const { fields } = await getAnalyticsFields();
-  const comparison = await apiFetch(`/compare?field_ids=${encodeURIComponent(fields.map((field) => field.id).join(","))}&metric=${params.metric}&from=${params.from}&to=${params.to}`, z.object({ rows: z.array(z.object({ field_id: z.string(), min: z.number(), max: z.number(), avg: z.number(), count: z.number() })) }));
+  const comparison = await apiFetch(`/compare?field_ids=${encodeURIComponent(fields.map((field) => field.id).join(","))}&metric=${apiMetric}&from=${params.from}&to=${params.to}`, z.object({ rows: z.array(z.object({ field_id: z.string(), min: z.number(), max: z.number(), avg: z.number(), count: z.number() })) }));
   return analyticsResponseSchema.parse({
     history: history.rows,
     indicators: indicators.rows.map((row) => ({ bucket: String(row.bucket), metric: params.metric, min: Number(row.min), max: Number(row.max), avg: Number(row.avg), count: Number(row.count), time_in_range_pct: row.time_in_range_pct == null ? null : Number(row.time_in_range_pct), hours_below_target: row.hours_below_target == null ? null : Number(row.hours_below_target) })),
