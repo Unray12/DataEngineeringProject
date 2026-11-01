@@ -9,3 +9,6 @@ dbt/target
 dbt/logs
 benchmarks/results
 docs
+web/.env.local
+web/.next
+web/node_modules
