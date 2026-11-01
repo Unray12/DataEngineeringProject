@@ -12,7 +12,7 @@ set dotenv-load := true
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 compose := "docker compose"
-all-profiles := "--profile core --profile processing --profile serving"
+all-profiles := "--profile core --profile processing --profile serving --profile app"
 
 # Show the recipe list
 default:
@@ -39,7 +39,7 @@ doctor:
 
 # Build every project image
 build:
-    {{compose}} --profile core --profile processing --profile serving build
+    {{compose}} --profile core --profile processing --profile serving --profile app build
 
 # -----------------------------------------------------------------------------
 # Lifecycle
@@ -249,6 +249,18 @@ _cassandra-counts:
 dbt-run:
     @just _hdfs-ready
     {{compose}} --profile core --profile processing run --rm dbt dbt build --project-dir /app/dbt --profiles-dir /app/dbt
+
+# Complete batch flow: initialize Iceberg tables, build silver/gold, test, then compact bronze.
+batch-run:
+    @just lakehouse-init
+    @just dbt-run
+    @just dbt-test
+    @just compact table="bronze.sensor_readings"
+
+# Start the API and Next.js frontend against the processed lakehouse.
+up-app:
+    {{compose}} --profile core --profile serving --profile app up -d --wait api web
+    @echo "web app is up -> http://localhost:${WEB_PORT:-3000}"
 
 # dbt data-quality tests only
 dbt-test:
