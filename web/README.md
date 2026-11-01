@@ -2,7 +2,8 @@
 
 This Next.js App Router project is the shared baseline for the agricultural
 monitoring frontend. Feature pages are intentionally placeholders so four
-members can build independently.
+members can build independently. The repository uses Bun 1.4.4 for local,
+container and CI parity.
 
 ## Setup
 
