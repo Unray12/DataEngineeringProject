@@ -48,3 +48,5 @@ web/*.tsbuildinfo
 # Local data and service state
 data/
 tmp/
+Video/
+Reports/Submission/
