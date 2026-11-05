@@ -42,6 +42,14 @@ column pinned, and drawers/dialogs are full-width on phones. `globals.css` holds
 the breakpoints; components only add small `hidden md:table-cell` classes for
 columns that are available in the detail drawer instead.
 
+From 1024 px up, the sidebar can be collapsed to an icon rail with the button in
+its header (`«` / `»`). The choice is stored under
+`agrimonitor-sidebar-collapsed` and restored on the next visit; the main content
+padding follows the rail so no state leaks into the mobile layout. The same
+sidebar behaviour is reused by the overview dashboard. Both shells also provide
+a "Skip to content" link, visible focus rings for keyboard users, `aria-current`
+on the active navigation item, and honour `prefers-reduced-motion`.
+
 ## Vercel
 
 Set the repository **Root Directory** to `web`. Preview deployments should use `DATA_MODE=mock`. Production can use mock mode for the project demo, or `api` mode only when FastAPI is available at a public HTTPS URL (for example through a Cloudflare Tunnel or hosted VM). `API_BASE_URL` and `API_KEY` remain server-only variables; do not prefix them with `NEXT_PUBLIC_`.

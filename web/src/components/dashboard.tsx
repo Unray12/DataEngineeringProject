@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Alert, Device, Farm, Field, Metric, Series } from "@/lib/types";
+import { useSidebarCollapse } from "./use-sidebar-collapse";
 
 type DashboardData = { farms: Farm[]; fields: Field[]; devices: Device[]; alerts: Alert[]; asOf: string };
 const DataContext = createContext<DashboardData>({ farms: [], fields: [], devices: [], alerts: [], asOf: "" });
@@ -31,13 +32,38 @@ function useData() { return useContext(DataContext); }
 
 function Header({ view, dark, setDark }: { view: string; dark: boolean; setDark: (value: boolean) => void }) {
   const title = view === "overview" ? "Good morning, Linh" : nav.find((item) => item.href === `/${view}`)?.label ?? "Field detail";
-  return <header className="mb-8 flex items-start justify-between gap-4"><div><p className="eyebrow mb-2">Field intelligence · live workspace</p><h1 className="text-3xl font-semibold tracking-tight">{title}</h1><p className="muted mt-2 text-sm">{view === "overview" ? "A calm, current view of conditions across your farms." : "Conditions, continuity and action in one place."}</p></div><div className="flex items-center gap-2"><button aria-label="Toggle theme" onClick={() => setDark(!dark)} className="icon-button">{dark ? "☼" : "☾"}</button><div className="profile-chip"><span>LN</span><b className="hidden sm:inline">Linh Nguyen</b></div></div></header>;
+  return <header className="mb-6 flex flex-wrap items-start justify-between gap-4 sm:mb-8"><div className="min-w-0 flex-1"><p className="eyebrow mb-2">Field intelligence · live workspace</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1><p className="muted mt-2 text-sm">{view === "overview" ? "A calm, current view of conditions across your farms." : "Conditions, continuity and action in one place."}</p></div><div className="flex flex-wrap items-center justify-end gap-2"><button aria-label="Toggle theme" onClick={() => setDark(!dark)} className="icon-button">{dark ? "☼" : "☾"}</button><div className="profile-chip"><span>LN</span><b className="hidden sm:inline">Linh Nguyen</b></div></div></header>;
 }
 
-function Sidebar({ view }: { view: string }) {
+function Sidebar({ view, collapsed, onToggle }: { view: string; collapsed: boolean; onToggle: () => void }) {
   const { alerts } = useData();
   const openCount = alerts.filter((alert) => alert.status !== "resolved").length;
-  return <aside className="sidebar fixed bottom-0 left-0 top-0 z-10 flex w-64 flex-col border-r border-[var(--line)] bg-[var(--panel)] px-5 py-7"><Link href="/" className="mb-12 flex items-center gap-3"><div className="brand-mark">✦</div><div><strong className="text-lg">AgriMonitor</strong><p className="muted text-xs">Farm intelligence</p></div></Link><p className="eyebrow mb-3 px-3">Workspace</p><nav className="space-y-1">{nav.map((item) => <Link key={item.href} href={item.href} className={`nav-item ${view === item.href.slice(1) || (view === "overview" && item.href === "/") ? "nav-item-active" : ""}`}><span className="w-5 text-center text-lg">{item.icon}</span>{item.label}{item.label === "Alerts" && openCount > 0 && <span className="ml-auto badge-danger">{openCount}</span>}</Link>)}</nav><div className="system-card mt-auto"><div className="flex items-center gap-2"><span className="status-pulse bg-emerald-400" /><p className="text-sm font-semibold">Pipeline healthy</p></div><p className="muted mt-2 text-xs">Live readings are flowing into the workspace.</p><div className="progress-track"><div className="progress-value w-[96%]" /></div></div></aside>;
+  return (
+    <aside id="app-sidebar" className={`sidebar ${collapsed ? "is-collapsed" : ""} fixed bottom-0 left-0 top-0 z-10 flex w-64 flex-col border-r border-[var(--line)] bg-[var(--panel)] px-5 py-7`} aria-label="Workspace">
+      <div className="sidebar-head mb-12">
+        <Link href="/" className="sidebar-brand flex items-center gap-3" aria-label="AgriMonitor home">
+          <div className="brand-mark">✦</div>
+          <div className="sidebar-label"><strong className="text-lg">AgriMonitor</strong><p className="muted text-xs">Farm intelligence</p></div>
+        </Link>
+        <button type="button" className="sidebar-toggle" onClick={onToggle} aria-expanded={!collapsed} aria-controls="app-sidebar" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}><span aria-hidden="true">{collapsed ? "»" : "«"}</span></button>
+      </div>
+      <p className="eyebrow sidebar-label mb-3 px-3">Workspace</p>
+      <nav className="space-y-1" aria-label="Main navigation">
+        {nav.map((item) => (
+          <Link key={item.href} href={item.href} title={collapsed ? item.label : undefined} aria-current={view === item.href.slice(1) || (view === "overview" && item.href === "/") ? "page" : undefined} className={`nav-item ${view === item.href.slice(1) || (view === "overview" && item.href === "/") ? "nav-item-active" : ""}`}>
+            <span className="w-5 text-center text-lg" aria-hidden="true">{item.icon}</span>
+            <span className="sidebar-label">{item.label}</span>
+            {item.label === "Alerts" && openCount > 0 && <span className="badge-danger ml-auto">{openCount}</span>}
+          </Link>
+        ))}
+      </nav>
+      <div className="system-card mt-auto" title={collapsed ? "Pipeline healthy" : undefined}>
+        <div className="flex items-center gap-2"><span className="status-pulse shrink-0 bg-emerald-400" /><p className="sidebar-label text-sm font-semibold">Pipeline healthy</p></div>
+        <p className="sidebar-label muted mt-2 text-xs">Live readings are flowing into the workspace.</p>
+        <div className="progress-track sidebar-label"><div className="progress-value w-[96%]" /></div>
+      </div>
+    </aside>
+  );
 }
 
 function FarmFilter({ selected, setSelected }: { selected: string; setSelected: (id: string) => void }) {
@@ -46,7 +72,7 @@ function FarmFilter({ selected, setSelected }: { selected: string; setSelected: 
 }
 
 function Stat({ label, value, detail, color = "text-[var(--ink)]" }: { label: string; value: string | number; detail: string; color?: string }) {
-  return <div className="stat-card"><p className="muted text-xs">{label}</p><p className={`mt-2 text-3xl font-semibold ${color}`}>{value}</p><p className="muted mt-2 text-xs">{detail}</p></div>;
+  return <div className="stat-card"><p className="muted text-xs">{label}</p><p className={`mt-2 text-2xl font-semibold sm:text-3xl ${color}`}>{value}</p><p className="muted mt-2 text-xs">{detail}</p></div>;
 }
 
 function Overview({ farmId }: { farmId: string }) {
@@ -55,7 +81,7 @@ function Overview({ farmId }: { farmId: string }) {
   const visibleIds = new Set(visible.map((field) => field.id));
   const scopedDevices = devices.filter((device) => visibleIds.has(device.fieldId));
   const open = alerts.filter((alert) => alert.status !== "resolved" && (farmId === "all" || visibleIds.has(alert.fieldId)));
-  return <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Stat label="Farms monitored" value={farmId === "all" ? farms.length : 1} detail={`${farms.length} regions connected`} /><Stat label="Fields" value={visible.length} detail="Latest conditions available" /><Stat label="Devices online" value={`${scopedDevices.filter((device) => device.status === "online").length}/${scopedDevices.length}`} detail="From Cassandra device status" color="text-emerald-500" /><Stat label="Open alerts" value={open.length} detail="Requires operator review" color="text-rose-500" /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]"><section className="surface-card p-5"><div className="section-heading"><div><p className="eyebrow">Field overview</p><h2 className="mt-1 text-lg font-semibold">Conditions by field</h2></div><Link href="/live" className="action-link">Open live view →</Link></div><div className="space-y-2">{visible.map((field) => <FieldRow key={field.id} field={field} />)}</div></section><Attention alerts={open} /></div></>;
+  return <><div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"><Stat label="Farms monitored" value={farmId === "all" ? farms.length : 1} detail={`${farms.length} regions connected`} /><Stat label="Fields" value={visible.length} detail="Latest conditions available" /><Stat label="Devices online" value={`${scopedDevices.filter((device) => device.status === "online").length}/${scopedDevices.length}`} detail="From Cassandra device status" color="text-emerald-500" /><Stat label="Open alerts" value={open.length} detail="Requires operator review" color="text-rose-500" /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]"><section className="surface-card p-5"><div className="section-heading"><div><p className="eyebrow">Field overview</p><h2 className="mt-1 text-lg font-semibold">Conditions by field</h2></div><Link href="/live" className="action-link">Open live view →</Link></div><div className="space-y-2">{visible.map((field) => <FieldRow key={field.id} field={field} />)}</div></section><Attention alerts={open} /></div></>;
 }
 
 function FieldRow({ field }: { field: Field }) {
@@ -86,7 +112,7 @@ function Live({ farmId, setFarmId }: { farmId: string; setFarmId: (id: string) =
   if (!field) return <EmptyState title="No fields available" detail="The API has not returned any fields yet." />;
   const data = (chart?.points ?? []).map((point) => ({ ...point, time: fmt(point.t) }));
   const fieldDevices = devices.filter((device) => device.fieldId === field.id);
-  return <><FarmFilter selected={farmId} setSelected={setFarmId} /><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Near real-time · Cassandra</p><h2 className="mt-1 text-xl font-semibold">{field.name}</h2><p className="muted mt-1 text-sm">Current conditions and the last 24 hours.</p></div><div className="flex gap-2"><select value={field.id} onChange={(event) => setFieldId(event.target.value)} className="select-control">{visibleFields.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={metric} onChange={(event) => setMetric(event.target.value as Metric)} className="select-control">{Object.entries(metricLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div></div><div className="grid gap-4 sm:grid-cols-3"><Stat label="Soil moisture" value={`${field.moisture.toFixed(1)}%`} detail="Latest reading" color={field.moisture < 30 ? "text-amber-500" : "text-emerald-500"} /><Stat label="Air temperature" value={`${field.temperature.toFixed(1)}°C`} detail="Latest reading" color="text-emerald-500" /><Stat label="Air humidity" value={`${field.humidity.toFixed(1)}%`} detail="Latest reading" color="text-emerald-500" /></div><section className="surface-card mt-6 p-5"><div className="section-heading"><div><h2 className="font-semibold">{metricLabels[metric]} · last 24 hours</h2><p className="muted mt-1 text-xs">Live Cassandra series · gaps remain visible</p></div><span className="status-chip ok">Live · 30 sec</span></div>{error ? <ErrorState detail={error} onRetry={() => setChart(null)} /> : <div className="h-72"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data}><defs><linearGradient id="live-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={.35} /><stop offset="100%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="var(--line)" strokeDasharray="3 3" /><XAxis dataKey="time" tick={{ fontSize: 10 }} minTickGap={30} /><YAxis unit={unitFor(metric)} tick={{ fontSize: 10 }} /><Tooltip /><Area type="monotone" dataKey="value" stroke="#10b981" fill="url(#live-fill)" connectNulls={false} /></AreaChart></ResponsiveContainer></div>}</section><DevicePanel devices={fieldDevices} /></>;
+  return <><FarmFilter selected={farmId} setSelected={setFarmId} /><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Near real-time · Cassandra</p><h2 className="mt-1 text-xl font-semibold">{field.name}</h2><p className="muted mt-1 text-sm">Current conditions and the last 24 hours.</p></div><div className="flex flex-wrap gap-2"><select value={field.id} onChange={(event) => setFieldId(event.target.value)} className="select-control">{visibleFields.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={metric} onChange={(event) => setMetric(event.target.value as Metric)} className="select-control">{Object.entries(metricLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4"><Stat label="Soil moisture" value={`${field.moisture.toFixed(1)}%`} detail="Latest reading" color={field.moisture < 30 ? "text-amber-500" : "text-emerald-500"} /><Stat label="Air temperature" value={`${field.temperature.toFixed(1)}°C`} detail="Latest reading" color="text-emerald-500" /><Stat label="Air humidity" value={`${field.humidity.toFixed(1)}%`} detail="Latest reading" color="text-emerald-500" /></div><section className="surface-card mt-6 p-5"><div className="section-heading"><div><h2 className="font-semibold">{metricLabels[metric]} · last 24 hours</h2><p className="muted mt-1 text-xs">Live Cassandra series · gaps remain visible</p></div><span className="status-chip ok">Live · 30 sec</span></div>{error ? <ErrorState detail={error} onRetry={() => setChart(null)} /> : <div className="h-72"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data}><defs><linearGradient id="live-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={.35} /><stop offset="100%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="var(--line)" strokeDasharray="3 3" /><XAxis dataKey="time" tick={{ fontSize: 10 }} minTickGap={30} /><YAxis unit={unitFor(metric)} tick={{ fontSize: 10 }} /><Tooltip /><Area type="monotone" dataKey="value" stroke="#10b981" fill="url(#live-fill)" connectNulls={false} /></AreaChart></ResponsiveContainer></div>}</section><DevicePanel devices={fieldDevices} /></>;
 }
 
 function DevicePanel({ devices }: { devices: Device[] }) {
@@ -109,7 +135,7 @@ function Analytics() {
   const [rows, setRows] = useState<Array<{ bucket: string; min: number; max: number; avg: number }>>([]);
   useEffect(() => { if (fields[0] && !fields.some((field) => field.id === fieldId)) setFieldId(fields[0].id); }, [fields, fieldId]);
   useEffect(() => { if (!fieldId) return; fetch(`/api/analytics?fieldId=${fieldId}`).then((response) => response.json()).then((body: { data: { rows: Array<{ bucket: string; min: number; max: number; avg: number }> } }) => setRows(body.data.rows)).catch(() => setRows([])); }, [fieldId]);
-  return <section className="surface-card p-5"><div className="section-heading"><div><p className="eyebrow">Intraday / daily · Trino + Iceberg</p><h2 className="mt-1 text-lg font-semibold">Historical field performance</h2></div><select value={fieldId} onChange={(event) => setFieldId(event.target.value)} className="select-control">{fields.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></div><p className="muted mt-2 text-sm">Gold daily aggregates; this view is not live.</p><div className="mt-5 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={rows}><CartesianGrid stroke="var(--line)" strokeDasharray="3 3" /><XAxis dataKey="bucket" tick={{ fontSize: 10 }} /><YAxis unit="%" tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="avg" fill="#10b981" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div></section>;
+  return <section className="surface-card p-5"><div className="section-heading"><div><p className="eyebrow">Intraday / daily · Trino + Iceberg</p><h2 className="mt-1 text-lg font-semibold">Historical field performance</h2></div><select value={fieldId} onChange={(event) => setFieldId(event.target.value)} className="select-control">{fields.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></div><p className="muted mt-2 text-sm">Gold daily aggregates; this view is not live.</p>{rows.length === 0 ? <div className="empty-state mt-5"><p className="font-semibold">No gold rows for this field yet</p><p className="muted mt-2 text-sm">The daily aggregate job has not written rows for this field. Check the batch schedule or pick another field.</p></div> : <div className="mt-5 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={rows}><CartesianGrid stroke="var(--line)" strokeDasharray="3 3" /><XAxis dataKey="bucket" tick={{ fontSize: 10 }} /><YAxis unit="%" tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="avg" fill="#10b981" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div>}</section>;
 }
 
 function Quality() {
@@ -119,7 +145,7 @@ function Quality() {
   return <><section className="surface-card p-5"><p className="eyebrow">Trino + Iceberg quality_daily</p><h2 className="mt-1 text-lg font-semibold">Trust and traceability</h2><p className="muted mt-2 text-sm">Valid, duplicate, out-of-range and quarantined records from the batch layer.</p><div className="mt-5 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={summary}><CartesianGrid stroke="var(--line)" strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="valid" stackId="a" fill="#10b981" /><Bar dataKey="out_of_range" stackId="a" fill="#f59e0b" /><Bar dataKey="quarantined" stackId="a" fill="#f43f5e" /></BarChart></ResponsiveContainer></div></section><section className="surface-card mt-6 p-5"><h2 className="font-semibold">Device quality</h2><div className="mt-4 grid gap-3 md:grid-cols-2">{devices.map((device) => <div key={device.id} className="device-card flex items-center justify-between"><span><strong className="text-sm">{device.name}</strong><span className="muted ml-2 text-xs">gap count {device.gapCount24h}</span></span><span className={`text-sm font-semibold ${statusColor(device.status)}`}>{device.status}</span></div>)}</div></section></>;
 }
 
-function Devices() { const { devices } = useData(); return <section className="surface-card overflow-hidden p-5"><div className="section-heading"><div><p className="eyebrow">Operational continuity</p><h2 className="mt-1 text-lg font-semibold">All devices</h2></div><span className="status-chip ok">{devices.length} registered</span></div><div className="mt-5 overflow-x-auto"><table className="data-table"><thead><tr><th>Device</th><th>Status</th><th>Last seen</th><th>Battery</th><th>Signal</th><th>Gaps / 24h</th></tr></thead><tbody>{devices.map((device) => <tr key={device.id}><td className="font-medium">{device.name}</td><td className={statusColor(device.status)}>{device.status}</td><td>{fmtDate(device.lastSeen)}</td><td>{device.batteryPct}%</td><td>{device.rssi}</td><td>{device.gapCount24h}</td></tr>)}</tbody></table></div></section>; }
+function Devices() { const { devices } = useData(); return <section className="surface-card overflow-hidden p-5"><div className="section-heading"><div><p className="eyebrow">Operational continuity</p><h2 className="mt-1 text-lg font-semibold">All devices</h2></div><span className="status-chip ok">{devices.length} registered</span></div><div className="mt-5 overflow-x-auto"><table className="data-table m3-sticky-first"><thead><tr><th>Device</th><th>Status</th><th>Last seen</th><th>Battery</th><th>Signal</th><th>Gaps / 24h</th></tr></thead><tbody>{devices.map((device) => <tr key={device.id}><td className="font-medium">{device.name}</td><td className={statusColor(device.status)}>{device.status}</td><td>{fmtDate(device.lastSeen)}</td><td>{device.batteryPct}%</td><td>{device.rssi}</td><td>{device.gapCount24h}</td></tr>)}</tbody></table></div></section>; }
 
 function FieldDetail({ fieldId }: { fieldId: string }) { const { fields, devices, alerts } = useData(); const field = fields.find((item) => item.id === fieldId); if (!field) return <EmptyState title="Field not found" detail="The requested field is not present in the live reference data." />; return <><section className="hero-card"><div><p className="eyebrow">Field detail</p><h2 className="mt-2 text-2xl font-semibold">{field.name}</h2><p className="muted mt-2">{field.crop} · {field.areaHa} ha · {field.growthStage}</p></div><div className={`status-chip ${field.status}`}>{field.status}</div></section><div className="mt-6 grid gap-6 md:grid-cols-2"><DevicePanel devices={devices.filter((device) => device.fieldId === field.id)} /><Attention alerts={alerts.filter((alert) => alert.fieldId === field.id && alert.status !== "resolved")} /></div></>; }
 function EmptyState({ title, detail }: { title: string; detail: string }) { return <div className="empty-state"><p className="text-lg font-semibold">{title}</p><p className="muted mt-2 text-sm">{detail}</p></div>; }
@@ -133,6 +159,7 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData>({ farms: [], fields: [], devices: [], alerts: [], asOf: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { collapsed, toggle: toggleSidebar } = useSidebarCollapse();
   useEffect(() => {
     const parts = window.location.pathname.split("/").filter(Boolean);
     setView(parts[0] || "overview");
@@ -141,5 +168,24 @@ export default function Dashboard() {
   useEffect(() => { document.documentElement.classList.toggle("dark", dark); window.localStorage.setItem("agrimonitor-theme", dark ? "dark" : "light"); }, [dark]);
   useEffect(() => { let active = true; const load = async () => { try { const response = await fetch("/api/dashboard", { cache: "no-store" }); if (!response.ok) throw new Error("The monitoring API is unavailable."); const body = await response.json() as { farms: { data: Farm[]; meta: { asOf: string } }; fields: { data: Field[] }; devices: { data: Device[] }; alerts: { data: Alert[] } }; if (active) { setData({ farms: body.farms.data, fields: body.fields.data, devices: body.devices.data, alerts: body.alerts.data, asOf: body.farms.meta.asOf }); setLoading(false); setError(""); } } catch (reason) { if (active) { setLoading(false); setError(reason instanceof Error ? reason.message : "Unable to load monitoring data."); } } }; void load(); const timer = window.setInterval(load, 30_000); return () => { active = false; window.clearInterval(timer); }; }, []);
   const content = useMemo(() => view === "live" ? <Live farmId={farmId} setFarmId={setFarmId} /> : view === "alerts" ? <AlertsView /> : view === "analytics" ? <Analytics /> : view === "quality" ? <Quality /> : view === "devices" ? <Devices /> : view === "fields" ? <FieldDetail fieldId={fieldId} /> : <Overview farmId={farmId} />, [view, farmId, fieldId, data]);
-  return <DataContext.Provider value={data}><Sidebar view={view} /><main className="main min-h-screen pl-64 p-8"><div className="mx-auto max-w-[1400px]"><Header view={view} dark={dark} setDark={setDark} />{error ? <ErrorState detail={error} onRetry={() => window.location.reload()} /> : loading ? <div className="loading-panel">Loading live farm data…</div> : <>{view === "overview" && <FarmFilter selected={farmId} setSelected={setFarmId} />}{content}</>}</div></main><nav className="mobile-nav fixed bottom-0 left-0 right-0 z-20 justify-around border-t border-[var(--line)] bg-[var(--panel)] p-2">{nav.slice(0, 5).map((item) => <Link key={item.href} href={item.href} className={`mobile-nav-item ${view === item.href.slice(1) || (view === "overview" && item.href === "/") ? "text-emerald-500" : ""}`}><span className="block text-lg">{item.icon}</span>{item.label}</Link>)}</nav></DataContext.Provider>;
+  return (
+    <DataContext.Provider value={data}>
+      <a href="#app-content" className="skip-link">Skip to content</a>
+      <Sidebar view={view} collapsed={collapsed} onToggle={toggleSidebar} />
+      <main id="app-content" tabIndex={-1} className={`main ${collapsed ? "is-collapsed" : ""} min-h-screen pl-72 p-8`}>
+        <div className="mx-auto max-w-[1400px]">
+          <Header view={view} dark={dark} setDark={setDark} />
+          {error ? <ErrorState detail={error} onRetry={() => window.location.reload()} /> : loading ? <div className="loading-panel">Loading live farm data…</div> : <>{view === "overview" && <FarmFilter selected={farmId} setSelected={setFarmId} />}{content}</>}
+        </div>
+      </main>
+      <nav className="mobile-nav fixed bottom-0 left-0 right-0 z-20 justify-around border-t border-[var(--line)] bg-[var(--panel)] p-2" aria-label="Mobile navigation">
+        {nav.map((item) => (
+          <Link key={item.href} href={item.href} className={`mobile-nav-item ${view === item.href.slice(1) || (view === "overview" && item.href === "/") ? "text-emerald-500" : ""}`}>
+            <span className="block text-lg" aria-hidden="true">{item.icon}</span>
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+    </DataContext.Provider>
+  );
 }
