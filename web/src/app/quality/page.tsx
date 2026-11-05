@@ -1,3 +1,11 @@
-export default function QualityPage() {
-  return <main><h1>Quality — owner M3 — BR4 — not implemented yet</h1></main>;
+import type { Metadata } from "next";
+import { QualityPage } from "@/features/quality/quality-page";
+
+export const metadata: Metadata = {
+  title: "Data quality · AgriMonitor",
+  description: "Daily quality counts, per-device quality and lineage.",
+};
+
+export default function Page() {
+  return <QualityPage />;
 }
