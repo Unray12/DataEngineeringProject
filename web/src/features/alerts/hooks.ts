@@ -14,9 +14,9 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 import {
+  alertReferenceSchema,
   alertsEnvelopeSchema,
   alertEnvelopeSchema,
-  dashboardReferenceSchema,
   errorBodySchema,
   type AlertsEnvelope,
 } from "@/lib/api/schemas";
@@ -110,12 +110,12 @@ export type AlertReference = {
 };
 
 export async function fetchAlertReference(): Promise<AlertReference> {
-  const response = await fetch("/api/dashboard", { cache: "no-store" });
+  const response = await fetch("/api/alerts/reference", { cache: "no-store" });
   const body = await readBody(response);
   if (!response.ok) {
     throw new Error(messageFrom(body, "Reference data is unavailable."));
   }
-  const parsed = dashboardReferenceSchema.parse(body);
+  const parsed = alertReferenceSchema.parse(body);
   return {
     farms: parsed.farms.data.map((farm) => ({ id: farm.id, name: farm.name })),
     fields: parsed.fields.data.map((field) => ({
@@ -135,7 +135,7 @@ export async function fetchAlertReference(): Promise<AlertReference> {
 
 export function useAlertReference() {
   return useQuery({
-    queryKey: ["dashboard", "reference"],
+    queryKey: ["alerts", "reference"],
     queryFn: fetchAlertReference,
     staleTime: 300_000,
     refetchOnWindowFocus: false,
@@ -173,9 +173,8 @@ export async function patchAlert(variables: MutationVariables): Promise<Alert> {
 }
 
 /**
- * Optimistic transition with rollback. Invalidates every alert list (including
- * M2's active-alerts key) and the dashboard payload, so `/` and `/live` see the
- * same state after an acknowledge or resolve.
+ * Optimistic transition with rollback. Invalidates every alert list, so any
+ * other alert surface sees the same state after an acknowledge or resolve.
  */
 export function useAlertMutation() {
   const queryClient = useQueryClient();
@@ -214,10 +213,7 @@ export function useAlertMutation() {
       });
     },
     onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["alerts"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ["alerts", "list"] });
     },
   });
 }

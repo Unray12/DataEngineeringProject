@@ -246,6 +246,36 @@ async function fetchApiReference(): Promise<{ farms: Farm[]; fields: Field[]; de
 }
 
 // ---------------------------------------------------------------------------
+// Reference data shared by the alert filters and detail drawer (M3).
+// Kept separate from the dashboard payload so /alerts only pulls what it needs.
+// ---------------------------------------------------------------------------
+
+export type ReferenceData = {
+  farms: Envelope<Farm[]>;
+  fields: Envelope<Field[]>;
+  devices: Envelope<Device[]>;
+};
+
+export async function getReferenceData(): Promise<ReferenceData> {
+  if (env.DATA_MODE === "mock") {
+    return {
+      farms: envelope<Farm[]>(mockFarms),
+      fields: envelope<Field[]>(mockFields),
+      devices: envelope<Device[]>(mockDevices),
+    };
+  }
+
+  const reference = await fetchApiReference();
+  const asOf = new Date().toISOString();
+  const meta = { asOf, source: "cassandra" as const };
+  return {
+    farms: { data: reference.farms, meta },
+    fields: { data: reference.fields, meta },
+    devices: { data: reference.devices, meta },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard and live series (kept compatible with the existing scaffold)
 // ---------------------------------------------------------------------------
 

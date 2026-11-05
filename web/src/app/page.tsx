@@ -1,2 +1,3 @@
-import Dashboard from "@/components/dashboard";
-export default function Page() { return <Dashboard />; }
+export default function OverviewPage() {
+  return <main><h1>Overview — owner M1 — BR1, BR7 — not implemented yet</h1></main>;
+}

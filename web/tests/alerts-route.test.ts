@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { GET as listAlerts } from "@/app/api/alerts/route";
+import { GET as alertReference } from "@/app/api/alerts/reference/route";
 import { PATCH as patchAlertRoute } from "@/app/api/alerts/[id]/route";
 import { resetMockAlerts } from "@/features/alerts/mock-store";
 import type { AlertsEnvelope } from "@/lib/api/schemas";
@@ -53,6 +54,21 @@ describe("GET /api/alerts", () => {
   it("rejects an invalid status with 400", async () => {
     const response = await listAlerts(listRequest("?status=closed"));
     expect(response.status).toBe(400);
+  });
+});
+
+describe("GET /api/alerts/reference", () => {
+  it("returns farms, fields and devices for the alert filters", async () => {
+    const response = await alertReference();
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      farms: { data: unknown[] };
+      fields: { data: unknown[] };
+      devices: { data: unknown[] };
+    };
+    expect(body.farms.data.length).toBeGreaterThan(0);
+    expect(body.fields.data.length).toBeGreaterThan(0);
+    expect(body.devices.data.length).toBeGreaterThan(0);
   });
 });
 

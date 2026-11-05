@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import type { Alert } from "@/lib/types";
-import { isStale } from "@/lib/format";
 import { M3QueryProvider, M3Shell } from "@/components/m3-shell";
 import { AlertDrawer } from "./components/AlertDrawer";
 import { AlertFilters } from "./components/AlertFilters";
@@ -16,7 +15,7 @@ import {
   type SortOrder,
 } from "./hooks";
 import type { AlertAction } from "./state";
-import { formatDateTime } from "./format";
+import { formatDateTime, isStale } from "./format";
 
 const SEVERITY_RANK: Record<Alert["severity"], number> = {
   critical: 0,

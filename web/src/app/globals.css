@@ -163,3 +163,110 @@ button, select { font: inherit; }
 
 
 
+/* Analytics workspace (M4, BR5/BR6). Kept from the shared baseline; the page
+   is still a standalone route, so it carries its own page padding. */
+.analytics-page {
+  min-height: 100vh;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  font-family: Arial, sans-serif;
+}
+.analytics-header, .analytics-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.analytics-header h1 {
+  margin: .25rem 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  letter-spacing: -.04em;
+}
+.analytics-header p, .analytics-muted, .analytics-asof {
+  color: #647481;
+}
+.analytics-eyebrow {
+  color: #059669 !important;
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.analytics-button {
+  border: 0;
+  border-radius: .75rem;
+  background: #059669;
+  color: white;
+  cursor: pointer;
+  padding: .7rem 1rem;
+  font-weight: 700;
+}
+.analytics-button:disabled { cursor: not-allowed; opacity: .45; }
+.analytics-filters {
+  display: grid;
+  grid-template-columns: 2fr 1.3fr 1fr 1fr 1fr;
+  gap: .75rem;
+  margin: 2rem 0 1rem;
+  padding: 1rem;
+  border: 1px solid #dfe9e5;
+  border-radius: 1rem;
+  background: white;
+  box-shadow: 0 15px 40px rgb(22 75 55 / 7%);
+}
+.analytics-filters label {
+  display: grid;
+  gap: .35rem;
+  color: #647481;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.analytics-filters select, .analytics-filters input {
+  min-width: 0;
+  border: 1px solid #dfe9e5;
+  border-radius: .6rem;
+  background: white;
+  color: #12212d;
+  padding: .6rem;
+}
+.analytics-asof { font-size: .8rem; }
+.analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.analytics-card, .analytics-state {
+  border: 1px solid #dfe9e5;
+  border-radius: 1.1rem;
+  background: white;
+  padding: 1.25rem;
+  box-shadow: 0 15px 40px rgb(22 75 55 / 6%);
+}
+.analytics-card h2 { margin: 0; font-size: 1.1rem; }
+.analytics-card-heading p { margin: .35rem 0 0; font-size: .8rem; }
+.chart-wrap { height: 310px; margin-top: 1.5rem; }
+.indicator-list { display: grid; gap: .7rem; margin-top: 1.2rem; }
+.indicator-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .2rem .75rem;
+  border-bottom: 1px solid #edf2f0;
+  padding-bottom: .65rem;
+}
+.indicator-row span, .indicator-row small { color: #647481; font-size: .78rem; }
+.indicator-row small { grid-column: 1 / -1; }
+.comparison-card { margin-top: 1rem; }
+.comparison-list { display: grid; gap: .85rem; margin-top: 1.25rem; }
+.comparison-row { display: flex; align-items: center; gap: .8rem; }
+.rank { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: #d1fae5; color: #047857; font-size: .75rem; font-weight: 800; }
+.comparison-name { flex: 1; min-width: 0; }
+.comparison-name strong { font-size: .85rem; }
+.comparison-track { height: .4rem; margin-top: .35rem; border-radius: 99px; background: #edf2f0; overflow: hidden; }
+.comparison-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #34d399, #059669); }
+.analytics-state { margin-top: 1rem; color: #647481; text-align: center; }
+@media (max-width: 800px) {
+  .analytics-page { padding: 2rem 1rem; }
+  .analytics-filters, .analytics-grid { grid-template-columns: 1fr; }
+  .analytics-header { flex-direction: column; }
+}

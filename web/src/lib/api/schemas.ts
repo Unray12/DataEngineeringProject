@@ -136,8 +136,8 @@ export const errorBodySchema = z
   .object({ error: z.string().optional(), code: z.string().optional() })
   .passthrough();
 
-/** Only the reference data the alert UI needs from the existing dashboard route. */
-export const dashboardReferenceSchema = z.object({
+/** Only the reference data the alert filters and drawer need. */
+export const alertReferenceSchema = z.object({
   farms: envelopeSchema(z.array(farmSchema)),
   fields: envelopeSchema(z.array(fieldSchema)),
   devices: envelopeSchema(z.array(deviceSchema)),

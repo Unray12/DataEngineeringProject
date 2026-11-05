@@ -1,6 +1,11 @@
-# features/alerts (M3, BR8)
+# Alerts
 
-Alert queue and response tracking for `/alerts`.
+- Owner: M3
+- Requirements: BR8
+- Pages: `/alerts`
+- Endpoints: FastAPI alert list and acknowledge/resolve transition contracts
+
+Previous implementation (for reference only): git tag archive/webapp-v1, path `web/src/components/dashboard.tsx`
 
 ## What it does
 
@@ -11,8 +16,7 @@ Alert queue and response tracking for `/alerts`.
   responder name is read from the `agrimonitor.responder` localStorage key; if it is
   missing the action dialog asks for it.
 - Optimistic updates with rollback on error. After a change every `["alerts"]` query
-  (including M2's active-alerts key) and `["dashboard"]` are invalidated, so `/` and
-  `/live` see the same state.
+  is invalidated, so any other alert surface sees the same state.
 - Mock mode keeps the lifecycle in a `globalThis` in-memory store, because Next.js
   bundles route handlers separately.
 
@@ -21,6 +25,7 @@ Alert queue and response tracking for `/alerts`.
 | Endpoint | Source | Notes |
 |---|---|---|
 | `GET /api/alerts?status=&severity=&type=&fieldId=&farmId=` | Cassandra | Zod-validated query, `no-store` |
+| `GET /api/alerts/reference` | Cassandra | Farms, fields and devices for the filters and drawer; cached 5 min |
 | `PATCH /api/alerts/{id}` body `{ action, by, note? }` | Cassandra | 400 invalid body, 404 unknown alert, 409 invalid transition |
 
 The browser never calls FastAPI. In `DATA_MODE=api` the adapter maps camelCase to
@@ -42,8 +47,8 @@ transition. The route handler validates it again (defence in depth).
 
 ## Data gaps in API mode
 
-The current FastAPI list response may omit lifecycle timestamps. `timeline.ts`
-keeps the event but renders `chưa có dữ liệu` for a missing time. Severity and type
+The current FastAPI list response may omit lifecycle timestamps. `timeline.ts` keeps
+the event but renders `chưa có dữ liệu` for a missing time. Severity and type
 filters work in the adapter even though FastAPI does not accept them directly.
 
 ## Safety and accessibility

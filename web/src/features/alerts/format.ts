@@ -21,6 +21,17 @@ export function formatPercent(value: number, digits = 1): string {
   return `${value.toFixed(digits)}%`;
 }
 
+/**
+ * True when the snapshot timestamp is older than the freshness budget.
+ * The alerts page uses it to warn that the list may be behind. An unparseable
+ * timestamp is treated as stale rather than as fresh data.
+ */
+export function isStale(asOf: string, thresholdSeconds = 90, now = Date.now()): boolean {
+  const measured = new Date(asOf).getTime();
+  if (Number.isNaN(measured)) return true;
+  return now - measured > thresholdSeconds * 1000;
+}
+
 export const ALERT_TYPE_LABELS: Record<string, string> = {
   threshold: "Threshold breach",
   rate_of_change: "Rapid change",
