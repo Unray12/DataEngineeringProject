@@ -129,8 +129,12 @@ export function envelopeSchema<T extends z.ZodTypeAny>(data: T) {
 
 export const alertsEnvelopeSchema = envelopeSchema(z.array(alertSchema));
 export const alertEnvelopeSchema = envelopeSchema(alertSchema);
-export const qualitySummaryEnvelopeSchema = envelopeSchema(z.array(qualityDaySchema));
-export const deviceQualityEnvelopeSchema = envelopeSchema(z.array(deviceQualitySchema));
+export const qualitySummaryEnvelopeSchema = envelopeSchema(
+  z.array(qualityDaySchema),
+);
+export const deviceQualityEnvelopeSchema = envelopeSchema(
+  z.array(deviceQualitySchema),
+);
 
 export const errorBodySchema = z
   .object({ error: z.string().optional(), code: z.string().optional() })
@@ -143,7 +147,8 @@ export const alertReferenceSchema = z.object({
   devices: envelopeSchema(z.array(deviceSchema)),
 });
 
-const emptyToUndefined = (value: unknown): unknown => (value === "" ? undefined : value);
+const emptyToUndefined = (value: unknown): unknown =>
+  value === "" ? undefined : value;
 
 export const alertQuerySchema = z.object({
   status: z.preprocess(emptyToUndefined, alertStatusSchema.optional()),
@@ -167,7 +172,9 @@ export const alertActionInputSchema = z.object({
     .transform((value) => value ?? undefined),
 });
 
-const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
 export const qualityRangeSchema = z
   .object({
@@ -187,5 +194,92 @@ export type QualityDay = z.infer<typeof qualityDaySchema>;
 export type LineageEntry = z.infer<typeof lineageEntrySchema>;
 export type DeviceQuality = z.infer<typeof deviceQualitySchema>;
 export type AlertsEnvelope = z.infer<typeof alertsEnvelopeSchema>;
-export type QualitySummaryEnvelope = z.infer<typeof qualitySummaryEnvelopeSchema>;
+export type QualitySummaryEnvelope = z.infer<
+  typeof qualitySummaryEnvelopeSchema
+>;
 export type DeviceQualityEnvelope = z.infer<typeof deviceQualityEnvelopeSchema>;
+
+// M2 transport contracts (WEBAPP A5). Existing M3 payloads remain compatible.
+export const timestampSchema = z.string().datetime({ offset: true });
+export const resourceIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+export const latestMetricSchema = z.object({
+  metric: metricSchema,
+  value: z.number().finite(),
+  unit: z.string().min(1),
+  measuredAt: timestampSchema,
+  quality: qualitySchema,
+  state: z.enum(["low", "ok", "high"]),
+});
+export const latestSchema = z.object({
+  fieldId: resourceIdSchema,
+  metrics: z.array(latestMetricSchema),
+});
+export const gapSchema = z
+  .object({ start: timestampSchema, end: timestampSchema })
+  .refine(
+    (row) => Date.parse(row.start) < Date.parse(row.end),
+    "Gap end must follow start",
+  );
+export const seriesPointSchema = z.object({
+  t: timestampSchema,
+  value: z.number().finite().nullable(),
+  quality: qualitySchema,
+});
+export const seriesSchema = z.object({
+  fieldId: resourceIdSchema,
+  metric: metricSchema,
+  unit: z.string().min(1),
+  points: z.array(seriesPointSchema),
+  gaps: z.array(gapSchema),
+});
+export const indicatorRowSchema = z.object({
+  bucket: z.string().min(1),
+  metric: metricSchema,
+  min: z.number(),
+  max: z.number(),
+  avg: z.number(),
+  count: z.number().int().nonnegative(),
+  timeInRangePct: z.number().min(0).max(100),
+  hoursBelowTarget: z.number().nonnegative().optional(),
+});
+export const latestEnvelopeSchema = envelopeSchema(latestSchema);
+export const seriesEnvelopeSchema = envelopeSchema(seriesSchema);
+export const seriesQuerySchema = z.object({
+  hours: z.coerce.number().int().min(1).max(24).default(24),
+  metric: metricSchema,
+});
+// Additive, read-only device continuity proposal; the existing DeviceStatus stays frozen.
+export const deviceReadingSchema = z.object({
+  deviceId: resourceIdSchema,
+  metric: metricSchema,
+  measuredAt: timestampSchema,
+  value: z.number().finite().nullable(),
+  unit: z.string().min(1),
+  quality: qualitySchema,
+});
+export const deviceGapSchema = z
+  .object({ start: timestampSchema, end: timestampSchema.nullable() })
+  .refine(
+    (row) => row.end === null || Date.parse(row.start) < Date.parse(row.end),
+    "Gap end must follow start",
+  );
+export const deviceContinuitySchema = z.discriminatedUnion("availability", [
+  z.object({
+    availability: z.literal("available"),
+    deviceId: resourceIdSchema,
+    gaps: z.array(deviceGapSchema),
+    readings: z.array(deviceReadingSchema),
+  }),
+  z.object({
+    availability: z.literal("unavailable"),
+    deviceId: resourceIdSchema,
+    reason: z.string().min(1),
+  }),
+]);
+export const deviceContinuityEnvelopeSchema = envelopeSchema(
+  deviceContinuitySchema,
+);

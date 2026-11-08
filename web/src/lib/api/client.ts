@@ -61,22 +61,48 @@ type ApiFetchOptions = {
   timeoutMs?: number;
 };
 
-async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<unknown> {
+export async function apiFetch(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<unknown> {
   if (!env.API_BASE_URL) {
-    throw new ApiError(500, "API_BASE_URL is required in api mode", "config_error");
+    throw new ApiError(
+      500,
+      "API_BASE_URL is required in api mode",
+      "config_error",
+    );
   }
 
-  const response = await fetch(`${env.API_BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      ...(env.API_KEY ? { "x-api-key": env.API_KEY } : {}),
-      ...(options.body !== undefined ? { "content-type": "application/json" } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
-    ...(options.noStore ? { cache: "no-store" as RequestCache } : {}),
-    ...(options.revalidate !== undefined ? { next: { revalidate: options.revalidate } } : {}),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${env.API_BASE_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        ...(env.API_KEY ? { "x-api-key": env.API_KEY } : {}),
+        ...(options.body !== undefined
+          ? { "content-type": "application/json" }
+          : {}),
+      },
+      body:
+        options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+      ...(options.noStore ? { cache: "no-store" as RequestCache } : {}),
+      ...(options.revalidate !== undefined
+        ? { next: { revalidate: options.revalidate } }
+        : {}),
+    });
+  } catch (error) {
+    const timeout =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
+    throw new ApiError(
+      timeout ? 504 : 502,
+      timeout
+        ? "The data service timed out. Please retry."
+        : "The data service could not be reached. Please retry.",
+      timeout ? "timeout" : "network_error",
+    );
+  }
 
   if (!response.ok) {
     let detail = "";
@@ -85,10 +111,21 @@ async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<un
     } catch {
       // The body is optional; the status is enough to build a useful error.
     }
-    throw new ApiError(response.status, detail || `FastAPI returned ${response.status}`);
+    throw new ApiError(
+      response.status,
+      detail || `FastAPI returned ${response.status}`,
+    );
   }
 
-  return response.json() as Promise<unknown>;
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    throw new ApiError(
+      502,
+      "The data service returned an invalid response.",
+      "invalid_payload",
+    );
+  }
 }
 
 function asString(value: unknown): string | undefined {
@@ -168,7 +205,7 @@ async function fetchApiReference(): Promise<{ farms: Farm[]; fields: Field[]; de
     await Promise.all(
       rawFarms.map((farm) =>
         apiFetch(`/farms/${encodeURIComponent(farm.farm_id)}/fields`, { revalidate: 300 }) as Promise<
-          Array<{ field_id: string; farm_id: string; name: string; crop_code: string; area_ha: number }>
+          Array<{ field_id: string; farm_id: string; name: string; crop_code: string; area_ha: number; targets?: Field["targets"] }>
         >,
       ),
     )
@@ -202,6 +239,7 @@ async function fetchApiReference(): Promise<{ farms: Farm[]; fields: Field[]; de
       crop: field.crop_code,
       growthStage: "Current season",
       areaHa: field.area_ha,
+      targets: field.targets,
       status,
       moisture,
       temperature,

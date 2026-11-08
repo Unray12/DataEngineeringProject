@@ -1,3 +1,11 @@
+import { Suspense } from "react";
+import { env } from "@/lib/env";
+import { LiveWorkspace } from "@/features/live/workspace";
+export const dynamic = "force-dynamic";
 export default function LivePage() {
-  return <main><h1>Live monitor — owner M2 — BR2, BR3 — not implemented yet</h1></main>;
+  return (
+    <Suspense fallback={<p role="status">Loading live monitor…</p>}>
+      <LiveWorkspace preview={env.DATA_MODE === "mock"} />
+    </Suspense>
+  );
 }
