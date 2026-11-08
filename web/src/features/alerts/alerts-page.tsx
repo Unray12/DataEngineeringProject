@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Alert } from "@/lib/types";
 import { M3QueryProvider, M3Shell } from "@/components/m3-shell";
 import { AlertDrawer } from "./components/AlertDrawer";
@@ -69,6 +69,12 @@ export function AlertsPage() {
 function AlertsContent() {
   const [filters, setFilters] = useState<AlertFilterState>(DEFAULT_ALERT_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Deep link from other pages (e.g. /alerts?alert=<id>) opens that alert's drawer.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("alert");
+    if (id) setSelectedId(id);
+  }, []);
 
   const alertsQuery = useAlerts(filters);
   const allAlertsQuery = useAlerts(DEFAULT_ALERT_FILTERS);
