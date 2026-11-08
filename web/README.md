@@ -32,7 +32,7 @@ src/
 ├── app/
 │   ├── page.tsx                 # Overview placeholder (M1)
 │   ├── live/page.tsx            # Live monitor placeholder (M2)
-│   ├── devices/page.tsx         # Devices placeholder (M2)
+│   ├── devices/page.tsx         # Device continuity/status (M2, implemented)
 │   ├── alerts/page.tsx          # Alerts (M3, implemented)
 │   ├── quality/page.tsx         # Quality (M3, implemented)
 │   ├── analytics/page.tsx       # Analytics (M4, implemented)
@@ -115,3 +115,11 @@ bun run typecheck
 bun run test
 DATA_MODE=mock bun run build
 ```
+
+## BR3 web-only scope
+
+The Devices page uses existing read-only FastAPI contracts and main's shell.
+Missing values are explicit; only the latest reported gap state is available.
+Main's Quality workspace remains at `/quality`. This branch changes no database
+schema, tables, streaming/batch processing or infrastructure. See
+[device feature notes](src/features/devices/README.md) for limits and checks.
