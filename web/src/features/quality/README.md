@@ -17,7 +17,7 @@ Previous implementation (for reference only): git tag archive/webapp-v1, path `w
   stream position to the gold quality table.
 - Plain-language glossary for valid, duplicate, out-of-range, quarantined, suspect and
   lineage.
-- Every panel shows `Data as of …` and states that this is not live.
+- Panels show snapshot retrieval time and state that this is not live; batch refresh time is unavailable in the current API.
 
 ## Endpoints
 
@@ -57,3 +57,11 @@ bun run test -- tests/quality-lineage.test.ts tests/quality-route.test.ts
   not a query against the real Iceberg metadata tables.
 - The page is read-only. It does not repair or re-run quality jobs.
 - The date range is computed in UTC to match the seed and the API.
+
+## Loading and failure states
+
+Summary cards show Loading or Unavailable until a successful response arrives.
+A successful empty range can show zero; an unsuccessful response cannot. If a
+refresh fails after data has loaded, cached totals are labelled as the last
+successful snapshot. The chart and trace panel distinguish loading, failed
+requests, and genuinely empty results. No backend contracts are changed.

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { DeviceQuality } from "@/lib/types";
 import { M3QueryProvider, M3Shell } from "@/components/m3-shell";
-import { formatDateTime, formatNumber, formatPercent } from "@/features/alerts/format";
+import { formatDateTime } from "@/features/alerts/format";
 import { DeviceQualityTable } from "./components/DeviceQualityTable";
 import { Glossary } from "./components/Glossary";
 import { LineageDrawer } from "./components/LineageDrawer";
+import { QualitySummaryCards } from "./components/QualitySummaryCards";
 import { QualityStackedBar } from "./components/QualityStackedBar";
 import { TraceView } from "./components/TraceView";
 import { QUALITY_RANGES, useDeviceQuality, useQualitySummary, type QualityRange } from "./hooks";
@@ -30,22 +31,6 @@ function QualityContent() {
   const days = summaryQuery.data?.data ?? [];
   const devices = devicesQuery.data?.data ?? [];
 
-  const totals = useMemo(
-    () =>
-      days.reduce(
-        (accumulator, day) => ({
-          valid: accumulator.valid + day.valid,
-          duplicate: accumulator.duplicate + day.duplicate,
-          outOfRange: accumulator.outOfRange + day.outOfRange,
-          quarantined: accumulator.quarantined + day.quarantined,
-          total: accumulator.total + day.total,
-        }),
-        { valid: 0, duplicate: 0, outOfRange: 0, quarantined: 0, total: 0 },
-      ),
-    [days],
-  );
-
-  const overallRate = totals.total > 0 ? (totals.valid / totals.total) * 100 : null;
   const apiLimitations =
     devices.some((row) => missingBreakdown(row.counts).length > 0) ||
     devices.some((row) => missingLineage(row));
@@ -85,34 +70,11 @@ function QualityContent() {
       }
     >
       <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-        <strong>Not live.</strong> Quality comes from the batch layer after each run. Check “Data as
-        of” on every panel before acting on a number.
+        <strong>Not live.</strong> Quality comes from the batch layer. Retrieval times show when
+        a snapshot was fetched; the service does not provide its batch refresh time.
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <div className="stat-card">
-          <p className="muted text-xs">Records in range</p>
-          <p className="mt-2 text-2xl font-semibold sm:text-3xl">{formatNumber(totals.total, 0)}</p>
-          <p className="muted mt-2 text-xs">{days.length} days of batch results</p>
-        </div>
-        <div className="stat-card">
-          <p className="muted text-xs">Valid rate</p>
-          <p className="mt-2 text-2xl font-semibold sm:text-3xl text-emerald-500">
-            {overallRate === null ? "—" : formatPercent(overallRate)}
-          </p>
-          <p className="muted mt-2 text-xs">{formatNumber(totals.valid, 0)} valid records</p>
-        </div>
-        <div className="stat-card">
-          <p className="muted text-xs">Duplicates</p>
-          <p className="mt-2 text-2xl font-semibold sm:text-3xl text-blue-500">{formatNumber(totals.duplicate, 0)}</p>
-          <p className="muted mt-2 text-xs">Kept once, counted here</p>
-        </div>
-        <div className="stat-card">
-          <p className="muted text-xs">Quarantined</p>
-          <p className="mt-2 text-2xl font-semibold sm:text-3xl text-rose-500">{formatNumber(totals.quarantined, 0)}</p>
-          <p className="muted mt-2 text-xs">Excluded from normal reporting</p>
-        </div>
-      </div>
+      <QualitySummaryCards days={summaryQuery.data?.data} loading={summaryQuery.isLoading} failed={summaryQuery.isError} />
 
       {apiLimitations && (
         <p className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
@@ -128,7 +90,7 @@ function QualityContent() {
             <p className="eyebrow">Daily quality counts</p>
             <h2 className="mt-1 text-lg font-semibold">What arrived, by day</h2>
             <p className="muted mt-1 text-xs">
-              {summaryAsOf ? `Data as of ${formatDateTime(summaryAsOf)}` : "Waiting for quality data"} ·
+              {summaryAsOf ? `Snapshot retrieved ${formatDateTime(summaryAsOf)}` : "Waiting for quality data"} ·
               not live
             </p>
           </div>
@@ -136,7 +98,10 @@ function QualityContent() {
         </div>
 
         <div className="mt-5">
-          <QualityStackedBar days={days} />
+          {summaryQuery.data ? <>
+            {summaryQuery.isError && <p className="muted mb-3 text-sm">Showing the last successful snapshot. Refresh failed.</p>}
+            <QualityStackedBar days={days} />
+          </> : summaryQuery.isLoading ? <p role="status">Loading daily quality…</p> : <p className="empty-state">Daily quality data is unavailable.</p>}
         </div>
 
         <p className="muted mt-4 text-xs">
@@ -157,11 +122,11 @@ function QualityContent() {
             <p className="eyebrow">Per-device quality</p>
             <h2 className="mt-1 text-lg font-semibold">Devices and their records</h2>
             <p className="muted mt-1 text-xs">
-              {devicesAsOf ? `Data as of ${formatDateTime(devicesAsOf)}` : "Waiting for device quality"} ·
+              {devicesAsOf ? `Snapshot retrieved ${formatDateTime(devicesAsOf)}` : "Waiting for device quality"} ·
               not live
             </p>
           </div>
-          <span className="status-chip resolved">{devices.length} devices</span>
+          <span className="status-chip resolved">{devicesQuery.data ? `${devices.length} devices` : devicesQuery.isLoading ? "Loading devices…" : "Device count unavailable"}</span>
         </div>
 
         <div className="mt-5">
@@ -183,7 +148,7 @@ function QualityContent() {
           </div>
         </div>
         <div className="mt-5">
-          <TraceView rows={devices} />
+          {devicesQuery.data ? <TraceView rows={devices} /> : devicesQuery.isLoading ? <p role="status">Loading traceability…</p> : <p className="empty-state">Traceability is unavailable until device quality loads.</p>}
         </div>
       </section>
 
