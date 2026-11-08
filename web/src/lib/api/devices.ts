@@ -35,7 +35,7 @@ function normalize(value: unknown): Device {
   if (!parsed.success)
     throw new ApiError(
       502,
-      "Device service does not provide the agreed status, timestamp, battery, RSSI and 24-hour gap count. The M2 API contract needs integration.",
+      "Device status is missing required observation, battery, signal or gap details. Service integration is required.",
       "device_contract_mismatch",
     );
   return parsed.data;

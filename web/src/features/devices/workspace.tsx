@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { DataProvider } from "@/lib/api/provider";
+import { useMonitoringScope } from "@/features/live/scope";
+import { DeviceHistory } from "./history";
+import Link from "next/link";
 import { M3Shell } from "@/components/m3-shell";
 import { useDevices, useDeviceStatus, useFarms, useFields } from "./hooks";
 import {
@@ -11,17 +15,18 @@ import {
 } from "./presentation";
 
 export function DevicesWorkspace({ preview = false }: { preview?: boolean }) {
-  const [client] = useState(() => new QueryClient());
   return (
-    <QueryClientProvider client={client}>
+    <DataProvider>
       <DevicesContent preview={preview} />
-    </QueryClientProvider>
+    </DataProvider>
   );
 }
 function DevicesContent({ preview }: { preview: boolean }) {
-  const [farm, setFarm] = useState(""),
-    [field, setField] = useState(""),
-    [status, setStatus] = useState("");
+  const scope = useMonitoringScope();
+  const queryClient = useQueryClient();
+  const farm = scope.farmId,
+    field = scope.fieldId;
+  const [status, setStatus] = useState("");
   const [selected, setSelected] = useState(""),
     [sort, setSort] = useState("id");
   const [now, setNow] = useState(() => Date.now());
@@ -65,7 +70,12 @@ function DevicesContent({ preview }: { preview: boolean }) {
     : [...new Set(list.data?.data.map((row) => row.fieldId))];
   const refresh = () => {
     void list.refetch();
-    if (selected) void detail.refetch();
+    if (selected) {
+      void detail.refetch();
+      void queryClient.invalidateQueries({
+        queryKey: ["devices", selected, "continuity"],
+      });
+    }
   };
   const error =
     list.error instanceof Error
@@ -86,8 +96,7 @@ function DevicesContent({ preview }: { preview: boolean }) {
               aria-label="Farm filter"
               value={farm}
               onChange={(e) => {
-                setFarm(e.target.value);
-                setField("");
+                scope.setScope({ farmId: e.target.value, fieldId: "" });
               }}
             >
               <option value="">All farms</option>
@@ -104,7 +113,7 @@ function DevicesContent({ preview }: { preview: boolean }) {
               className="select-control block"
               aria-label="Field filter"
               value={field}
-              onChange={(e) => setField(e.target.value)}
+              onChange={(e) => scope.setScope({ fieldId: e.target.value })}
             >
               <option value="">All fields</option>
               {fieldIds.map((id) => (
@@ -164,6 +173,12 @@ function DevicesContent({ preview }: { preview: boolean }) {
           </p>
         )}
       </section>
+      <Link
+        className="button-secondary mb-3 inline-block"
+        href={scope.href("/live")}
+      >
+        View live field conditions
+      </Link>
       <p className="muted mb-3 text-sm">
         {preview ? "Preview data · " : ""}Polls every 30 seconds while visible;
         refreshes on focus. Times shown in{" "}
@@ -354,10 +369,7 @@ function DevicesContent({ preview }: { preview: boolean }) {
                 )}
               </>
             )}
-            <p className="muted mt-4">
-              Full gap history and recent readings are not available through the
-              frozen device-status contract.
-            </p>
+            <DeviceHistory id={selected} preview={preview} />
           </aside>
         </div>
       )}

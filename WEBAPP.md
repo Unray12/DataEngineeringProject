@@ -128,6 +128,31 @@ type DeviceQuality = { deviceId: string; counts: Omit<QualityDay, "date">; linea
 
 Contract changes after Phase 0 need a PR that updates the Zod schema, the mock data and this file, with all members notified.
 
+### M2 additive continuity proposal (BR3; pending team review)
+
+The existing endpoints and `DeviceStatus` are unchanged. Proposed read-only
+`GET /devices/{id}/continuity` (browser: `/api/devices/{id}/continuity`) uses a
+Cassandra envelope and the following additional response. No database schema
+changes are part of this proposal.
+
+```ts
+type DeviceContinuity =
+  | { availability: "available"; deviceId: string;
+      gaps: { start: string; end: string | null }[];
+      readings: { deviceId: string; metric: Metric; measuredAt: string;
+                  value: number | null; unit: string; quality: Quality }[] }
+  | { availability: "unavailable"; deviceId: string; reason: string };
+```
+
+`end: null` means an ongoing gap. Every returned reading must belong to the
+requested device. A service without this endpoint yields `unavailable`; network
+and processing failures remain errors. M2's synthetic history fixture is local
+to `features/devices/mock-continuity.ts`, documented in that feature's README;
+M3's shared dataset is unchanged. Existing FastAPI has no such endpoint.
+This proposal needs the owners' review and notification before merge; adding
+this paragraph does not represent that approval.
+
+
 ## A6. Caching and refresh
 
 | Data | Route handler | Client |

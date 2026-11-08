@@ -10,7 +10,7 @@ it("shows a friendly retry message for an HTML gateway failure", async () => {
     ),
   );
   await expect(read("/api/devices", z.array(z.string()))).rejects.toThrow(
-    "Device data is unavailable. Please retry.",
+    "Data is unavailable. Please retry.",
   );
 });
 it("handles a JSON null failure without dereferencing it", async () => {
@@ -19,7 +19,7 @@ it("handles a JSON null failure without dereferencing it", async () => {
     vi.fn(async () => new Response("null", { status: 503 })),
   );
   await expect(read("/api/devices", z.array(z.string()))).rejects.toThrow(
-    "Device data is unavailable. Please retry.",
+    "Data is unavailable. Please retry.",
   );
 });
 it("rejects a successful but malformed payload with a friendly message", async () => {
