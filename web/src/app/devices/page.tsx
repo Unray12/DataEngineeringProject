@@ -1,3 +1,7 @@
+import { env } from "@/lib/env";
+import { DevicesWorkspace } from "@/features/devices/workspace";
+export const dynamic = "force-dynamic";
+
 export default function DevicesPage() {
-  return <main><h1>Devices — owner M2 — BR3 — not implemented yet</h1></main>;
+  return <DevicesWorkspace preview={env.DATA_MODE === "mock"} />;
 }

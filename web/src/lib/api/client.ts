@@ -61,7 +61,7 @@ type ApiFetchOptions = {
   timeoutMs?: number;
 };
 
-async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<unknown> {
+export async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<unknown> {
   if (!env.API_BASE_URL) {
     throw new ApiError(500, "API_BASE_URL is required in api mode", "config_error");
   }
