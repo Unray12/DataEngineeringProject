@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Dropdown } from "@/components/shared/dropdown";
 import type { DeviceQuality } from "@/lib/types";
 import { M3QueryProvider, M3Shell } from "@/components/m3-shell";
 import { formatDateTime, formatNumber, formatPercent } from "@/features/alerts/format";
@@ -66,18 +67,15 @@ function QualityContent() {
       description="See how many records are valid, duplicated, out of range or quarantined, and trace a device value back to the batch that produced it. These panels are analytical snapshots, not live readings."
       headerAction={
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <select
-            className="select-control min-w-0 flex-1 sm:flex-none"
-            value={range}
-            onChange={(event) => setRange(event.target.value as QualityRange)}
-            aria-label="Quality date range"
-          >
-            {QUALITY_RANGES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <Dropdown
+              label="Quality date range"
+              value={range}
+              options={QUALITY_RANGES.map((option) => ({ value: option.value, label: option.label }))}
+              onChange={setRange}
+              block
+            />
+          </div>
           <button type="button" className="button-secondary" onClick={refresh} disabled={isFetching}>
             {isFetching ? "Refreshing…" : "Refresh"}
           </button>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Dropdown } from "@/features/insights/dropdown";
+import { Dropdown } from "@/components/shared/dropdown";
 import { useFieldInsights } from "@/features/insights/hooks";
 import {
   DIRECTION_LABEL,
@@ -13,7 +13,7 @@ import {
   type TargetState,
 } from "@/features/insights/narrative";
 import { lastDays, previousRange } from "@/features/insights/range";
-import { Tooltip } from "@/features/insights/tooltip";
+import { Tooltip } from "@/components/shared/tooltip";
 import { METRICS, METRIC_ICON, METRIC_INFO } from "@/features/insights/types";
 import { Panel } from "@/features/overview/ui";
 import type { Field } from "@/lib/types";

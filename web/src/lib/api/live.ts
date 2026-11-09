@@ -35,11 +35,15 @@ function contractError(): never {
     "live_contract_mismatch",
   );
 }
+// The platform names humidity `relative_humidity`; the UI contract calls it `air_humidity`.
+const toWebMetric = (name: string) => (name === "relative_humidity" ? "air_humidity" : name);
+const toApiMetric = (metric: Metric) => (metric === "air_humidity" ? "relative_humidity" : metric);
+const upstreamMetric = z.string().transform(toWebMetric).pipe(metricSchema);
 const latestUpstream = z.object({
   field_id: z.string(),
   metrics: z.array(
     z.object({
-      metric: metricSchema,
+      metric: upstreamMetric,
       value: z.number(),
       unit: z.string(),
       measured_at: timestampSchema,
@@ -57,7 +61,7 @@ function quality(value: string) {
         implausible_jump: "suspect",
         late: "valid",
       } as Record<string, string>
-    )[value] ?? value;
+    )[value] ?? "invalid"; // unknown flags (duplicate, null_value, ...) are not trusted
   return qualitySchema.parse(normalized);
 }
 export async function getLatest(fieldId: string) {
@@ -100,7 +104,7 @@ export async function getLatest(fieldId: string) {
 }
 const seriesUpstream = z.object({
   field_id: z.string(),
-  metric: metricSchema,
+  metric: upstreamMetric,
   unit: z.string(),
   points: z.array(
     z.object({
@@ -129,7 +133,7 @@ export async function getSeries(fieldId: string, metric: Metric, hours = 24) {
     );
   }
   const raw = await apiFetch(
-    `/fields/${encodeURIComponent(fieldId)}/series?hours=${hours}&metric=${metric}`,
+    `/fields/${encodeURIComponent(fieldId)}/series?hours=${hours}&metric=${toApiMetric(metric)}`,
     { noStore: true },
   );
   const canonical = seriesEnvelopeSchema.safeParse(raw);

@@ -6,7 +6,7 @@ import { M3QueryProvider, M3Shell } from "@/components/m3-shell";
 import { useOverview } from "@/features/overview/hooks";
 import { Panel } from "@/features/overview/ui";
 import { downloadCsv, toCsv } from "./csv";
-import { Dropdown } from "./dropdown";
+import { Dropdown } from "@/components/shared/dropdown";
 import { useCompare, useSummary } from "./hooks";
 import {
   DIRECTION_LABEL,

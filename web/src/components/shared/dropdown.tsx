@@ -10,6 +10,8 @@ type Props<T extends string | number> = {
   options: ReadonlyArray<DropdownOption<T>>;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** Fill the width of the parent (grid cells, mobile headers). */
+  block?: boolean;
 };
 
 /**
@@ -17,7 +19,7 @@ type Props<T extends string | number> = {
  * matches the page and shows hover and keyboard focus. Keyboard: arrows, Home,
  * End, Enter/Space to choose, Escape to close.
  */
-export function Dropdown<T extends string | number>({ label, value, options, onChange, disabled = false }: Props<T>) {
+export function Dropdown<T extends string | number>({ label, value, options, onChange, disabled = false, block = false }: Props<T>) {
   const [open, setOpen] = useState(false);
   const selected = Math.max(0, options.findIndex((option) => option.value === value));
   const [active, setActive] = useState(selected);
@@ -83,7 +85,7 @@ export function Dropdown<T extends string | number>({ label, value, options, onC
   const current = options[selected];
 
   return (
-    <div ref={root} className="relative">
+    <div ref={root} className={`relative ${block ? "w-full" : ""}`}>
       <button
         type="button"
         aria-label={label}
@@ -96,7 +98,7 @@ export function Dropdown<T extends string | number>({ label, value, options, onC
           setOpen((state) => !state);
         }}
         onKeyDown={onKeyDown}
-        className="select-control flex min-w-[10rem] cursor-pointer items-center justify-between gap-3 text-sm font-medium normal-case tracking-normal transition-colors hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+        className={`select-control flex ${block ? "w-full" : "min-w-[10rem]"} cursor-pointer items-center justify-between gap-3 text-sm font-medium normal-case tracking-normal transition-colors hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50`}
       >
         <span>
           {current?.icon ? <span aria-hidden="true">{current.icon} </span> : null}

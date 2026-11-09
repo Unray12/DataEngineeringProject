@@ -4,15 +4,121 @@ import { useQueryClient } from "@tanstack/react-query";
 import { DataProvider } from "@/lib/api/provider";
 import { useMonitoringScope } from "@/features/live/scope";
 import { DeviceHistory } from "./history";
+import type { Device } from "@/lib/types";
 import Link from "next/link";
 import { M3Shell } from "@/components/m3-shell";
+import { Dropdown } from "@/components/shared/dropdown";
+import { formatClock } from "@/lib/datetime";
+import { Tooltip } from "@/components/shared/tooltip";
+import { PulseDot } from "@/features/live/panels";
 import { useDevices, useDeviceStatus, useFarms, useFields } from "./hooks";
 import {
-  formatTime,
   formatSignal,
   isStale,
-  observationAge,
 } from "./presentation";
+
+const STATUS = {
+  online: { text: "Online", chip: "resolved" },
+  stale: { text: "Stale", chip: "acknowledged" },
+  offline: { text: "Offline", chip: "open" },
+} as const;
+
+function ago(seconds: number): string {
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  return minutes < 60 ? `${minutes} min ago` : `${Math.floor(minutes / 60)} h ago`;
+}
+
+/** Clock time only; the long date adds noise on a live page. */
+const clock = formatClock;
+
+function Meter({ label, percent, tone }: { label: string; percent: number | null; tone: string }) {
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent ?? undefined}
+      className="h-1.5 overflow-hidden rounded-full bg-[var(--line)]"
+    >
+      <div className={`h-full rounded-full transition-all duration-700 ${tone}`} style={{ width: `${percent ?? 0}%` }} />
+    </div>
+  );
+}
+
+const batteryTone = (pct: number) => (pct < 20 ? "bg-rose-500" : pct < 40 ? "bg-orange-500" : "bg-emerald-500");
+
+function DeviceCard({
+  row,
+  fieldName,
+  now,
+  onOpen,
+}: {
+  row: Device;
+  fieldName: string;
+  now: number;
+  onOpen: () => void;
+}) {
+  const stale = isStale(row.lastSeen, now);
+  const signalPct = row.rssi >= 0 && row.rssi <= 1 ? Math.round(row.rssi * 100) : null;
+  const seconds = Math.max(0, Math.floor((now - Date.parse(row.lastSeen)) / 1000));
+  const status = STATUS[row.status];
+  return (
+    <li className="surface-card flex min-w-0 flex-col p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate font-semibold">📡 {row.id}</p>
+          <p className="muted truncate text-xs">{fieldName}</p>
+        </div>
+        <span className={`status-chip ${status.chip}`}>
+          {row.status === "online" && <PulseDot live />}
+          <span className={row.status === "online" ? "ml-1.5" : ""}>{status.text}</span>
+        </span>
+      </div>
+
+      <p className="muted mt-3 flex flex-wrap items-center gap-x-2 text-xs">
+        <PulseDot live={!stale} />
+        <Tooltip text={`Last reading ${clock(row.lastSeen)}`}>
+          <span>{Number.isFinite(seconds) ? ago(seconds) : "—"}</span>
+        </Tooltip>
+        {stale && <strong className="text-orange-600">Stale: older than 90 s</strong>}
+      </p>
+
+      <div className="mt-3 space-y-2.5 text-xs">
+        <div>
+          <div className="mb-1 flex justify-between">
+            <span className="muted">🔋 Battery</span>
+            <span className="font-semibold">{Math.round(row.batteryPct)}%</span>
+          </div>
+          <Meter label="Battery" percent={Math.round(row.batteryPct)} tone={batteryTone(row.batteryPct)} />
+        </div>
+        <div>
+          <div className="mb-1 flex justify-between">
+            <span className="muted">📶 Signal</span>
+            <span className="font-semibold">{formatSignal(row.rssi)}</span>
+          </div>
+          <Meter label="Signal" percent={signalPct} tone="bg-emerald-500" />
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+            row.gapCount24h > 0 ? "bg-orange-500/10 text-orange-600" : "bg-emerald-500/10 text-emerald-600"
+          }`}
+        >
+          {row.gapCount24h > 0
+            ? `▲ ${row.gapCount24h} ${row.gapCount24h === 1 ? "gap" : "gaps"} in 24 h`
+            : "✓ No gaps in 24 h"}
+        </span>
+        <button className="button-secondary hover:!border-[var(--accent)]" onClick={onOpen}>
+          View status
+        </button>
+      </div>
+    </li>
+  );
+}
 
 export function DevicesWorkspace({ preview = false }: { preview?: boolean }) {
   return (
@@ -51,13 +157,14 @@ function DevicesContent({ preview }: { preview: boolean }) {
       previous?.focus();
     };
   }, [selected]);
-  const rows = (list.data?.data ?? [])
-    .filter(
-      (row) =>
-        (!farm || fields.data?.data.some((item) => item.id === row.fieldId)) &&
-        (!field || row.fieldId === field) &&
-        (!status || row.status === status),
-    )
+  const inScope = (list.data?.data ?? []).filter(
+    (row) =>
+      (!farm || fields.data?.data.some((item) => item.id === row.fieldId)) &&
+      (!field || row.fieldId === field),
+  );
+  const count = (value: string) => inScope.filter((row) => row.status === value).length;
+  const rows = inScope
+    .filter((row) => !status || row.status === status)
     .sort((a, b) =>
       sort === "lastSeen"
         ? Date.parse(b.lastSeen) - Date.parse(a.lastSeen)
@@ -65,6 +172,7 @@ function DevicesContent({ preview }: { preview: boolean }) {
           ? a.status.localeCompare(b.status)
           : a.id.localeCompare(b.id),
     );
+  const fieldName = (id: string) => fields.data?.data.find((item) => item.id === id)?.name ?? id;
   const fieldIds = farm
     ? (fields.data?.data.map((row) => row.id) ?? [])
     : [...new Set(list.data?.data.map((row) => row.fieldId))];
@@ -86,75 +194,73 @@ function DevicesContent({ preview }: { preview: boolean }) {
       eyebrow="BR3 · Monitoring continuity"
       title="Devices"
       description="Check device availability and the age of the latest reported observation."
+      headerAction={
+        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold">
+          <PulseDot live />
+          Live · refreshes every 30 s
+        </span>
+      }
     >
-      <section className="panel mb-5 p-4">
+      <section className="surface-card mb-5 p-4" aria-label="Device filters">
         <div className="flex flex-wrap items-end gap-3">
-          <label>
+          <div className="filter-field">
             Farm
-            <select
-              className="select-control block"
-              aria-label="Farm filter"
+            <Dropdown
+              label="Farm filter"
               value={farm}
-              onChange={(e) => {
-                scope.setScope({ farmId: e.target.value, fieldId: "" });
-              }}
-            >
-              <option value="">All farms</option>
-              {farms.data?.data.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
+              options={[
+                { value: "", label: "All farms" },
+                ...(farms.data?.data.map((row) => ({ value: row.id, label: row.name })) ?? []),
+              ]}
+              onChange={(farmId) => scope.setScope({ farmId, fieldId: "" })}
+            />
+          </div>
+          <div className="filter-field">
             Field
-            <select
-              className="select-control block"
-              aria-label="Field filter"
+            <Dropdown
+              label="Field filter"
               value={field}
-              onChange={(e) => scope.setScope({ fieldId: e.target.value })}
-            >
-              <option value="">All fields</option>
-              {fieldIds.map((id) => (
-                <option key={id}>{id}</option>
-              ))}
-            </select>
-          </label>
-          <label>
+              options={[{ value: "", label: "All fields" }, ...fieldIds.map((id) => ({ value: id, label: fieldName(id) }))]}
+              onChange={(fieldId) => scope.setScope({ fieldId })}
+            />
+          </div>
+          <div className="filter-field">
             Status
-            <select
-              className="select-control block"
-              aria-label="Device status filter"
+            <Dropdown
+              label="Device status filter"
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">All statuses</option>
-              {["online", "stale", "offline"].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </label>
-          <label>
+              options={[
+                { value: "", label: "All statuses" },
+                { value: "online", label: "Online" },
+                { value: "stale", label: "Stale" },
+                { value: "offline", label: "Offline" },
+              ]}
+              onChange={setStatus}
+            />
+          </div>
+          <div className="filter-field">
             Sort
-            <select
-              className="select-control block"
-              aria-label="Device sort"
+            <Dropdown
+              label="Device sort"
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              <option value="id">Device</option>
-              <option value="lastSeen">Latest observation</option>
-              <option value="status">Status</option>
-            </select>
-          </label>
+              options={[
+                { value: "id", label: "Device" },
+                { value: "lastSeen", label: "Latest observation" },
+                { value: "status", label: "Status" },
+              ]}
+              onChange={setSort}
+            />
+          </div>
           <button
-            className="button-secondary"
+            className="button-primary disabled:opacity-50"
             disabled={list.isFetching || detail.isFetching}
             onClick={refresh}
           >
-            Refresh
+            {list.isFetching ? "Refreshing…" : "Refresh"}
           </button>
+          <Link className="action-link ml-auto" href={scope.href("/live")}>
+            View live field conditions →
+          </Link>
         </div>
         {farms.isPending && <p role="status">Loading farm filters…</p>}
         {farms.isError && (
@@ -163,9 +269,7 @@ function DevicesContent({ preview }: { preview: boolean }) {
             <button onClick={() => void farms.refetch()}>Retry farms</button>
           </p>
         )}
-        {farm && fields.isPending && (
-          <p role="status">Loading field filters…</p>
-        )}
+        {farm && fields.isPending && <p role="status">Loading field filters…</p>}
         {farm && fields.isError && (
           <p role="alert">
             Field filters unavailable.{" "}
@@ -173,30 +277,41 @@ function DevicesContent({ preview }: { preview: boolean }) {
           </p>
         )}
       </section>
-      <Link
-        className="button-secondary mb-3 inline-block"
-        href={scope.href("/live")}
-      >
-        View live field conditions
-      </Link>
-      <p className="muted mb-3 text-sm">
-        {preview ? "Preview data · " : ""}Polls every 30 seconds while visible;
-        refreshes on focus. Times shown in{" "}
-        {process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Ho_Chi_Minh"}.
+
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="stat-card">
+          <p className="muted text-xs">📡 Devices</p>
+          <p className="mt-2 text-2xl font-semibold sm:text-3xl">{list.data ? inScope.length : "—"}</p>
+          <p className="muted mt-2 text-xs">In the current view</p>
+        </div>
+        <div className="stat-card">
+          <p className="muted text-xs">✓ Online</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-600 sm:text-3xl">{list.data ? count("online") : "—"}</p>
+          <p className="muted mt-2 text-xs">Reporting normally</p>
+        </div>
+        <div className="stat-card">
+          <p className="muted text-xs">▲ Stale</p>
+          <p className="mt-2 text-2xl font-semibold text-orange-600 sm:text-3xl">{list.data ? count("stale") : "—"}</p>
+          <p className="muted mt-2 text-xs">Reading older than 90 s</p>
+        </div>
+        <div className="stat-card">
+          <p className="muted text-xs">✕ Offline</p>
+          <p className="mt-2 text-2xl font-semibold text-rose-600 sm:text-3xl">{list.data ? count("offline") : "—"}</p>
+          <p className="muted mt-2 text-xs">Outage reported by the service</p>
+        </div>
+      </div>
+
+      <p className="muted mb-3 flex flex-wrap items-center gap-x-2 text-xs">
+        <PulseDot live={!list.isError} />
+        <Tooltip
+          text={`Stale means the latest reading is older than 90 seconds. Offline is reported by the service from the device reporting interval, not from a failed request. Times are in ${process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Ho_Chi_Minh"}.`}
+        >
+          <span>
+            {preview ? "Preview data · " : ""}Updates every 30 s
+            {list.data ? ` · data as of ${clock(list.data.meta.asOf)}` : ""}
+          </span>
+        </Tooltip>
       </p>
-      <p
-        className="muted mb-3 text-sm"
-        title="Stale observations are older than 90 seconds. Offline is reported by the service based on the device reporting interval; it is not inferred from a failed HTTP request."
-      >
-        Stale: observation older than 90 seconds. Offline: device outage
-        reported by the service.
-      </p>
-      {list.data && (
-        <p className="muted mb-3 text-sm">
-          Data as of {formatTime(list.data.meta.asOf)} · snapshot retrieved;
-          observation times below show actual freshness.
-        </p>
-      )}
       {list.isError && (
         <p role="alert" className="empty-state">
           {error} {list.data ? "Showing the last successful snapshot." : ""}{" "}
@@ -212,72 +327,20 @@ function DevicesContent({ preview }: { preview: boolean }) {
       )}
       {list.data && (
         <>
-          <div className="table-scroll">
-            <table
-              className="data-table m3-sticky-first"
-              aria-label="Device continuity"
-            >
-              <thead>
-                <tr>
-                  {[
-                    "Device",
-                    "Field",
-                    "Reported status",
-                    "Observation age",
-                    "Last reading",
-                    "Battery",
-                    "Signal",
-                    "Gaps in 24 h",
-                    "Details",
-                  ].map((label) => (
-                    <th scope="col" key={label}>
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.id}</td>
-                    <td>{row.fieldId}</td>
-                    <td>
-                      <span
-                        className={`status-chip ${row.status === "online" ? "resolved" : row.status === "offline" ? "open" : "acknowledged"}`}
-                      >
-                        {row.status}
-                      </span>
-                    </td>
-                    <td>
-                      {observationAge(row.lastSeen, now)}{" "}
-                      {isStale(row.lastSeen, now) && (
-                        <strong className="text-amber-700">
-                          Stale observation
-                        </strong>
-                      )}
-                    </td>
-                    <td>{formatTime(row.lastSeen)}</td>
-                    <td>{row.batteryPct}%</td>
-                    <td>{formatSignal(row.rssi)}</td>
-                    <td>{row.gapCount24h}</td>
-                    <td>
-                      <button
-                        className="button-secondary"
-                        onClick={() => setSelected(row.id)}
-                      >
-                        View status
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {rows.length === 0 &&
-            (!farm || !fields.isPending) &&
-            !fields.isError && (
-              <p className="empty-state">No devices match these filters.</p>
-            )}
+          <ul className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Device continuity">
+            {rows.map((row) => (
+              <DeviceCard
+                key={row.id}
+                row={row}
+                fieldName={fieldName(row.fieldId)}
+                now={now}
+                onOpen={() => setSelected(row.id)}
+              />
+            ))}
+          </ul>
+          {rows.length === 0 && (!farm || !fields.isPending) && !fields.isError && (
+            <p className="empty-state">No devices match these filters.</p>
+          )}
         </>
       )}
       {selected && (
@@ -346,21 +409,30 @@ function DevicesContent({ preview }: { preview: boolean }) {
             )}
             {detail.data && (
               <>
-                <p className="muted mt-3">
-                  Data as of {formatTime(detail.data.meta.asOf)} · snapshot
-                  retrieved
+                <p className="muted mt-3 text-xs">
+                  Data as of {clock(detail.data.meta.asOf)}
                 </p>
-                <dl className="mt-3 grid gap-2">
-                  <dt>Reported status</dt>
-                  <dd>{detail.data.data.status}</dd>
-                  <dt>Last reading</dt>
-                  <dd>{formatTime(detail.data.data.lastSeen)}</dd>
-                  <dt>Battery</dt>
-                  <dd>{detail.data.data.batteryPct}%</dd>
-                  <dt>Signal</dt>
-                  <dd>{formatSignal(detail.data.data.rssi)}</dd>
-                  <dt>Gaps in 24 h</dt>
-                  <dd>{detail.data.data.gapCount24h}</dd>
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div className="stat-card">
+                    <dt className="muted text-xs">Reported status</dt>
+                    <dd className="mt-1 font-semibold capitalize">{detail.data.data.status}</dd>
+                  </div>
+                  <div className="stat-card">
+                    <dt className="muted text-xs">Last reading</dt>
+                    <dd className="mt-1 font-semibold">{clock(detail.data.data.lastSeen)}</dd>
+                  </div>
+                  <div className="stat-card">
+                    <dt className="muted text-xs">🔋 Battery</dt>
+                    <dd className="mt-1 font-semibold">{Math.round(detail.data.data.batteryPct)}%</dd>
+                  </div>
+                  <div className="stat-card">
+                    <dt className="muted text-xs">📶 Signal</dt>
+                    <dd className="mt-1 font-semibold">{formatSignal(detail.data.data.rssi)}</dd>
+                  </div>
+                  <div className="stat-card col-span-2">
+                    <dt className="muted text-xs">Gaps in 24 h</dt>
+                    <dd className="mt-1 font-semibold">{detail.data.data.gapCount24h}</dd>
+                  </div>
                 </dl>
                 {isStale(detail.data.data.lastSeen, now) && (
                   <p role="status">

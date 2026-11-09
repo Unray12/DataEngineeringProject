@@ -108,3 +108,28 @@ describe("M2 frozen device contract (BR3)", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 });
+
+it("accepts FastAPI device rows: signal quality becomes the signal value", async () => {
+  vi.stubEnv("DATA_MODE", "api");
+  vi.stubEnv("API_BASE_URL", "http://backend");
+  vi.resetModules();
+  const api = await import("@/lib/api/devices");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json([
+        {
+          device_id: "F001-S01",
+          field_id: "F001",
+          status: "online",
+          last_seen: "2026-11-09T15:35:48.390000+00:00",
+          battery_pct: 92,
+          signal_quality: 0.84,
+          gap_count_24h: 3,
+        },
+      ]),
+    ),
+  );
+  const result = await api.getDevices();
+  expect(result.data[0]).toMatchObject({ id: "F001-S01", rssi: 0.84, gapCount24h: 3, batteryPct: 92 });
+});

@@ -3,7 +3,7 @@
 import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Dropdown } from "@/features/insights/dropdown";
+import { Dropdown } from "@/components/shared/dropdown";
 import { M3QueryProvider, M3Shell } from "@/components/m3-shell";
 import type { Field } from "@/lib/types";
 import { useOverview } from "./hooks";

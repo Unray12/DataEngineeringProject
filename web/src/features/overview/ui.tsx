@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { formatInTimeZone } from "date-fns-tz";
 import {
   DEVICE_ICON,
   DEVICE_TEXT,
@@ -10,23 +9,8 @@ import {
   isStale,
 } from "./summary";
 
-const TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE ?? "Asia/Ho_Chi_Minh";
-
-function formatTime(iso: string): string {
-  try {
-    return formatInTimeZone(new Date(iso), TIMEZONE, "HH:mm:ss");
-  } catch {
-    return "unknown time";
-  }
-}
-
-export function formatDateTime(iso: string): string {
-  try {
-    return formatInTimeZone(new Date(iso), TIMEZONE, "d MMM, HH:mm");
-  } catch {
-    return "unknown time";
-  }
-}
+export { formatDateTime } from "@/lib/datetime";
+import { formatClock } from "@/lib/datetime";
 
 /** Status is always icon + text, never colour alone. */
 export function StatusChip({ status }: { status: keyof typeof STATUS_TEXT }) {
@@ -67,7 +51,7 @@ function Freshness({ asOf, live = true }: { asOf: string; live?: boolean }) {
   const stale = live && now !== null && isStale(asOf, now);
   return (
     <p className="muted text-xs" role={stale ? "status" : undefined}>
-      Data as of {formatTime(asOf)}
+      Data as of {formatClock(asOf)}
       {live ? "" : " · historical data, not live"}
       {stale ? (
         <strong className="ml-2 text-amber-600">

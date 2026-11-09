@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { formatDay } from "@/lib/datetime";
 import type { QualityDay } from "@/lib/types";
 import { QUALITY_COLORS, QUALITY_TERM_LABELS } from "../glossary";
 
@@ -29,7 +30,7 @@ export function QualityStackedBar({ days }: { days: QualityDay[] }) {
     );
   }
 
-  const chartData = days.map((day) => ({ ...day, label: day.date.slice(5) }));
+  const chartData = days.map((day) => ({ ...day, label: formatDay(day.date, false) }));
 
   return (
     <div>
@@ -90,7 +91,7 @@ export function QualityStackedBar({ days }: { days: QualityDay[] }) {
             <tbody>
               {[...days].reverse().map((day) => (
                 <tr key={day.date}>
-                  <td>{day.date}</td>
+                  <td>{formatDay(day.date)}</td>
                   <td>{day.valid.toLocaleString("en-GB")}</td>
                   <td>{day.duplicate.toLocaleString("en-GB")}</td>
                   <td>{day.outOfRange.toLocaleString("en-GB")}</td>

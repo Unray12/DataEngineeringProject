@@ -92,7 +92,7 @@ function FieldDetailContent({ fieldId }: { fieldId: string }) {
       ) : (
         <div className="space-y-6">
           <nav aria-label="Related views" className="flex flex-wrap gap-2">
-            <Link href={`/live?field=${id}`} className="button-primary">
+            <Link href={`/live?fieldId=${id}`} className="button-primary">
               Live conditions
             </Link>
             <Link href={`/analytics?field=${id}`} className="button-secondary">

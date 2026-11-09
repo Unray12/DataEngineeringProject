@@ -52,8 +52,8 @@ export function chartPoints(series: Series) {
       point.quality === "valid" &&
       !series.gaps.some(
         (gap) =>
-          Date.parse(point.t) >= Date.parse(gap.start) &&
-          Date.parse(point.t) <= Date.parse(gap.end),
+          Date.parse(point.t) > Date.parse(gap.start) &&
+          Date.parse(point.t) < Date.parse(gap.end),
       )
         ? point.value
         : null,

@@ -28,13 +28,17 @@ Previous implementation (for reference only): git tag archive/webapp-v1, path `w
 
 Only Trino-backed endpoints are used on this page. The browser never calls FastAPI.
 
-## Data gaps in API mode
+## Per-device data in API mode
 
-The current FastAPI `/quality/devices` endpoint exposes `device_id`, `total`, `valid`,
-`flagged` and `last_batch_id`, but not the duplicate/out-of-range/quarantined
-breakdown and not lineage. The adapter keeps the fields it has and sets the missing
-ones to `null` or `[]`; the UI renders **“chưa có dữ liệu”** instead of inventing a
-number. The daily summary still has the full breakdown.
+FastAPI `/quality/devices` returns, per device: `total`, `valid`, `flagged`,
+`last_batch_id`, the `duplicate` and `out_of_range` counters (summed from
+`ops.quality_counters`), the `quarantined` count (from `ops.quarantine`) and the
+three newest `lineage` records (batch, topic, partition, offset, ingest time) from
+`silver.sensor_readings`. The adapter reads all of them.
+
+An older API that omits a field still works: the adapter sets the missing
+breakdown to `null` and lineage to `[]`, and the UI renders **“chưa có dữ liệu”**
+and shows the notice, instead of inventing a number.
 
 ## Pure helpers
 

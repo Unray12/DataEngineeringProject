@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from common.reference import ReferenceData, load_reference
 from api.analytics import AnalyticsReader
+from api.live import find_gaps, gap_multiplier, outage_counts, target_state
 from streaming.alerts import ALLOWED_TRANSITIONS, STATUS_ACKNOWLEDGED, STATUS_OPEN, STATUS_RESOLVED
 from streaming.cassandra_io import CassandraWriter
 
@@ -152,9 +153,24 @@ def list_fields(farm_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def _gap_counts(field_ids: set[str]) -> dict[str, int]:
+    """Gaps (outage episodes) per device over the last 24 h, from the outage alerts of the given fields."""
+    since = datetime.now(UTC) - timedelta(hours=24)
+    counts: dict[str, int] = {}
+    for field_id in field_ids:
+        rows = _session().execute(
+            "SELECT condition_code, device_id, created_at FROM alerts_by_field "
+            "WHERE field_id = %s AND created_at >= %s",
+            (field_id, since),
+        )
+        counts.update(outage_counts(_rows(rows), since))
+    return counts
+
+
 @app.get("/devices")
 def list_devices() -> list[dict[str, Any]]:
     ref = _ref()
+    gaps = _gap_counts({device.field_id for device in ref.devices.values()})
     rows = []
     for device in ref.devices.values():
         row = _session().execute("SELECT * FROM device_status WHERE device_id = %s", (device.device_id,)).one()
@@ -167,6 +183,8 @@ def list_devices() -> list[dict[str, Any]]:
             "signal_quality": device.signal_quality,
             "gap_count_24h": 0,
         })
+    for row in rows:
+        row["gap_count_24h"] = gaps.get(row["device_id"], 0)
     return rows
 
 
@@ -185,6 +203,10 @@ def field_latest(field_id: str) -> dict[str, Any]:
     )
     metrics = _rows(rows)
     metrics.sort(key=lambda row: row["metric"])
+    ref = _ref()
+    crop = ref.crop(ref.fields[field_id].crop_code)
+    for row in metrics:
+        row["state"] = target_state(row["value"], crop.target(row["metric"]) if crop else None)
     return {"field_id": field_id, "metrics": metrics}
 
 
@@ -209,7 +231,19 @@ def field_series(
     )
     series = _rows(rows)
     series.sort(key=lambda row: row["measured_at"])
-    return {"field_id": field_id, "metric": metric, "hours": hours, "points": series[-limit:]}
+    points = series[-limit:]
+    # Silence longer than the device outage threshold is a gap; the shortest reporting
+    # interval among the field's devices for this metric decides how sensitive it is.
+    intervals = [d.reporting_interval_s for d in _ref().devices_of_field(field_id) if metric in d.metrics]
+    threshold_s = max(min(intervals, default=30.0) * gap_multiplier(), 1.0)
+    return {
+        "field_id": field_id,
+        "metric": metric,
+        "unit": _ref().metrics[metric].unit,
+        "hours": hours,
+        "points": points,
+        "gaps": find_gaps(points, threshold_s, now),
+    }
 
 
 @app.get("/devices/{device_id}/status")
@@ -218,7 +252,9 @@ def device_status(device_id: str) -> dict[str, Any]:
     row = _session().execute("SELECT * FROM device_status WHERE device_id = %s", (device_id,)).one()
     if row is None:
         return {"device_id": device_id, "status": "unknown", "detail": "no readings received yet"}
-    return _rows([row])[0]
+    result = _rows([row])[0]
+    result["gap_count_24h"] = _gap_counts({_ref().devices[device_id].field_id}).get(device_id, 0)
+    return result
 
 
 # --------------------------------------------------------------------------------------
