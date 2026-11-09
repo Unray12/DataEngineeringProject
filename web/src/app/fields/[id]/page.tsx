@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
+import { FieldDetailPage } from "@/features/field-detail/field-detail-page";
+
 type FieldPageProps = { params: Promise<{ id: string }> };
 
-export default async function FieldDetailPage({ params }: FieldPageProps) {
+export const metadata: Metadata = {
+  title: "Field · AgriMonitor",
+  description: "Crop, targets, devices and recent alerts for one field.",
+};
+
+export default async function Page({ params }: FieldPageProps) {
   const { id } = await params;
-  return <main><h1>Field detail: {id} — owner M1 — BR1 — not implemented yet</h1></main>;
+  return <FieldDetailPage fieldId={id} />;
 }
