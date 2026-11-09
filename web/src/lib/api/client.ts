@@ -507,16 +507,23 @@ export async function getDeviceQuality(): Promise<Envelope<DeviceQuality[]>> {
       deviceId: String(row.device_id),
       counts: {
         valid,
-        // FastAPI exposes only total/valid/flagged today. Missing breakdown
-        // fields become null so the UI can say "chưa có dữ liệu".
+        // Older API versions omit the breakdown; missing fields stay null so
+        // the UI says "chưa có dữ liệu" instead of inventing a number.
         duplicate: asNumber(row.duplicate) ?? null,
         outOfRange: asNumber(row.out_of_range ?? row.outOfRange) ?? null,
         quarantined: asNumber(row.quarantined) ?? null,
         total,
         flagged: asNumber(row.flagged),
       },
-      // No lineage endpoint yet; the API-mode UI must say so explicitly.
-      lineage: [],
+      lineage: Array.isArray(row.lineage)
+        ? (row.lineage as Array<Record<string, unknown>>).map((entry) => ({
+            batchId: asNumber(entry.batch_id) ?? 0,
+            topic: String(entry.topic ?? "unknown"),
+            partition: asNumber(entry.partition) ?? 0,
+            offset: asNumber(entry.offset) ?? 0,
+            ingestedAt: String(entry.ingested_at ?? ""),
+          }))
+        : [],
       lastBatchId: asNumber(row.last_batch_id) ?? null,
     });
   });

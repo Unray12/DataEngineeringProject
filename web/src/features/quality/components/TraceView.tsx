@@ -1,5 +1,6 @@
 "use client";
 
+import { Dropdown } from "@/components/shared/dropdown";
 import { useState } from "react";
 import type { DeviceQuality } from "@/lib/types";
 import { formatDateTime } from "@/features/alerts/format";
@@ -27,20 +28,16 @@ export function TraceView({ rows }: TraceViewProps) {
 
   return (
     <div>
-      <label className="filter-field max-w-xs">
+      <div className="filter-field max-w-xs">
         Pick a device value
-        <select
-          className="select-control"
+        <Dropdown
+          label="Pick a device value"
           value={row.deviceId}
-          onChange={(event) => setDeviceId(event.target.value)}
-        >
-          {rows.map((item) => (
-            <option key={item.deviceId} value={item.deviceId}>
-              {item.deviceId}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={rows.map((item) => ({ value: item.deviceId, label: item.deviceId }))}
+          onChange={setDeviceId}
+          block
+        />
+      </div>
 
       {!summary || !latest ? (
         <p className="muted mt-4 text-sm">

@@ -94,13 +94,56 @@ class AnalyticsReader:
         )
 
     def quality_devices(self) -> list[dict[str, Any]]:
-        return self.query(
+        """Per-device quality counts plus the lineage of each device's newest readings."""
+        devices = self.query(
             """
-            SELECT device_id, count(*) AS total,
-                   sum(CASE WHEN quality_flag = 'ok' THEN 1 ELSE 0 END) AS valid,
-                   sum(CASE WHEN quality_flag <> 'ok' THEN 1 ELSE 0 END) AS flagged,
-                   max(batch_id) AS last_batch_id
-            FROM lakehouse.silver.sensor_readings
-            GROUP BY device_id ORDER BY device_id
+            WITH silver AS (
+                SELECT device_id, count(*) AS total,
+                       sum(CASE WHEN quality_flag = 'ok' THEN 1 ELSE 0 END) AS valid,
+                       sum(CASE WHEN quality_flag <> 'ok' THEN 1 ELSE 0 END) AS flagged,
+                       max(batch_id) AS last_batch_id
+                FROM lakehouse.silver.sensor_readings
+                GROUP BY device_id
+            ),
+            counters AS (
+                SELECT device_id, sum(duplicate) AS duplicate, sum(out_of_range) AS out_of_range
+                FROM lakehouse.ops.quality_counters
+                GROUP BY device_id
+            ),
+            quarantined AS (
+                SELECT device_id, count(*) AS quarantined
+                FROM lakehouse.ops.quarantine
+                GROUP BY device_id
+            )
+            SELECT s.device_id, s.total, s.valid, s.flagged, s.last_batch_id,
+                   coalesce(c.duplicate, 0) AS duplicate,
+                   coalesce(c.out_of_range, 0) AS out_of_range,
+                   coalesce(q.quarantined, 0) AS quarantined
+            FROM silver s
+            LEFT JOIN counters c ON c.device_id = s.device_id
+            LEFT JOIN quarantined q ON q.device_id = s.device_id
+            ORDER BY s.device_id
             """
         )
+        lineage = self.query(
+            """
+            SELECT device_id, batch_id, source_topic AS topic, source_partition AS partition,
+                   source_offset AS "offset", ingested_at
+            FROM (
+                SELECT *, row_number() OVER (PARTITION BY device_id ORDER BY ingested_at DESC) AS rn
+                FROM lakehouse.silver.sensor_readings
+            )
+            WHERE rn <= 3
+            ORDER BY device_id, ingested_at DESC
+            """
+        )
+        return attach_lineage(devices, lineage)
+
+
+def attach_lineage(devices: list[dict[str, Any]], lineage: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Add a ``lineage`` list (newest first) to every device row; devices without records get ``[]``."""
+    by_device: dict[str, list[dict[str, Any]]] = {}
+    for row in lineage:
+        entry = {key: value for key, value in row.items() if key != "device_id"}
+        by_device.setdefault(row["device_id"], []).append(entry)
+    return [{**device, "lineage": by_device.get(device["device_id"], [])} for device in devices]

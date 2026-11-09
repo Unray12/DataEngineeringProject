@@ -13,6 +13,8 @@ const upstreamDevice = z.object({
   last_seen: z.string().nullable().optional(),
   battery_pct: z.number().nullable().optional(),
   rssi: z.number().nullable().optional(),
+  // FastAPI reports a 0-1 signal quality; the UI shows it as a percentage.
+  signal_quality: z.number().nullable().optional(),
   gap_count_24h: z.number().nullable().optional(),
 });
 export const deviceEnvelopeSchema = envelopeSchema(deviceSchema);
@@ -29,7 +31,7 @@ function normalize(value: unknown): Device {
     status: row.status,
     lastSeen: row.last_seen,
     batteryPct: row.battery_pct,
-    rssi: row.rssi,
+    rssi: row.rssi ?? row.signal_quality,
     gapCount24h: row.gap_count_24h,
   });
   if (!parsed.success)

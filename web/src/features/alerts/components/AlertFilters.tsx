@@ -1,5 +1,6 @@
 "use client";
 
+import { Dropdown } from "@/components/shared/dropdown";
 import type { AlertSeverity, AlertStatus, AlertType } from "@/lib/types";
 import type { AlertFilterState, AlertReference, SortOrder } from "../hooks";
 import { ALERT_SEVERITY_LABELS, ALERT_STATUS_LABELS, ALERT_TYPE_LABELS } from "../format";
@@ -36,100 +37,80 @@ export function AlertFilters({ filters, onChange, farms, fields }: AlertFiltersP
 
   return (
     <div className="filter-bar" role="group" aria-label="Alert filters">
-      <label className="filter-field">
+      <div className="filter-field">
         Status
-        <select
-          className="select-control"
+        <Dropdown
+          label="Status"
           value={filters.status}
-          onChange={(event) => change({ status: event.target.value as AlertStatus | "all" })}
-        >
-          <option value="all">All statuses</option>
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {ALERT_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={[
+            { value: "all" as AlertStatus | "all", label: "All statuses" },
+            ...STATUSES.map((status) => ({ value: status, label: ALERT_STATUS_LABELS[status] })),
+          ]}
+          onChange={(status) => change({ status })}
+        />
+      </div>
 
-      <label className="filter-field">
+      <div className="filter-field">
         Severity
-        <select
-          className="select-control"
+        <Dropdown
+          label="Severity"
           value={filters.severity}
-          onChange={(event) => change({ severity: event.target.value as AlertSeverity | "all" })}
-        >
-          <option value="all">All severities</option>
-          {SEVERITIES.map((severity) => (
-            <option key={severity} value={severity}>
-              {ALERT_SEVERITY_LABELS[severity]}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={[
+            { value: "all" as AlertSeverity | "all", label: "All severities" },
+            ...SEVERITIES.map((severity) => ({ value: severity, label: ALERT_SEVERITY_LABELS[severity] })),
+          ]}
+          onChange={(severity) => change({ severity })}
+        />
+      </div>
 
-      <label className="filter-field">
+      <div className="filter-field">
         Type
-        <select
-          className="select-control"
+        <Dropdown
+          label="Type"
           value={filters.type}
-          onChange={(event) => change({ type: event.target.value as AlertType | "all" })}
-        >
-          <option value="all">All types</option>
-          {TYPES.map((type) => (
-            <option key={type} value={type}>
-              {ALERT_TYPE_LABELS[type]}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={[
+            { value: "all" as AlertType | "all", label: "All types" },
+            ...TYPES.map((type) => ({ value: type, label: ALERT_TYPE_LABELS[type] })),
+          ]}
+          onChange={(type) => change({ type })}
+        />
+      </div>
 
-      <label className="filter-field">
+      <div className="filter-field">
         Farm
-        <select
-          className="select-control"
+        <Dropdown
+          label="Farm"
           value={filters.farmId}
-          onChange={(event) => change({ farmId: event.target.value })}
-        >
-          <option value="all">All farms</option>
-          {farms.map((farm) => (
-            <option key={farm.id} value={farm.id}>
-              {farm.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={[{ value: "all", label: "All farms" }, ...farms.map((farm) => ({ value: farm.id, label: farm.name }))]}
+          onChange={(farmId) => change({ farmId })}
+        />
+      </div>
 
-      <label className="filter-field">
+      <div className="filter-field">
         Field
-        <select
-          className="select-control"
+        <Dropdown
+          label="Field"
           value={filters.fieldId}
-          onChange={(event) => change({ fieldId: event.target.value })}
-        >
-          <option value="all">All fields</option>
-          {visibleFields.map((field) => (
-            <option key={field.id} value={field.id}>
-              {field.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={[
+            { value: "all", label: "All fields" },
+            ...visibleFields.map((field) => ({ value: field.id, label: field.name })),
+          ]}
+          onChange={(fieldId) => change({ fieldId })}
+        />
+      </div>
 
-      <label className="filter-field">
+      <div className="filter-field">
         Sort
-        <select
-          className="select-control"
+        <Dropdown
+          label="Sort"
           value={filters.sort}
-          onChange={(event) => change({ sort: event.target.value as SortOrder })}
-        >
-          {(Object.keys(SORT_LABELS) as SortOrder[]).map((order) => (
-            <option key={order} value={order}>
-              {SORT_LABELS[order]}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={(Object.keys(SORT_LABELS) as SortOrder[]).map((order) => ({
+            value: order,
+            label: SORT_LABELS[order],
+          }))}
+          onChange={(sort) => change({ sort })}
+        />
+      </div>
 
       <button
         type="button"

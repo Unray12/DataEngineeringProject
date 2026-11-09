@@ -1,13 +1,8 @@
-const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+import { formatDateTime as sharedDateTime } from "@/lib/datetime";
 
 export function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "chưa có dữ liệu";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "chưa có dữ liệu";
-  return DATE_TIME.format(date);
+  if (!value || Number.isNaN(new Date(value).getTime())) return "chưa có dữ liệu";
+  return sharedDateTime(value);
 }
 
 export function formatNumber(value: number, digits = 1): string {

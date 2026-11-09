@@ -39,7 +39,8 @@ export async function getAnalytics(params: { fieldId: string; metric: Metric; gr
   const comparison = await apiFetch(`/compare?field_ids=${encodeURIComponent(fields.map((field) => field.id).join(","))}&metric=${apiMetric}&from=${params.from}&to=${params.to}`, z.object({ rows: z.array(z.object({ field_id: z.string(), min: z.number(), max: z.number(), avg: z.number(), count: z.number() })) }));
   return analyticsResponseSchema.parse({
     history: history.rows,
-    indicators: indicators.rows.map((row) => ({ bucket: String(row.bucket), metric: params.metric, min: Number(row.min), max: Number(row.max), avg: Number(row.avg), count: Number(row.count), time_in_range_pct: row.time_in_range_pct == null ? null : Number(row.time_in_range_pct), hours_below_target: row.hours_below_target == null ? null : Number(row.hours_below_target) })),
+    // The endpoint returns every metric for each day; keep only the selected one.
+    indicators: indicators.rows.filter((row) => row.metric === apiMetric).map((row) => ({ bucket: String(row.bucket), metric: params.metric, min: Number(row.min), max: Number(row.max), avg: Number(row.avg), count: Number(row.count), time_in_range_pct: row.time_in_range_pct == null ? null : Number(row.time_in_range_pct), hours_below_target: row.hours_below_target == null ? null : Number(row.hours_below_target) })),
     comparison: comparison.rows,
     asOf: new Date().toISOString(),
     source: "trino",

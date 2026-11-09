@@ -19,6 +19,7 @@ const NAV = [
   { href: "/live", label: "Live monitor", icon: "◉" },
   { href: "/alerts", label: "Alerts", icon: "!" },
   { href: "/analytics", label: "Analytics", icon: "↗" },
+  { href: "/insights", label: "Insights", icon: "★" },
   { href: "/quality", label: "Data quality", icon: "✓" },
   { href: "/devices", label: "Devices", icon: "▣" },
 ];
@@ -69,7 +70,8 @@ export function M3Shell({ eyebrow, title, description, headerAction, children }:
   }, [dark]);
 
   function isActive(href: string): boolean {
-    if (href === "/") return pathname === "/";
+    // A field page belongs to the Overview tab.
+    if (href === "/") return pathname === "/" || pathname.startsWith("/fields/");
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
@@ -170,7 +172,7 @@ export function M3Shell({ eyebrow, title, description, headerAction, children }:
           <Link
             key={item.href}
             href={item.href}
-            className={`mobile-nav-item ${isActive(item.href) ? "text-emerald-500" : ""}`}
+            className={`mobile-nav-item rounded-lg ${isActive(item.href) ? "bg-emerald-500/20 font-bold text-emerald-500" : ""}`}
             aria-current={isActive(item.href) ? "page" : undefined}
           >
             <span className="block text-lg" aria-hidden="true">

@@ -98,3 +98,56 @@ it("validates live route inputs before making service calls", async () => {
     ).status,
   ).toBe(400);
 });
+
+it("accepts the FastAPI latest and series payloads, renaming relative_humidity", async () => {
+  const api = await adapter();
+  const fetcher = vi.fn<typeof fetch>(async (input) =>
+    Response.json(
+      String(input).includes("/latest")
+        ? {
+            field_id: "F001",
+            metrics: [
+              {
+                metric: "relative_humidity",
+                value: 72.1,
+                unit: "%",
+                measured_at: "2026-11-09T15:35:33.386000+00:00",
+                quality_flag: "ok",
+                state: "high",
+              },
+              {
+                metric: "rainfall",
+                value: 0.2,
+                unit: "mm/h",
+                measured_at: "2026-11-09T15:35:33.386000+00:00",
+                quality_flag: "duplicate",
+                state: "ok",
+              },
+            ],
+          }
+        : {
+            field_id: "F001",
+            metric: "relative_humidity",
+            unit: "%",
+            points: [
+              { measured_at: "2026-11-09T15:00:00+00:00", value: 70, quality_flag: "ok" },
+            ],
+            gaps: [
+              { start: "2026-11-09T15:00:00+00:00", end: "2026-11-09T15:10:00+00:00" },
+            ],
+          },
+    ),
+  );
+  vi.stubGlobal("fetch", fetcher);
+
+  const latest = await api.getLatest("F001");
+  expect(latest.data.metrics.map((row) => [row.metric, row.quality, row.state])).toEqual([
+    ["air_humidity", "valid", "high"],
+    ["rainfall", "invalid", "ok"],
+  ]);
+
+  const series = await api.getSeries("F001", "air_humidity");
+  expect(String(fetcher.mock.calls[1][0])).toContain("metric=relative_humidity");
+  expect(series.data.metric).toBe("air_humidity");
+  expect(series.data.gaps).toHaveLength(1);
+});

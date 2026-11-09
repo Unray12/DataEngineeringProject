@@ -3,6 +3,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQueries } from "@tanstack/react-query";
 import { M3Shell } from "@/components/m3-shell";
+import { Dropdown } from "@/components/shared/dropdown";
+import { Tooltip } from "@/components/shared/tooltip";
+import { METRIC_ICON } from "@/features/insights/types";
 import { DataProvider } from "@/lib/api/provider";
 import {
   useFarms,
@@ -16,7 +19,7 @@ import { read } from "@/lib/api/read";
 import { seriesEnvelopeSchema } from "@/lib/api/schemas";
 import type { Field, Metric } from "@/types";
 import { useMonitoringScope } from "./scope";
-import { DataPanel, Freshness, useNow } from "./panels";
+import { DataPanel, Freshness, PulseDot, useFlash, useNow } from "./panels";
 import { GapChart } from "./chart";
 import { monitoringCoverage } from "./continuity";
 
@@ -28,15 +31,64 @@ const METRICS: Metric[] = [
   "rainfall",
 ];
 const label = (metric: Metric) => metric.replaceAll("_", " ");
+const ALL = "";
+
+type Reading = {
+  metric: Metric;
+  value: number;
+  unit: string;
+  measuredAt: string;
+  quality: "valid" | "suspect" | "invalid";
+  state: "low" | "ok" | "high";
+};
+
+// Colour follows meaning (inside or outside the healthy range); the words and arrows carry it too.
+const STATE_CHIP = {
+  ok: { text: "In range", icon: "✓", tone: "bg-emerald-500/10 text-emerald-600" },
+  low: { text: "Below target", icon: "▼", tone: "bg-orange-500/10 text-orange-600" },
+  high: { text: "Above target", icon: "▲", tone: "bg-orange-500/10 text-orange-600" },
+} as const;
+
+function StateChip({ reading, hasTarget }: { reading: Reading; hasTarget: boolean }) {
+  if (reading.quality !== "valid") {
+    return (
+      <span className="rounded-full bg-[var(--line)] px-2 py-0.5 text-xs font-semibold">
+        Excluded · {reading.quality}
+      </span>
+    );
+  }
+  if (!hasTarget) return <span className="muted text-xs">No target range</span>;
+  const chip = STATE_CHIP[reading.state];
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${chip.tone}`}>
+      {chip.icon} {chip.text}
+    </span>
+  );
+}
+
+function Value({ reading, big = false }: { reading: Reading; big?: boolean }) {
+  const flash = useFlash(reading.value);
+  return (
+    <p
+      className={`font-semibold transition-colors duration-700 ${big ? "text-3xl" : "text-xl"} ${
+        flash ? "rounded-lg bg-emerald-500/20" : ""
+      }`}
+    >
+      {reading.quality === "valid" ? reading.value.toFixed(1) : "—"}
+      <span className="muted ml-1 text-sm font-normal">{reading.unit}</span>
+    </p>
+  );
+}
+
 function MetricPanel({ field, metric }: { field: Field; metric: Metric }) {
   const series = useSeries(field.id, metric),
     latest = useLatest(field.id);
-  const current = latest.data?.data.metrics.find(
-    (row) => row.metric === metric,
-  );
+  const current = latest.data?.data.metrics.find((row) => row.metric === metric);
+  const target = field.targets?.[metric];
   return (
     <DataPanel
       title={label(metric)}
+      icon={METRIC_ICON[metric]}
       pending={series.isPending || latest.isPending}
       error={series.error ?? latest.error}
       retry={() => {
@@ -45,45 +97,21 @@ function MetricPanel({ field, metric }: { field: Field; metric: Metric }) {
       }}
       asOf={series.data?.meta.asOf}
     >
-      {latest.data && (
-        <>
-          {current ? (
-            <>
-              <p className="mt-3 text-2xl font-semibold">
-                {current.quality === "valid"
-                  ? `${current.value} ${current.unit}`
-                  : "Excluded reading"}
-              </p>
-              <p>
-                {current.quality === "valid"
-                  ? field.targets?.[metric]
-                    ? `Target state: ${current.state}`
-                    : "No target range configured"
-                  : `Quality: ${current.quality}`}
-              </p>
-              <Freshness
-                asOf={latest.data.meta.asOf}
-                observedAt={current.measuredAt}
-              />
-            </>
-          ) : (
-            <p className="empty-state">No current reading.</p>
-          )}
-        </>
-      )}
-      {series.data && (
-        <GapChart series={series.data.data} target={field.targets?.[metric]} />
-      )}
+      {latest.data &&
+        (current ? (
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-2">
+            <Value reading={current} big />
+            <StateChip reading={current} hasTarget={Boolean(target)} />
+          </div>
+        ) : (
+          <p className="empty-state mt-3">No current reading.</p>
+        ))}
+      {series.data && <GapChart series={series.data.data} target={target} />}
     </DataPanel>
   );
 }
-function Coverage({
-  fieldId,
-  interval,
-}: {
-  fieldId: string;
-  interval: number;
-}) {
+
+function Coverage({ fieldId, interval }: { fieldId: string; interval: number }) {
   const now = useNow();
   const resources = useQueries({
     queries: METRICS.map((metric) => ({
@@ -100,24 +128,20 @@ function Coverage({
     failed = resources.find((row) => row.error);
   const end = now,
     start = end - 86_400_000;
-  const available = resources.flatMap((row) =>
-    row.data ? [row.data.data] : [],
-  );
+  const available = resources.flatMap((row) => (row.data ? [row.data.data] : []));
   const coverage =
     !pending && !failed && available.length === METRICS.length
       ? monitoringCoverage(available, start, end, interval * 60)
       : null;
-  const asOf = resources
-    .flatMap((row) => (row.data ? [row.data.meta.asOf] : []))
-    .sort()[0];
+  const percent = coverage === null ? null : Math.max(0, Math.min(100, coverage));
   return (
-    <div className="mt-3" aria-label="Monitoring coverage">
+    <div className="mt-4" aria-label="Monitoring coverage">
       {pending ? (
-        <p className="animate-pulse" role="status">
+        <p className="muted animate-pulse text-sm" role="status">
           Loading coverage…
         </p>
       ) : failed ? (
-        <p role="alert">
+        <p role="alert" className="text-sm">
           Coverage unavailable.{" "}
           <button
             className="button-secondary"
@@ -127,64 +151,100 @@ function Coverage({
           </button>
         </p>
       ) : (
-        <p className="font-semibold">
-          Monitoring coverage:{" "}
-          {coverage === null ? "Unavailable" : `${coverage.toFixed(1)}%`}
-        </p>
+        <>
+          <div className="flex items-baseline justify-between text-sm">
+            <Tooltip
+              text={`Received samples across five metrics / expected samples in 24 hours, at one reading every ${interval} minutes.`}
+            >
+              <span className="font-semibold">Monitoring coverage (24 h)</span>
+            </Tooltip>
+            <span className="font-semibold">{percent === null ? "Unavailable" : `${percent.toFixed(1)}%`}</span>
+          </div>
+          <div
+            className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--line)]"
+            role="progressbar"
+            aria-label="Monitoring coverage"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent ?? undefined}
+          >
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${
+                percent !== null && percent < 80 ? "bg-orange-500" : "bg-emerald-500"
+              }`}
+              style={{ width: `${percent ?? 0}%` }}
+            />
+          </div>
+        </>
       )}
-      <p className="muted text-xs">
-        Received samples across five metrics / expected samples in 24 hours;
-        schedule: every {interval} minutes.
-      </p>
-      {asOf && <Freshness asOf={asOf} />}
     </div>
   );
 }
+
 function FieldCard({ field, interval }: { field: Field; interval: number }) {
   const latest = useLatest(field.id),
     scope = useMonitoringScope();
+  const metrics = latest.data?.data.metrics ?? [];
+  const attention = metrics.some(
+    (row) => row.quality === "valid" && field.targets?.[row.metric] && row.state !== "ok",
+  );
   return (
     <DataPanel
       title={field.name}
+      icon="🌾"
+      action={
+        latest.data ? (
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              attention ? "bg-orange-500/10 text-orange-600" : "bg-emerald-500/10 text-emerald-600"
+            }`}
+          >
+            {attention ? "▲ Needs attention" : "✓ All in range"}
+          </span>
+        ) : undefined
+      }
       pending={latest.isPending}
       error={latest.error}
       retry={latest.refetch}
     >
       {latest.data && (
         <>
-          {latest.data.data.metrics.length === 0 && (
-            <p className="empty-state">No current readings.</p>
-          )}
-          <dl className="mt-3 grid grid-cols-2 gap-2">
-            {latest.data.data.metrics.map((row) => (
-              <div key={row.metric}>
-                <dt className="muted text-sm">{label(row.metric)}</dt>
-                <dd>
-                  {row.quality === "valid"
-                    ? `${row.value} ${row.unit}`
-                    : `Excluded (${row.quality})`}
-                </dd>
-              </div>
+          {metrics.length === 0 && <p className="empty-state mt-3">No current readings.</p>}
+          <ul className="mt-3 grid grid-cols-2 gap-2">
+            {metrics.map((row) => (
+              <li key={row.metric} className="device-card">
+                <p className="muted text-xs capitalize">
+                  <span aria-hidden="true">{METRIC_ICON[row.metric]}</span> {label(row.metric)}
+                </p>
+                <Value reading={row} />
+                <div className="mt-1">
+                  <StateChip reading={row} hasTarget={Boolean(field.targets?.[row.metric])} />
+                </div>
+              </li>
             ))}
-          </dl>
+          </ul>
           <Freshness
             asOf={latest.data.meta.asOf}
-            observedAt={
-              latest.data.data.metrics.map((row) => row.measuredAt).sort()[0]
-            }
+            observedAt={metrics.map((row) => row.measuredAt).sort()[0]}
           />
         </>
       )}
       <Coverage fieldId={field.id} interval={interval} />
-      <div className="mt-3 flex flex-wrap gap-3">
-        <Link className="button-secondary" href={scope.href("/live", field.id)}>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Link
+          className="button-primary"
+          href={scope.href("/live", field.id)}
+        >
           View field charts
         </Link>
-        <Link href={scope.href("/devices", field.id)}>View devices</Link>
+        <Link className="action-link inline-flex items-center self-stretch" href={scope.href("/devices", field.id)}>
+          View devices
+        </Link>
       </div>
     </DataPanel>
   );
 }
+
 function ActiveAlerts() {
   const scope = useMonitoringScope();
   const alerts = useActiveAlerts({
@@ -194,6 +254,7 @@ function ActiveAlerts() {
   return (
     <DataPanel
       title="Active alerts"
+      icon="🔔"
       pending={alerts.isPending}
       error={alerts.error}
       retry={alerts.refetch}
@@ -204,116 +265,134 @@ function ActiveAlerts() {
           <ul className="mt-3 space-y-2">
             {alerts.data.data.map((alert) => (
               <li key={alert.id}>
-                <Link href={scope.href("/alerts", alert.fieldId)}>
-                  {alert.severity} · {alert.status}: {alert.message}
+                <Link href={scope.href("/alerts", alert.fieldId)} className="alert-row">
+                  <span className={`severity-icon ${alert.severity}`} aria-hidden="true">
+                    {alert.severity === "critical" ? "!" : alert.severity === "warning" ? "▲" : "i"}
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm">
+                    <strong className="block capitalize">
+                      {alert.severity} · {alert.status}
+                    </strong>
+                    <span className="muted">{alert.message}</span>
+                  </span>
                 </Link>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="empty-state">No active alerts in this scope.</p>
+          <p className="empty-state mt-3">✅ No active alerts in this scope.</p>
         ))}
     </DataPanel>
   );
 }
+
 function LiveContent({ preview }: { preview: boolean }) {
   const scope = useMonitoringScope(),
     farms = useFarms(),
-    fields = useFields(scope.farmId || undefined);
+    fields = useFields(scope.farmId || undefined),
+    alerts = useActiveAlerts({
+      farmId: scope.farmId || undefined,
+      fieldId: scope.fieldId || undefined,
+    });
   const [interval, setInterval] = useState(5);
   const visible =
-    fields.data?.data.filter(
-      (field) => !scope.fieldId || field.id === scope.fieldId,
-    ) ?? [];
+    fields.data?.data.filter((field) => !scope.fieldId || field.id === scope.fieldId) ?? [];
+  const open = alerts.data?.data.length;
   return (
     <M3Shell
       eyebrow="BR2 · BR3"
       title="Live monitor"
       description="Current field conditions, recent trends and monitoring continuity."
+      headerAction={
+        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold">
+          <PulseDot live />
+          Live · refreshes every 30 s
+        </span>
+      }
     >
       <section
-        className="panel mb-5 flex flex-wrap items-end gap-3 p-4"
+        className="surface-card mb-5 flex flex-wrap items-end gap-3 p-4"
         aria-label="Monitoring controls"
       >
-        <label>
+        <div className="filter-field">
           Farm
-          <select
-            className="select-control block"
-            aria-label="Farm filter"
+          <Dropdown
+            label="Farm filter"
             value={scope.farmId}
-            onChange={(event) =>
-              scope.setScope({ farmId: event.target.value, fieldId: "" })
-            }
-          >
-            <option value="">All farms</option>
-            {farms.data?.data.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
+            options={[
+              { value: ALL, label: "All farms" },
+              ...(farms.data?.data.map((row) => ({ value: row.id, label: row.name })) ?? []),
+            ]}
+            onChange={(farmId) => scope.setScope({ farmId, fieldId: "" })}
+          />
+        </div>
+        <div className="filter-field">
           Field
-          <select
-            className="select-control block"
-            aria-label="Field filter"
+          <Dropdown
+            label="Field filter"
             value={scope.fieldId}
-            onChange={(event) =>
-              scope.setScope({ fieldId: event.target.value })
-            }
-          >
-            <option value="">All fields</option>
-            {fields.data?.data.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
+            options={[
+              { value: ALL, label: "All fields" },
+              ...(fields.data?.data.map((row) => ({ value: row.id, label: row.name })) ?? []),
+            ]}
+            onChange={(fieldId) => scope.setScope({ fieldId })}
+          />
+        </div>
+        <div className="filter-field">
           Expected reading interval
-          <select
-            className="select-control block"
-            aria-label="Expected reading interval"
+          <Dropdown
+            label="Expected reading interval"
             value={interval}
-            onChange={(event) => setInterval(Number(event.target.value))}
-          >
-            {[1, 5, 10, 15, 30].map((value) => (
-              <option key={value} value={value}>
-                {value} minutes
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="muted text-sm">
+            options={[1, 5, 10, 15, 30].map((value) => ({ value, label: `${value} minutes` }))}
+            onChange={setInterval}
+          />
+        </div>
+        <p className="muted min-w-[14rem] flex-1 text-xs">
           {preview
             ? "Preview data. Demo schedule: 5 minutes."
-            : "Set the expected device schedule before interpreting coverage."}{" "}
-          Polls every 30 seconds while visible.
+            : "Set the expected device schedule before interpreting coverage."}
         </p>
       </section>
-      <DataPanel
-        title="Fields"
-        asOf={fields.data?.meta.asOf}
-        pending={fields.isPending || farms.isPending}
-        error={fields.error ?? farms.error}
-        retry={() => {
-          void fields.refetch();
-          void farms.refetch();
-        }}
-      >
-        {fields.data && (
-          <p className="muted text-sm">
-            {visible.length} fields in scope · {farms.data?.data.length ?? 0}{" "}
-            farms. Choose a field for detailed charts.
+
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="stat-card">
+          <p className="muted text-xs">🌾 Fields in scope</p>
+          <p className="mt-2 text-2xl font-semibold sm:text-3xl">{fields.data ? visible.length : "—"}</p>
+          <p className="muted mt-2 text-xs">{farms.data ? `${farms.data.data.length} farms` : "Loading"}</p>
+        </div>
+        <div className="stat-card">
+          <p className="muted text-xs">🔔 Active alerts</p>
+          <p
+            className={`mt-2 text-2xl font-semibold sm:text-3xl ${
+              open ? "text-orange-600" : ""
+            }`}
+          >
+            {open ?? "—"}
           </p>
-        )}
-        {fields.data && visible.length === 0 && (
-          <p className="empty-state">No fields match this scope.</p>
-        )}
-      </DataPanel>
-      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <p className="muted mt-2 text-xs">Open or acknowledged</p>
+        </div>
+        <div className="stat-card col-span-2 lg:col-span-1">
+          <p className="muted text-xs">⏱ Refresh</p>
+          <p className="mt-2 text-2xl font-semibold sm:text-3xl">30 s</p>
+          <p className="muted mt-2 text-xs">Paused while the tab is hidden</p>
+        </div>
+      </div>
+
+      {fields.error && (
+        <DataPanel
+          title="Fields"
+          pending={false}
+          error={fields.error}
+          retry={() => {
+            void fields.refetch();
+            void farms.refetch();
+          }}
+        />
+      )}
+      {fields.data && visible.length === 0 && (
+        <p className="empty-state">No fields match this scope.</p>
+      )}
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {visible.map((field) => (
           <FieldCard key={field.id} field={field} interval={interval} />
         ))}
@@ -326,9 +405,8 @@ function LiveContent({ preview }: { preview: boolean }) {
         </div>
       )}
       {!scope.fieldId && (
-        <p className="muted my-4">
-          Choose “View field charts” to inspect five metric charts, target bands
-          and gap intervals.
+        <p className="muted my-4 text-sm">
+          Choose “View field charts” to inspect five metric charts, target bands and gap intervals.
         </p>
       )}
       <div className="mt-5">

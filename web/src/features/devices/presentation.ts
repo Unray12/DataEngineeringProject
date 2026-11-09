@@ -1,3 +1,5 @@
+import { formatDateTimeSeconds } from "@/lib/datetime";
+
 export const STALE_AFTER_MS = 90_000;
 export function isStale(lastSeen: string, now: number): boolean {
   const observed = Date.parse(lastSeen);
@@ -10,12 +12,7 @@ export function observationAge(lastSeen: string, now: number): string {
     : "Unavailable";
 }
 export function formatTime(value: string): string {
-  if (!Number.isFinite(Date.parse(value))) return "Unavailable";
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Ho_Chi_Minh",
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(value));
+  return formatDateTimeSeconds(value);
 }
 export function liveQueryOptions() {
   return {
