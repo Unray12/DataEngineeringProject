@@ -2,10 +2,26 @@
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {2.1}{\ignorespaces Ví dụ hai micro-batch 5 giây của một cảm biến độ ẩm đất}}{4}{table.caption.7}%
 \contentsline {table}{\numberline {2.2}{\ignorespaces So sánh xử lý theo lô, micro-batch và xử lý luồng}}{7}{table.caption.11}%
-\contentsline {table}{\numberline {2.3}{\ignorespaces Lợi ích và chi phí của micro-batch}}{8}{table.caption.12}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces Lợi ích và chi phí của micro-batch}}{7}{table.caption.12}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Danh sách yêu cầu nghiệp vụ (Business Requirements)}}{10}{table.caption.13}%
+\contentsline {table}{\numberline {3.1}{\ignorespaces Danh sách yêu cầu nghiệp vụ (Business Requirements)}}{13}{table.caption.13}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Nhu cầu sử dụng dữ liệu của BR4 và BR8}}{14}{table.caption.14}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Ma trận truy vết giữa yêu cầu nghiệp vụ và thành phần xử lý dữ liệu}}{15}{table.caption.15}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Ánh xạ yêu cầu chức năng của BR4 và BR8 sang bước xử lý}}{16}{table.caption.16}%
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Ngưỡng kiểm định theo chỉ số (\texttt {reference/reference\_data.json})}}{19}{table.caption.23}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Các điều kiện cảnh báo (\texttt {src/streaming/pipeline.py}, \texttt {\_build\_conditions})}}{21}{table.caption.31}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Các bảng cảnh báo trong Cassandra (\texttt {cassandra/schema.cql})}}{23}{table.caption.32}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Các profile Docker Compose và dịch vụ (\texttt {docker-compose.yml})}}{25}{table.caption.36}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Phiên bản các thành phần}}{25}{table.caption.38}%
+\contentsline {table}{\numberline {4.6}{\ignorespaces Các recipe \texttt {just} chính}}{26}{table.caption.40}%
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Môi trường thực nghiệm}}{27}{table.caption.43}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Cấu hình bộ mô phỏng (\texttt {.env.example})}}{28}{table.caption.44}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Tham số mặc định của tác vụ streaming và cảnh báo}}{29}{table.caption.45}%
+\contentsline {table}{\numberline {5.4}{\ignorespaces Kết quả mong đợi cho từng loại lỗi được tiêm vào}}{30}{table.caption.47}%
+\contentsline {table}{\numberline {5.5}{\ignorespaces Số lỗi tiêm vào so với số lỗi phát hiện được}}{31}{table.caption.49}%
+\contentsline {table}{\numberline {5.6}{\ignorespaces Tiêu chí chấp nhận của BR4 và bằng chứng}}{33}{table.caption.55}%
+\contentsline {table}{\numberline {5.7}{\ignorespaces Tiêu chí chấp nhận của BR8 và bằng chứng}}{34}{table.caption.57}%
 \addvspace {10\p@ }
 \contentsfinish 

@@ -4,6 +4,9 @@
 \contentsline {figure}{\numberline {2.2}{\ignorespaces Kiến trúc pipeline micro-batch từ cảm biến đến bảng điều khiển}}{4}{figure.caption.6}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Luồng bảo đảm chất lượng dữ liệu của BR04}}{18}{figure.caption.19}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Trang chất lượng dữ liệu của ứng dụng}}{20}{figure.caption.27}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Trang cảnh báo của ứng dụng}}{24}{figure.caption.33}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \contentsfinish 

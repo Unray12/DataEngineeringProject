@@ -1,0 +1,95 @@
+\section{Thiết lập thực nghiệm}
+\label{sec:5-setup}
+
+Mọi kết quả trong chương này được đo trên cùng một môi trường. Mỗi bảng kết quả ở các mục sau chỉ ghi các tham số khác với mục này.
+
+\subsection{Phần cứng và phần mềm}
+\label{sec:5-hardware}
+
+\begin{table}[H]
+\centering
+\caption{Môi trường thực nghiệm}
+\label{tab:5-environment}
+\small
+\begin{tblr}{
+  colspec = {X[1.4,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Hạng mục & Giá trị \\
+CPU & \dien{Mẫu CPU, số nhân, số luồng} \\
+RAM của máy & \dien{Dung lượng RAM} \\
+Bộ nhớ cấp cho Docker & \dien{Ví dụ 12 GB} \\
+Ổ đĩa & \dien{SSD hoặc HDD, dung lượng trống} \\
+Hệ điều hành & \dien{Ví dụ Windows 11 + WSL2, hoặc macOS} \\
+Docker Engine, Compose & \dien{Phiên bản, lấy từ \texttt{just doctor}} \\
+Thành phần hệ thống & Theo Bảng~\ref{tab:4-versions} \\
+Spark & \code{local[*]}, driver 2~GB, 4 nhân, 4 phân vùng shuffle \\
+\end{tblr}
+\end{table}
+
+\subsection{Dữ liệu thực nghiệm}
+\label{sec:5-data}
+
+Dữ liệu được sinh bởi bộ mô phỏng cảm biến (Mục~\ref{sec:4-application}) dựa trên dữ liệu danh mục \code{reference/reference\_data.json}: 4 trang trại, 8 thửa ruộng, 24 thiết bị, 4 loại cây trồng (lúa, ngô, cà chua, cà phê) và 5 chỉ số. Mỗi thiết bị báo cáo 5 giây một lần. Bộ mô phỏng có hạt giống cố định, nên cùng cấu hình sinh ra cùng chuỗi sự kiện.
+
+Bộ mô phỏng tiêm lỗi có chủ đích và đánh dấu mỗi sự kiện lỗi bằng trường \code{simulated\_fault}. Trường này đi theo bản ghi vào bronze (và nằm trong \code{raw\_payload} của bản ghi bị cách ly), nên có thể so số lỗi tiêm vào với số lỗi hệ thống phát hiện được mà không cần nhãn bên ngoài.
+
+\begin{table}[H]
+\centering
+\caption{Cấu hình bộ mô phỏng (\texttt{.env.example})}
+\label{tab:5-simulator}
+\small
+\begin{tblr}{
+  colspec = {X[1.8,l]X[1.2,l]X[2.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tham số & Mặc định & Ý nghĩa \\
+\code{SIM\_SEED} & 42 & Hạt giống ngẫu nhiên \\
+\code{SIM\_RATE\_HZ} & 1 & Số nhịp sinh dữ liệu mỗi giây \\
+\code{SIM\_FAULT\_RATE} & 0,05 & Xác suất ở mỗi nhịp có một thiết bị ngẫu nhiên được lên lịch tiêm lỗi \\
+\code{SIM\_FAULTS} & 7 loại & \code{null\_value}, \code{out\_of\_range}, \code{implausible\_jump}, \code{duplicate}, \code{unknown\_device}, \code{unexpected\_metric}, \code{malformed} \\
+\code{SIM\_GAP\_RATE} & 0,002 & Xác suất ở mỗi nhịp có một thiết bị ngẫu nhiên bắt đầu im lặng \\
+\code{SIM\_GAP\_SECONDS\_MIN/MAX} & 45 / 90 & Độ dài khoảng im lặng (giây) \\
+\code{SIM\_DURATION\_SECONDS} & \dien{giá trị dùng khi đo} & Thời gian chạy một lần thực nghiệm \\
+\end{tblr}
+\end{table}
+
+\subsection{Tham số của đường xử lý}
+\label{sec:5-params}
+
+\begin{table}[H]
+\centering
+\caption{Tham số mặc định của tác vụ streaming và cảnh báo}
+\label{tab:5-params}
+\small
+\begin{tblr}{
+  colspec = {X[2,l]X[1,l]X[2.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tham số & Giá trị & Ý nghĩa \\
+\code{TRIGGER\_INTERVAL} & 30 s & Chu kỳ micro-batch (benchmark \#1 đổi thành 10 s và 60 s) \\
+\code{MAX\_OFFSETS\_PER\_TRIGGER} & 20\,000 & Số sự kiện tối đa mỗi lô \\
+\code{WATERMARK\_S} & 3\,600 & Cửa sổ chấp nhận dữ liệu đến muộn \\
+\code{LATE\_AFTER\_S} & 600 & Ngưỡng gắn cờ \code{is\_late} \\
+\code{ALERT\_DEBOUNCE\_BATCHES} & 2 & Số lô vi phạm liên tiếp trước khi cảnh báo \\
+\code{ALERT\_COOLDOWN\_S} & 300 & Khoảng tối thiểu giữa hai cảnh báo cùng điều kiện \\
+\code{DEVICE\_OFFLINE\_MULTIPLIER} & 4 & Im lặng quá 4 lần chu kỳ báo cáo (20 s) thì coi là mất kết nối \\
+\code{BATTERY\_LOW\_PCT} & 20 & Ngưỡng pin yếu (\%) \\
+\code{SIGNAL\_POOR\_MAX} & 0,3 & Ngưỡng sóng yếu \\
+\end{tblr}
+\end{table}
+
+\subsection{Quy trình chạy lại}
+\label{sec:5-procedure}
+
+Mỗi thực nghiệm bắt đầu từ trạng thái sạch để kết quả lặp lại được:
+
+\begin{lstlisting}[language=bash, caption={Quy trình chuẩn của một lần thực nghiệm}, label={lst:5-procedure}]
+just clean && just up         # empty HDFS, Kafka, Cassandra
+just run-stream-bg            # start the micro-batch job
+just sim-for <seconds>        # fixed-length simulated load
+just batch-run                # dbt build + tests + compaction
+just verify-pipeline          # counts used by the evaluation
+\end{lstlisting}
+
+Kết quả của từng benchmark được lưu trong \code{benchmarks/results/*.csv}, với cấu hình của lần đo ghi ở các dòng đầu tệp.

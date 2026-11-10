@@ -2378,6 +2378,8 @@
     <bcf:citekey order="2" intorder="1">conduktor_microbatch</bcf:citekey>
     <bcf:citekey order="3" intorder="1">kafka_docs</bcf:citekey>
     <bcf:citekey order="4" intorder="1">spark_ss</bcf:citekey>
+    <bcf:citekey order="5" intorder="1">databricks_medallion</bcf:citekey>
+    <bcf:citekey order="6" intorder="1">dbt_docs</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="none">

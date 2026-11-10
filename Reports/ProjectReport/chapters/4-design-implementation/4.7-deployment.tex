@@ -1,0 +1,93 @@
+\subsection{Triển khai và cấu hình}
+\label{sec:4-deployment}
+
+Toàn bộ hệ thống chạy trên một máy bằng Docker Compose. Ba nguyên tắc triển khai: (1) mỗi nhóm dịch vụ khởi động được độc lập qua \emph{profile} của Compose; (2) mọi thao tác thường ngày là một \emph{recipe} của công cụ \code{just}; (3) mọi cấu hình đi qua biến môi trường, không có địa chỉ hay mật khẩu nào viết cứng trong mã.
+
+\paragraph{Các profile của Docker Compose.} Bảng~\ref{tab:4-profiles} liệt kê bốn profile trong \code{docker-compose.yml}. Cassandra thuộc cả hai profile \code{processing} và \code{serving}, vì cả tác vụ streaming lẫn API đều cần nó.
+
+\begin{table}[H]
+\centering
+\caption{Các profile Docker Compose và dịch vụ (\texttt{docker-compose.yml})}
+\label{tab:4-profiles}
+\small
+\begin{tblr}{
+  colspec = {X[1,l]X[3,l]X[2.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Profile & Dịch vụ & Vai trò \\
+\code{core} & namenode, datanode, kafka, ingest, hive-metastore, trino & Lưu trữ, hàng đợi sự kiện, catalog và engine truy vấn \\
+\code{processing} & spark-stream, spark-batch, dbt, spark-tests, simulator, cassandra & Xử lý streaming, xử lý theo lô, kiểm thử, sinh dữ liệu \\
+\code{serving} & cassandra, cassandra-init, api & Kho phục vụ gần thời gian thực và FastAPI \\
+\code{app} & web & Ứng dụng web Next.js \\
+\end{tblr}
+\end{table}
+
+\paragraph{Phiên bản thành phần.} Bảng~\ref{tab:4-versions} ghi phiên bản các ảnh Docker được dùng. Mục~\ref{sec:5-setup} dùng lại bảng này để mô tả môi trường thực nghiệm.
+
+\begin{table}[H]
+\centering
+\caption{Phiên bản các thành phần}
+\label{tab:4-versions}
+\small
+\begin{tblr}{
+  colspec = {X[2,l]X[1.5,l]X[2,l]X[1.5,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Thành phần & Phiên bản & Thành phần & Phiên bản \\
+Apache Hadoop (HDFS) & 3.3.6 & Apache Iceberg & 1.7.1 \\
+Apache Kafka (KRaft) & 3.8.0 & Hive Metastore & 3.1.3 \\
+Apache Spark & 3.5.3 & Trino & 438 \\
+Apache Cassandra & 5.0.3 & Python & 3.11 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Các recipe \code{just}.} Người dùng không cần nhớ lệnh \code{docker compose} dài. Đoạn mã~\ref{lst:4-just} là trình tự khởi động một phiên demo đầy đủ.
+
+\begin{lstlisting}[language=bash, caption={Trình tự khởi động hệ thống (\texttt{justfile})}, label={lst:4-just}]
+just init            # create .env from .env.example (never overwrites)
+just doctor          # check just, docker, compose and .env
+just up              # core + serving + processing profiles
+just run-stream-bg   # Spark micro-batch job, 30 s trigger
+just run-simulator   # LoRaWAN-style sensors with fault injection
+just batch-run       # lakehouse-init, dbt build, dbt test, compaction
+just up-app          # FastAPI + Next.js web app
+just verify-pipeline # row counts in Cassandra, bronze and quarantine
+\end{lstlisting}
+
+Bảng~\ref{tab:4-recipes} nhóm các recipe theo mục đích.
+
+\begin{table}[H]
+\centering
+\caption{Các recipe \texttt{just} chính}
+\label{tab:4-recipes}
+\small
+\begin{tblr}{
+  colspec = {X[1.2,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Nhóm & Recipe \\
+Vòng đời & \code{up}, \code{up-core}, \code{up-serving}, \code{up-processing}, \code{up-app}, \code{down}, \code{clean}, \code{ps}, \code{logs} \\
+Streaming & \code{run-stream}, \code{run-stream-bg}, \code{stop-stream}, \code{streaming-reset} \\
+Dữ liệu vào & \code{run-simulator}, \code{sim-for}, \code{ingest-check}, \code{kafka-tail} \\
+Theo lô & \code{lakehouse-init}, \code{dbt-run}, \code{dbt-test}, \code{dbt-docs}, \code{compact}, \code{batch-run} \\
+Kiểm tra & \code{verify-pipeline}, \code{trino-sql}, \code{api-health}, \code{test}, \code{test-unit}, \code{lint} \\
+Benchmark & \code{bench-trigger}, \code{bench-lookups}, \code{bench-storage}, \code{bench-compaction}, \code{bench-replay} \\
+\end{tblr}
+\end{table}
+
+\paragraph{Cấu hình qua biến môi trường.} Tệp \code{.env.example} là mẫu cấu hình duy nhất; \code{just init} sao chép nó thành \code{.env}, tệp này không được commit. Các tham số của tác vụ streaming được truyền vào container qua khối \code{x-spark-env} của Compose, với giá trị mặc định đặt ngay tại đó (Đoạn mã~\ref{lst:4-env}). Nhờ vậy benchmark có thể đổi chu kỳ trigger mà không sửa mã, ví dụ \code{just run-stream trigger=10s}.
+
+\begin{lstlisting}[caption={Tham số streaming và cảnh báo (\texttt{docker-compose.yml}, khối \texttt{x-spark-env}, rút gọn)}, label={lst:4-env}]
+SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-2g}
+TRIGGER_INTERVAL: ${TRIGGER_INTERVAL:-30s}
+MAX_OFFSETS_PER_TRIGGER: ${MAX_OFFSETS_PER_TRIGGER:-20000}
+WATERMARK_S: ${WATERMARK_S:-3600}
+LATE_AFTER_S: ${LATE_AFTER_S:-600}
+ALERT_DEBOUNCE_BATCHES: ${ALERT_DEBOUNCE_BATCHES:-2}
+ALERT_COOLDOWN_S: ${ALERT_COOLDOWN_S:-300}
+DEVICE_OFFLINE_MULTIPLIER: ${DEVICE_OFFLINE_MULTIPLIER:-4}
+BATTERY_LOW_PCT: ${BATTERY_LOW_PCT:-20}
+SIGNAL_POOR_MAX: ${SIGNAL_POOR_MAX:-0.3}
+\end{lstlisting}
+
+\paragraph{Yêu cầu tài nguyên.} Docker cần tối thiểu 8~GB bộ nhớ; 12~GB thoải mái hơn khi HDFS, Kafka, Cassandra, Spark, Trino và Hive Metastore chạy cùng lúc. Spark chạy ở chế độ \code{local[*]} với bộ nhớ driver 2~GB, 4 nhân và 4 phân vùng shuffle, phù hợp khối lượng dữ liệu demo.

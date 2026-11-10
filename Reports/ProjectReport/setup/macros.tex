@@ -7,7 +7,31 @@
 \newcommand{\tendetai}{Ứng dụng xử lý micro-batch trong giám sát và quản lý nông nghiệp}
 \newcommand{\gvhd}{PGS.TS. Võ Thị Ngọc Châu}
 \newcommand{\gvhdbia}{PGS.TS. VÕ THỊ NGỌC CHÂU}
-\newcommand{\code}[1]{\colorbox{backcolour}{\texttt{\small #1}}}
+% Inline code: short names keep the shaded box; a long name (a path, a key,
+% a table name) is set without the box so it can break after "_", ".", "/",
+% "-", "," or a space instead of running into the margin or a table cell.
+\ExplSyntaxOn
+\str_new:N \l__report_code_str
+\cs_generate_variant:Nn \str_replace_all:Nnn { Nnx }
+\DeclareRobustCommand{\code}[1]
+  {
+    \str_set:Nn \l__report_code_str {#1}
+    \str_replace_all:Nnn \l__report_code_str { \_ } { _ }
+    \str_replace_all:Nnx \l__report_code_str { \{ } { \c_left_brace_str }
+    \str_replace_all:Nnx \l__report_code_str { \} } { \c_right_brace_str }
+    \str_replace_all:Nnn \l__report_code_str { \ldots } { ... }
+    \int_compare:nNnTF { \str_count:N \l__report_code_str } > { 14 }
+      {
+        \texttt
+          {
+            \small
+            \str_map_inline:Nn \l__report_code_str
+              { ##1 \str_if_in:nnT { _./-, } {##1} { \allowbreak } }
+          }
+      }
+      { { \setlength{\fboxsep}{1pt} \colorbox{backcolour}{ \texttt{ \small \l__report_code_str } } } }
+  }
+\ExplSyntaxOff
 \newcommand{\hinhtrong}[3]{%
   \fbox{\parbox[c][#2][c]{#1}{\centering\small\color{gray}%
     \textit{[Hình sẽ bổ sung]}\\[4pt]#3}}}

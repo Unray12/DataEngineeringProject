@@ -1,0 +1,114 @@
+\subsection{BR08 -- Hỗ trợ ứng phó sớm với rủi ro}
+\label{sec:4-br08}
+
+\paragraph{Yêu cầu.} Vận hành viên cần biết sớm khi thửa ruộng có điều kiện bất thường hoặc thiết bị mất kết nối, ghi lại việc mình đã xử lý, và không bị ngập trong cảnh báo lặp lại (FR8.1--FR8.6).
+
+\paragraph{Luồng dữ liệu.} Luật cảnh báo chạy ở cuối mỗi micro-batch, sau khi dữ liệu đã được kiểm định (Mục~\ref{sec:4-br04}). Mỗi lô sinh ra một danh sách \emph{điều kiện} (condition). Mỗi điều kiện đi qua một máy trạng thái có debounce và cooldown, rồi được ghi vào các bảng cảnh báo trong Cassandra. FastAPI đọc các bảng này và nhận thao tác acknowledge hoặc resolve từ vận hành viên.
+
+\subsubsection{Các loại điều kiện}
+
+Bảng~\ref{tab:4-alert-conditions} liệt kê các điều kiện được đánh giá trên mỗi lô. Ngưỡng theo cây trồng nằm trong dữ liệu danh mục; ngưỡng thiết bị lấy từ biến môi trường.
+
+\begin{table}[H]
+\centering
+\caption{Các điều kiện cảnh báo (\texttt{src/streaming/pipeline.py}, \texttt{\_build\_conditions})}
+\label{tab:4-alert-conditions}
+\small
+\begin{tblr}{
+  colspec = {X[1.6,l]X[3,l]X[1,l]X[1,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Điều kiện & Khi nào vi phạm & Mức độ & FR \\
+Dưới ngưỡng cây trồng (\code{low\_soil\_moisture}, \ldots) & Trung bình các giá trị \code{ok} trong lô nhỏ hơn \code{alert\_below} của cây trồng & warning & FR8.1 \\
+Trên ngưỡng (\code{heat\_stress}, \ldots) & Trung bình lớn hơn \code{alert\_above} & critical & FR8.1 \\
+Thay đổi đột ngột (\code{rapid\_change}) & Có bản ghi cờ \code{implausible\_jump} & info & FR8.1 \\
+Mất kết nối (\code{device\_offline}) & Thiết bị im lặng lâu hơn 4 lần chu kỳ báo cáo & warning & FR8.2 \\
+Pin yếu (\code{battery\_low}) & Pin $\le$ 20\% & warning & FR8.2 \\
+Sóng yếu (\code{signal\_poor}) & Chất lượng tín hiệu $<$ 0,3 & info & FR8.2 \\
+\end{tblr}
+\end{table}
+
+Ví dụ với lúa (\code{RICE}): khoảng độ ẩm đất mục tiêu là 30--60\% và ngưỡng cảnh báo \code{alert\_below} là 32\%. Nếu trung bình độ ẩm các bản ghi hợp lệ trong một lô của thửa F001 là 29,5\%, điều kiện \code{low\_soil\_moisture} của F001 ở trạng thái vi phạm.
+
+Điều kiện mất kết nối được đánh giá cho \emph{mọi} thiết bị trong danh mục ở mỗi lô, kể cả khi lô không có dữ liệu. Để Spark vẫn chạy lô khi Kafka im lặng hoàn toàn, nguồn Kafka được hợp (\code{unionByName}) với nguồn \code{rate} của Spark phát một dòng nhịp mỗi giây; các dòng nhịp bị lọc bỏ ngay sau đó. Nếu thiếu cơ chế này, sự cố mất kết nối toàn bộ sẽ không bao giờ được phát hiện vì không có lô nào chạy.
+
+\subsubsection{Máy trạng thái: debounce, cooldown và tự đóng}
+
+Toàn bộ logic quyết định nằm trong một hàm thuần Python, không phụ thuộc Spark hay Cassandra, nên kiểm thử đơn vị được (Đoạn mã~\ref{lst:4-evaluate}).
+
+\begin{lstlisting}[language=Python, caption={Máy trạng thái cảnh báo (\texttt{src/streaming/alerts.py}, rút gọn)}, label={lst:4-evaluate}]
+def evaluate(condition, state, now, cfg) -> Decision:
+    if condition.breaching:
+        state.debounce_count += 1
+        if state.open_alert_id is not None:          # already open
+            return Decision(emit_alert=False, resolve_alert=False)
+        if state.debounce_count < cfg.debounce_batches:   # debounce
+            return Decision(emit_alert=False, resolve_alert=False)
+        if state.last_emitted_at is not None and \
+           (now - state.last_emitted_at).total_seconds() < cfg.cooldown_s:
+            return Decision(emit_alert=False, resolve_alert=False)  # cooldown
+        return Decision(emit_alert=True, resolve_alert=False)
+    state.debounce_count = 0                           # condition cleared
+    if state.open_alert_id is not None and state.open_status == "open":
+        return Decision(emit_alert=False, resolve_alert=True)    # auto-resolve
+    return Decision(emit_alert=False, resolve_alert=False)
+\end{lstlisting}
+
+Ba quy tắc chống bão cảnh báo (FR8.5) và vòng đời (FR8.4) như sau:
+
+\begin{itemize}
+  \item \textbf{Debounce}: điều kiện phải vi phạm liên tiếp \code{ALERT\_DEBOUNCE\_BATCHES} lô (mặc định 2) mới sinh cảnh báo, nên một lô nhiễu không gây cảnh báo. Với trigger 30 giây, cảnh báo xuất hiện sau khoảng 60 giây kể từ lô vi phạm đầu tiên.
+  \item \textbf{Một cảnh báo cho một sự cố}: khi đã có cảnh báo mở cho điều kiện đó, các lô vi phạm tiếp theo không sinh thêm cảnh báo.
+  \item \textbf{Cooldown}: sau khi một cảnh báo được phát, cùng điều kiện không được phát lại trong \code{ALERT\_COOLDOWN\_S} giây (mặc định 300).
+  \item \textbf{Tự đóng}: khi điều kiện hết vi phạm, cảnh báo đang ở trạng thái \code{open} được đóng tự động với lý do \code{condition\_cleared}. Cảnh báo mất kết nối vì thế tự đóng khi thiết bị gửi dữ liệu trở lại. Cảnh báo đã được \emph{acknowledge} thì không tự đóng, vì đã có người nhận xử lý và phải do họ đóng.
+\end{itemize}
+
+Trạng thái của từng cặp (thửa ruộng, điều kiện), gồm bộ đếm debounce, thời điểm phát gần nhất và cảnh báo đang mở, được lưu trong bảng Cassandra \code{alert\_state\_by\_field}. Vì vậy tác vụ không cần toán tử có trạng thái của Spark, và bộ đếm vẫn còn sau khi tác vụ khởi động lại.
+
+\subsubsection{Lưu trữ và vòng đời trong Cassandra}
+
+Cassandra được mô hình hóa theo truy vấn, nên một cảnh báo được ghi vào ba bảng, mỗi bảng phục vụ một câu truy vấn (Bảng~\ref{tab:4-alert-tables}). Lịch sử cảnh báo được giữ 90 ngày.
+
+\begin{table}[H]
+\centering
+\caption{Các bảng cảnh báo trong Cassandra (\texttt{cassandra/schema.cql})}
+\label{tab:4-alert-tables}
+\small
+\begin{tblr}{
+  colspec = {X[1.5,l]X[1.8,l]X[2.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Bảng & Khóa chính & Phục vụ truy vấn \\
+\code{alerts\_by\_field} & \code{((field\_id), created\_at, alert\_id)} & Lịch sử cảnh báo của một thửa ruộng, mới nhất trước \\
+\code{alerts\_by\_status} & \code{((status), created\_at, alert\_id)} & Danh sách cảnh báo đang mở cho bảng điều khiển \\
+\code{alert\_by\_id} & \code{((alert\_id))} & Tra cứu một cảnh báo khi acknowledge hoặc resolve \\
+\code{alert\_state\_by\_field} & \code{((field\_id), condition\_code)} & Trạng thái debounce và cooldown của tác vụ streaming \\
+\end{tblr}
+\end{table}
+
+Vì Cassandra không cho cập nhật cột khóa, đổi trạng thái một cảnh báo nghĩa là xóa dòng khỏi phân vùng trạng thái cũ của \code{alerts\_by\_status} và chèn vào phân vùng mới. Bảng \code{alerts\_by\_field} giữ thông tin người xử lý (\code{acknowledged\_by}, \code{resolved\_by}), thời điểm, cách đóng (\code{manual} hoặc \code{condition\_cleared}) và ghi chú, nên lịch sử phản hồi được bảo toàn.
+
+Thao tác của vận hành viên đi qua \code{PATCH /alerts/\{id\}} của FastAPI. API kiểm tra chuyển trạng thái theo cùng bảng \code{ALLOWED\_TRANSITIONS} với tác vụ streaming và trả mã 409 khi chuyển trạng thái không hợp lệ (ví dụ acknowledge một cảnh báo đã đóng):
+
+\begin{lstlisting}[language=Python, caption={Chuyển trạng thái hợp lệ (\texttt{src/streaming/alerts.py})}, label={lst:4-transitions}]
+ALLOWED_TRANSITIONS = {
+    "open":         {"acknowledged", "resolved"},
+    "acknowledged": {"resolved"},
+    "resolved":     set(),
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Acknowledge một cảnh báo qua API}, label={lst:4-patch}]
+curl -X PATCH http://localhost:8000/alerts/<alert_id> \
+     -H "content-type: application/json" \
+     -d '{"action": "acknowledge", "actor": "operator-1", "note": "Irrigation valve opened"}'
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\hinhtrong{0.9\linewidth}{6cm}{Trang Alerts: danh sách cảnh báo, bộ lọc và timeline của một cảnh báo}
+\caption{Trang cảnh báo của ứng dụng}
+\label{fig:4-br08-ui}
+\end{figure}
+
+\paragraph{Kiểm thử.} Logic cảnh báo có 7 kiểm thử đơn vị trong \code{tests/unit/test\_alerts.py}: debounce hoãn các lô đầu, một lô nhiễu không mở cảnh báo, cảnh báo đang mở không bị phát lại, điều kiện hết thì cảnh báo tự đóng, cảnh báo đã acknowledge không tự đóng, cooldown chặn cảnh báo thứ hai quá sớm, và bảng chuyển trạng thái. Logic mất kết nối và khoảng trống dữ liệu có 11 kiểm thử trong \code{tests/unit/test\_status.py}. Cả hai chạy bằng \code{just test-unit}, không cần khởi động cụm.

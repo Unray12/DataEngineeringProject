@@ -51,14 +51,36 @@
 \newlabel{tab:2-compare}{{2.2}{7}{So sánh xử lý theo lô, micro-batch và xử lý luồng}{table.caption.11}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Trường hợp sử dụng}{7}{subsection.2.5.2}\protected@file@percent }
 \newlabel{sec:2-usecases}{{2.5.2}{7}{Trường hợp sử dụng}{subsection.2.5.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Được và mất}{8}{subsection.2.5.3}\protected@file@percent }
-\newlabel{sec:2-tradeoffs}{{2.5.3}{8}{Được và mất}{subsection.2.5.3}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2.3}{\ignorespaces Lợi ích và chi phí của micro-batch}}{8}{table.caption.12}\protected@file@percent }
-\newlabel{tab:2-tradeoffs}{{2.3}{8}{Lợi ích và chi phí của micro-batch}{table.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Được và mất}{7}{subsection.2.5.3}\protected@file@percent }
+\newlabel{sec:2-tradeoffs}{{2.5.3}{7}{Được và mất}{subsection.2.5.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.3}{\ignorespaces Lợi ích và chi phí của micro-batch}}{7}{table.caption.12}\protected@file@percent }
+\newlabel{tab:2-tradeoffs}{{2.3}{7}{Lợi ích và chi phí của micro-batch}{table.caption.12}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.5.4}Liên hệ với đề tài}{8}{subsection.2.5.4}\protected@file@percent }
 \newlabel{sec:2-link}{{2.5.4}{8}{Liên hệ với đề tài}{subsection.2.5.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}dbt và kỹ thuật bảo đảm chất lượng dữ liệu}{8}{section.2.6}\protected@file@percent }
+\newlabel{sec:2-dbt-quality}{{2.6}{8}{dbt và kỹ thuật bảo đảm chất lượng dữ liệu}{section.2.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.1}Kiến trúc medallion}{8}{subsection.2.6.1}\protected@file@percent }
+\newlabel{sec:2-medallion}{{2.6.1}{8}{Kiến trúc medallion}{subsection.2.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.2}dbt: biến đổi dữ liệu dưới dạng mã}{8}{subsection.2.6.2}\protected@file@percent }
+\newlabel{sec:2-dbt}{{2.6.2}{8}{dbt: biến đổi dữ liệu dưới dạng mã}{subsection.2.6.2}{}}
+\newlabel{lst:2-silver}{{2.2}{9}{Model silver khử trùng lặp (\texttt {dbt/models/silver/sensor\_readings.sql}, rút gọn)}{lstlisting.2.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.2}{\ignorespaces Model silver khử trùng lặp (\texttt  {dbt/models/silver/sensor\_readings.sql}, rút gọn)}}{9}{lstlisting.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.3}Kiểm thử dữ liệu trong dbt}{9}{subsection.2.6.3}\protected@file@percent }
+\newlabel{sec:2-dbt-tests}{{2.6.3}{9}{Kiểm thử dữ liệu trong dbt}{subsection.2.6.3}{}}
+\newlabel{lst:2-silver-tests}{{2.3}{9}{Test của model silver (\texttt {dbt/models/silver/schema.yml}, rút gọn)}{lstlisting.2.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.3}{\ignorespaces Test của model silver (\texttt  {dbt/models/silver/schema.yml}, rút gọn)}}{9}{lstlisting.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.4}Kiểm định, cách ly và gắn cờ}{10}{subsection.2.6.4}\protected@file@percent }
+\newlabel{sec:2-validation}{{2.6.4}{10}{Kiểm định, cách ly và gắn cờ}{subsection.2.6.4}{}}
+\newlabel{lst:2-quarantine-ddl}{{2.4}{10}{Bảng cách ly trên Iceberg (\texttt {src/streaming/ddl.py}, rút gọn)}{lstlisting.2.4}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.4}{\ignorespaces Bảng cách ly trên Iceberg (\texttt  {src/streaming/ddl.py}, rút gọn)}}{10}{lstlisting.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.5}Lưu vết nguồn gốc (lineage)}{10}{subsection.2.6.5}\protected@file@percent }
+\newlabel{sec:2-lineage}{{2.6.5}{10}{Lưu vết nguồn gốc (lineage)}{subsection.2.6.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.6}Ghi idempotent và tính đúng đắn khi phát lại}{10}{subsection.2.6.6}\protected@file@percent }
+\newlabel{sec:2-idempotent}{{2.6.6}{10}{Ghi idempotent và tính đúng đắn khi phát lại}{subsection.2.6.6}{}}
+\newlabel{lst:2-merge}{{2.5}{11}{Ghi idempotent bằng MERGE (\texttt {src/streaming/ddl.py})}{lstlisting.2.5}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.5}{\ignorespaces Ghi idempotent bằng MERGE (\texttt  {src/streaming/ddl.py})}}{11}{lstlisting.2.5}\protected@file@percent }
 \@setckpt{chapters/2-background/main}{
-\setcounter{page}{9}
+\setcounter{page}{12}
 \setcounter{equation}{0}
 \setcounter{enumi}{6}
 \setcounter{enumii}{0}
@@ -68,14 +90,14 @@
 \setcounter{mpfootnote}{0}
 \setcounter{part}{0}
 \setcounter{chapter}{2}
-\setcounter{section}{5}
-\setcounter{subsection}{4}
+\setcounter{section}{6}
+\setcounter{subsection}{6}
 \setcounter{subsubsection}{0}
 \setcounter{paragraph}{0}
 \setcounter{subparagraph}{0}
 \setcounter{figure}{2}
 \setcounter{table}{3}
-\setcounter{lstnumber}{17}
+\setcounter{lstnumber}{7}
 \setcounter{parentequation}{0}
 \setcounter{caption@flags}{2}
 \setcounter{continuedfloat}{0}
@@ -86,7 +108,7 @@
 \setcounter{section@level}{0}
 \setcounter{Item}{6}
 \setcounter{Hfootnote}{0}
-\setcounter{bookmark@seq@number}{28}
+\setcounter{bookmark@seq@number}{35}
 \setcounter{tabx@nest}{0}
 \setcounter{listtotal}{0}
 \setcounter{listcount}{0}
@@ -96,7 +118,7 @@
 \setcounter{citetotal}{0}
 \setcounter{multicitecount}{0}
 \setcounter{multicitetotal}{0}
-\setcounter{instcount}{4}
+\setcounter{instcount}{6}
 \setcounter{maxnames}{2}
 \setcounter{minnames}{1}
 \setcounter{maxitems}{3}
@@ -201,5 +223,5 @@
 \setcounter{smartand}{1}
 \setcounter{bbx:relatedcount}{0}
 \setcounter{bbx:relatedtotal}{0}
-\setcounter{lstlisting}{1}
+\setcounter{lstlisting}{5}
 }

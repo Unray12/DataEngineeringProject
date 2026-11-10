@@ -1,0 +1,49 @@
+% Phần BR4 và BR8 của Mục 5.4 (người phụ trách: Tịnh).
+\subsection{BR04 -- Dữ liệu đáng tin cậy}
+\label{sec:5-eff-br04}
+
+Bảng~\ref{tab:5-eff-br04} đối chiếu các tiêu chí chấp nhận của BR4 trong tài liệu yêu cầu với bằng chứng thu được.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR4 và bằng chứng}
+\label{tab:5-eff-br04}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[2.6,l]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Các lỗi do bộ mô phỏng tiêm vào (trùng, đột biến, payload hỏng, thiết bị lạ) đều được phát hiện và đếm trong báo cáo chất lượng & Bảng~\ref{tab:5-fault-result}; trang \emph{Data quality} hiển thị cùng số liệu & \dien{Đạt / Chưa đạt} \\
+Mọi con số trên bảng điều khiển truy ngược được về offset nguồn và lô & Cột lineage trên mọi dòng bronze và silver; bảng lineage theo thiết bị trên trang \emph{Data quality} (Hình~\ref{fig:4-br04-ui}) & \dien{Đạt / Chưa đạt} \\
+Test dbt thất bại chặn làm mới gold (FR4.7) & Log \code{just dbt-run} khi cố ý làm hỏng một test silver: các model gold bị bỏ qua & \dien{Đạt / Chưa đạt} \\
+Bảng điều khiển loại bỏ hoặc đánh dấu dữ liệu lỗi (FR4.6) & Giá trị gần thời gian thực kèm \code{quality\_flag}; điểm đáng ngờ được đánh dấu trên biểu đồ & \dien{Đạt / Chưa đạt} \\
+\end{tblr}
+\end{table}
+
+\paragraph{Kịch bản minh họa.} Người dùng mở trang \emph{Data quality}, chọn khoảng 7 ngày và thấy số bản ghi hợp lệ, trùng, ngoài khoảng và bị cách ly theo từng ngày. Khi chọn một thiết bị, bảng lineage hiện topic, phân vùng, offset, mã lô và thời điểm nhận của các bản ghi mới nhất. \dien{Ảnh chụp màn hình và số liệu của lần demo.}
+
+\subsection{BR08 -- Ứng phó sớm với rủi ro}
+\label{sec:5-eff-br08}
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR8 và bằng chứng}
+\label{tab:5-eff-br08}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[2.6,l]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Một lần vượt ngưỡng mô phỏng tạo đúng một cảnh báo, trong một đến hai chu kỳ trigger cộng thời gian debounce & Số cảnh báo trong \code{alerts\_by\_field} cho điều kiện đó; thời điểm cảnh báo trừ thời điểm của số đo vi phạm đầu tiên & \dien{Số cảnh báo, độ trễ (giây)} \\
+Một lần mất kết nối mô phỏng tạo đúng một cảnh báo và cảnh báo tự đóng khi có dữ liệu lại & Cảnh báo \code{device\_offline} với \code{resolution = condition\_cleared}; bản ghi khoảng trống trong \code{ops.device\_gaps} & \dien{Đạt / Chưa đạt} \\
+Vận hành viên acknowledge và resolve cảnh báo qua API, lịch sử được giữ & \code{PATCH /alerts/\{id\}}; các cột \code{acknowledged\_by}, \code{resolved\_by}, \code{note} trong \code{alerts\_by\_field} & \dien{Đạt / Chưa đạt} \\
+Chuyển trạng thái không hợp lệ bị từ chối & API trả 409 khi acknowledge một cảnh báo đã đóng & \dien{Đạt / Chưa đạt} \\
+Không có bão cảnh báo khi điều kiện kéo dài & Số cảnh báo cho một điều kiện vi phạm liên tục trong \dien{số} phút & \dien{Số cảnh báo (mong đợi 1)} \\
+\end{tblr}
+\end{table}
+
+\paragraph{Cách đo độ trễ cảnh báo.} Với trigger 30 giây và debounce 2 lô, độ trễ lý thuyết từ số đo vi phạm đầu tiên đến khi cảnh báo xuất hiện nằm trong khoảng 30--90 giây cộng thời gian xử lý một lô. Benchmark \#1 đo giá trị này với trigger 10, 30 và 60 giây. \dien{Kết quả đo.}
+
+\paragraph{Kịch bản minh họa.} Độ ẩm đất của một thửa lúa được đưa xuống dưới ngưỡng 32\% và một thiết bị được cho im lặng (\dien{cách tạo vi phạm trong demo, ví dụ tệp phát lại \texttt{SIM\_FIXTURE}}). Sau khoảng một phút, trang \emph{Alerts} hiện hai cảnh báo. Vận hành viên acknowledge cảnh báo độ ẩm kèm ghi chú, rồi resolve; cảnh báo mất kết nối tự đóng khi thiết bị gửi dữ liệu trở lại. \dien{Ảnh chụp timeline của cảnh báo.}

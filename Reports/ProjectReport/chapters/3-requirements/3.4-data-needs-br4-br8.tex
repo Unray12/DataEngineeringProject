@@ -1,0 +1,20 @@
+% Phần BR4 và BR8 của Mục 3.4 (người phụ trách: Tịnh).
+\subsection{Nhu cầu dữ liệu của BR4 và BR8}
+\label{sec:3-needs-br4-br8}
+
+BR4 và BR8 có nhu cầu dữ liệu khác nhau về độ trễ. BR4 cần một bức tranh đầy đủ và kiểm chứng được, nên chấp nhận độ trễ của một lần làm mới tầng gold. BR8 cần phát hiện sự cố sớm, nên phải chạy ngay trong từng micro-batch. Bảng~\ref{tab:3-needs-br4-br8} tóm tắt hai nhu cầu này.
+
+\begin{table}[H]
+\centering
+\caption{Nhu cầu sử dụng dữ liệu của BR4 và BR8}
+\label{tab:3-needs-br4-br8}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[1.4,l]X[2.4,l]X[1.6,l]X[1.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+BR & Người dùng & Câu hỏi cần trả lời & Loại xử lý & Độ trễ chấp nhận \\
+BR4 & U4 nhóm dữ liệu, U3 nhà phân tích & Mỗi ngày có bao nhiêu bản ghi hợp lệ, trùng, ngoài khoảng, bị cách ly? Một giá trị cụ thể đến từ sự kiện và lô nào? & Kiểm định trong stream, đếm theo lô, tổng hợp theo ngày bằng dbt & Một lần làm mới gold (theo giờ hoặc theo ngày) \\
+BR8 & U2 vận hành viên, U1 quản lý & Thửa ruộng nào đang có điều kiện bất thường? Thiết bị nào mất kết nối? Ai đã xử lý cảnh báo, khi nào? & Luật đánh giá trên từng micro-batch, trạng thái cảnh báo trong Cassandra & Một đến hai chu kỳ trigger cộng thời gian debounce (khoảng 1--2 phút) \\
+\end{tblr}
+\end{table}

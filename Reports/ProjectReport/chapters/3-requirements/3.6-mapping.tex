@@ -1,0 +1,67 @@
+\section{Ánh xạ yêu cầu nghiệp vụ sang yêu cầu xử lý dữ liệu}
+\label{sec:3-mapping}
+
+Mục này nối các yêu cầu nghiệp vụ ở Mục~\ref{sec:3-br} với các thành phần xử lý dữ liệu sẽ được thiết kế ở Chương~\ref{chap:4-design}. Bảng~\ref{tab:3-traceability} là ma trận truy vết: một dấu \checkmark{} nghĩa là thành phần đó tham gia trực tiếp vào việc đáp ứng yêu cầu.
+
+\begin{table}[H]
+\centering
+\caption{Ma trận truy vết giữa yêu cầu nghiệp vụ và thành phần xử lý dữ liệu}
+\label{tab:3-traceability}
+\small
+\begin{tblr}{
+  colspec = {X[3,l]X[1,c]X[1,c]X[1,c]X[1.3,c]X[1,c]X[1,c]X[1.3,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries\footnotesize, bg=gray!20},
+}
+Yêu cầu & Kafka & Spark stream & Cassandra & Iceberg (bronze/gold) & dbt & Trino & FastAPI / web \\
+BR1 Tập trung hóa giám sát & \checkmark & \checkmark & \checkmark & \checkmark & & \checkmark & \checkmark \\
+BR2 Nhận biết điều kiện đồng ruộng & \checkmark & \checkmark & \checkmark & & & & \checkmark \\
+BR3 Liên tục giám sát & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & & \\
+BR4 Dữ liệu đáng tin cậy & & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+BR5 Quản lý dựa trên dữ liệu & & & & \checkmark & \checkmark & \checkmark & \checkmark \\
+BR6 Đánh giá lịch sử & & & & \checkmark & \checkmark & \checkmark & \checkmark \\
+BR7 Thông tin dễ tiếp cận & & & \checkmark & \checkmark & & \checkmark & \checkmark \\
+BR8 Ứng phó sớm với rủi ro & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\end{tblr}
+\end{table}
+
+\subsection{Cách đọc ma trận}
+\label{sec:3-mapping-read}
+
+Ma trận cho thấy ba nhóm yêu cầu, tương ứng với ba đường dữ liệu của hệ thống:
+
+\begin{itemize}
+  \item \textbf{Đường gần thời gian thực} (Kafka, Spark streaming, Cassandra): BR2 và BR3 dựa chủ yếu vào đường này, vì chúng cần dữ liệu mới trong khoảng một phút và cần chịu được gián đoạn.
+  \item \textbf{Đường phân tích} (Iceberg, dbt, Trino): BR5 và BR6 chỉ dùng đường này, vì chúng làm việc trên dữ liệu tổng hợp nhiều ngày đến nhiều tháng.
+  \item \textbf{Yêu cầu xuyên suốt}: BR1, BR4 và BR8 đi qua cả hai đường. BR8 chạm vào mọi thành phần: luật cảnh báo chạy trong Spark, trạng thái cảnh báo nằm trong Cassandra, còn lịch sử cảnh báo và dữ liệu thô đi vào Iceberg để phân tích sau.
+\end{itemize}
+
+\subsection{Yêu cầu xử lý cho BR4 và BR8}
+\label{sec:3-mapping-br4-br8}
+
+Bảng~\ref{tab:3-mapping-br4-br8} chi tiết hóa hai yêu cầu xuyên suốt BR4 và BR8 thành các yêu cầu chức năng (FR) và nơi chúng được hiện thực.
+
+\begin{table}[H]
+\centering
+\caption{Ánh xạ yêu cầu chức năng của BR4 và BR8 sang bước xử lý}
+\label{tab:3-mapping-br4-br8}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[2.6,l]X[1.6,l]X[2.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+FR & Yêu cầu & Thành phần & Cách hiện thực \\
+FR4.1 & Schema tường minh, cách ly bản ghi lỗi & Spark streaming & \code{StructType} tường minh; bảng \code{ops.quarantine} \\
+FR4.2 & Kiểm tra khoảng giá trị, phát hiện bước nhảy & Spark streaming & Ngưỡng \code{min}, \code{max}, \code{max\_jump} trong dữ liệu danh mục \\
+FR4.3 & Khử trùng lặp theo \code{(device\_id, metric, measured\_at)} & Spark, dbt & \code{row\_number()} và \code{MERGE} theo khóa \\
+FR4.4 & Lưu vết nguồn gốc trên mọi bản ghi & Spark, Iceberg & Cột topic, partition, offset, \code{ingested\_at}, \code{batch\_id} \\
+FR4.5 & Tóm tắt chất lượng hằng ngày & dbt, Trino & Model gold \code{quality\_daily} \\
+FR4.6 & Bảng điều khiển loại bỏ hoặc đánh dấu dữ liệu lỗi & FastAPI, web & Cột \code{quality\_flag} trả về cùng giá trị \\
+FR4.7 & Test dbt chặn làm mới gold khi thất bại & dbt & \code{dbt build} bỏ qua model phía sau test lỗi \\
+FR8.1 & Phát hiện vượt ngưỡng theo cây trồng & Spark streaming & Ngưỡng \code{alert\_below}, \code{alert\_above} theo cây trồng \\
+FR8.2 & Phát hiện mất kết nối, pin yếu, sóng yếu & Spark streaming & Thời gian im lặng so với chu kỳ báo cáo \\
+FR8.3 & Lưu cảnh báo với loại, mức độ, thửa ruộng, trạng thái & Cassandra & Bảng \code{alerts\_by\_field}, \code{alerts\_by\_status}, \code{alert\_by\_id} \\
+FR8.4 & Vòng đời open, acknowledged, resolved & Spark, FastAPI & Máy trạng thái thuần trong \code{alerts.py}; \code{PATCH /alerts/\{id\}} \\
+FR8.5 & Chống bão cảnh báo (debounce, cooldown) & Spark, Cassandra & Bảng \code{alert\_state\_by\_field} \\
+FR8.6 & Danh sách cảnh báo đang mở và lịch sử & FastAPI, web & \code{GET /alerts?status=} \\
+\end{tblr}
+\end{table}

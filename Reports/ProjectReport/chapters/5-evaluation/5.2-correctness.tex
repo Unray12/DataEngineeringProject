@@ -1,0 +1,139 @@
+\section{Tính đúng đắn của dữ liệu}
+\label{sec:5-correctness}
+
+Mục này kiểm tra dữ liệu sau khi qua đường xử lý có đúng hay không, theo bốn câu hỏi:
+
+\begin{enumerate}
+  \item Mọi lỗi được tiêm vào có bị phát hiện và đếm đúng không?
+  \item Tầng gold có khớp với tầng silver không?
+  \item Tầng gold có chứa giá trị phi lý không?
+  \item Sau khi tác vụ bị dừng và khởi động lại, có mất hoặc trùng dữ liệu không?
+\end{enumerate}
+
+Mọi lần đo dùng môi trường và quy trình ở Mục~\ref{sec:5-setup}.
+
+\subsection{Phát hiện lỗi được tiêm vào}
+\label{sec:5-fault-detection}
+
+\paragraph{Phương pháp.} Bộ mô phỏng gắn nhãn \code{simulated\_fault} cho mỗi sự kiện lỗi. Mỗi loại lỗi có một kết quả mong đợi: hoặc bị cách ly với một lý do cụ thể, hoặc được giữ lại với một cờ chất lượng cụ thể (Bảng~\ref{tab:5-fault-expect}). Số lỗi tiêm vào được đếm từ nhãn; số lỗi phát hiện được đếm từ \code{ops.quarantine} và \code{ops.quality\_counters}. Hai số phải bằng nhau.
+
+\begin{table}[H]
+\centering
+\caption{Kết quả mong đợi cho từng loại lỗi được tiêm vào}
+\label{tab:5-fault-expect}
+\small
+\begin{tblr}{
+  colspec = {X[1.6,l]X[2.8,l]X[2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Lỗi tiêm vào & Cách bộ mô phỏng tạo lỗi & Kết quả mong đợi \\
+\code{null\_value} & Giá trị đo là \code{null} & Cờ \code{null\_value} \\
+\code{out\_of\_range} & Giá trị lớn hơn ngưỡng tối đa từ 5 đến 50 đơn vị & Cờ \code{out\_of\_range} \\
+\code{implausible\_jump} & Giá trị lệch 3--10 lần bước nhảy tối đa & Cờ \code{implausible\_jump} \\
+\code{duplicate} & Gửi lại nguyên một payload đã gửi trước đó & Cờ \code{duplicate}, chỉ một bản vào bronze \\
+\code{unknown\_device} & Mã thiết bị không có trong danh mục & Cách ly, lý do \code{unknown\_device} \\
+\code{unexpected\_metric} & Tên chỉ số sai (\code{\ldots\_typo}) & Cách ly, lý do \code{unexpected\_metric} \\
+\code{malformed} & JSON hỏng, thiếu trường, thời gian sai, giá trị không phải số & Cách ly, lý do \code{invalid\_json}, \code{missing\_field}, \code{invalid\_timestamp} hoặc \code{malformed\_value} \\
+\end{tblr}
+\end{table}
+
+Có ba điểm cần lưu ý khi đếm:
+
+\begin{itemize}
+  \item \textbf{Đếm bản sao.} Với lỗi \code{duplicate}, bộ mô phỏng giữ payload ở lần đầu thiết bị bị chọn và chỉ gửi lại ở lần thứ hai. Số bản sao thật vì vậy phải đếm bằng số \code{event\_id} lặp lại, không đếm bằng số nhãn.
+  \item \textbf{Bản sao đến ở lô khác.} Cờ \code{duplicate} được gán bằng \code{row\_number()} \emph{trong một lô}. Nếu bản sao đến ở một lô sau, nó mang cờ \code{ok} và lệnh \code{MERGE} gộp nó vào dòng đã có. Bronze vẫn không bị trùng, nhưng bảng đếm sẽ ghi thiếu số bản sao. Vì bản sao của bộ mô phỏng thường cách bản gốc nhiều lô, đây là nguồn lệch được dự đoán của dòng \code{duplicate} trong Bảng~\ref{tab:5-fault-result}.
+  \item \textbf{Bước nhảy.} Bước nhảy được so với giá trị mới nhất của cả thửa ruộng, nên một giá trị bước nhảy đến ngay sau một giá trị ngoài khoảng có thể không bị coi là bước nhảy.
+\end{itemize}
+
+Câu truy vấn~\ref{lst:5-fault-count} đếm cả hai phía trên Trino.
+
+\begin{lstlisting}[language=SQL, caption={Đếm lỗi tiêm vào và lỗi phát hiện trên Trino}, label={lst:5-fault-count}]
+-- Faults kept in bronze: injected label vs quality flag
+SELECT simulated_fault, quality_flag, count(*) AS n
+FROM lakehouse.bronze.sensor_readings
+WHERE simulated_fault IS NOT NULL
+GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- Faults sent to quarantine: injected label (from the raw payload) vs reason
+SELECT json_extract_scalar(raw_payload, '$.simulated_fault') AS injected,
+       reason, count(*) AS n
+FROM lakehouse.ops.quarantine
+GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- Duplicates removed before bronze
+SELECT sum(duplicate) FROM lakehouse.ops.quality_counters;
+\end{lstlisting}
+
+\paragraph{Kết quả.} Bảng~\ref{tab:5-fault-result} là kết quả của một lần chạy \dien{thời lượng} giây với cấu hình mặc định.
+
+\begin{table}[H]
+\centering
+\caption{Số lỗi tiêm vào so với số lỗi phát hiện được}
+\label{tab:5-fault-result}
+\small
+\begin{tblr}{
+  colspec = {X[1.8,l]X[1,c]X[1,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Loại lỗi & Tiêm vào & Phát hiện & Tỷ lệ \\
+\code{null\_value} & \dien{} & \dien{} & \dien{} \\
+\code{out\_of\_range} & \dien{} & \dien{} & \dien{} \\
+\code{implausible\_jump} & \dien{} & \dien{} & \dien{} \\
+\code{duplicate} & \dien{} & \dien{} & \dien{} \\
+\code{unknown\_device} & \dien{} & \dien{} & \dien{} \\
+\code{unexpected\_metric} & \dien{} & \dien{} & \dien{} \\
+\code{malformed} & \dien{} & \dien{} & \dien{} \\
+Tổng & \dien{} & \dien{} & \dien{} \\
+\end{tblr}
+\end{table}
+
+\dien{Nhận xét kết quả: loại nào đạt 100\%, loại nào lệch và vì sao.}
+
+\subsection{Đối soát tầng gold với tầng silver}
+\label{sec:5-reconciliation}
+
+\paragraph{Phương pháp.} Chọn ngẫu nhiên \dien{số} cặp (thửa ruộng, ngày), tính lại min, max, trung bình và số bản ghi trực tiếp từ silver, rồi so với \code{gold.field\_daily}. Truy vấn~\ref{lst:5-reconcile} trả về các dòng lệch; kết quả mong đợi là rỗng.
+
+\begin{lstlisting}[language=SQL, caption={Đối soát gold với silver trên Trino}, label={lst:5-reconcile}]
+WITH recomputed AS (
+    SELECT field_id, metric, CAST(date_trunc('day', measured_at) AS date) AS day,
+           min(value) AS min_value, max(value) AS max_value,
+           avg(value) AS avg_value, count(*) AS reading_count
+    FROM lakehouse.silver.sensor_readings
+    WHERE value IS NOT NULL
+    GROUP BY 1, 2, 3
+)
+SELECT g.field_id, g.metric, g.day
+FROM lakehouse.gold.field_daily g
+JOIN recomputed r USING (field_id, metric, day)
+WHERE g.reading_count <> r.reading_count
+   OR abs(g.avg_value - r.avg_value) > 1e-9
+   OR g.min_value <> r.min_value OR g.max_value <> r.max_value;
+\end{lstlisting}
+
+\paragraph{Kết quả.} \dien{Số cặp kiểm tra, số dòng lệch (mong đợi 0).}
+
+\subsection{Giá trị phi lý trong tầng gold}
+\label{sec:5-implausible}
+
+\paragraph{Phương pháp.} Đếm số dòng của \code{gold.field\_daily} có \code{min\_value} hoặc \code{max\_value} nằm ngoài khoảng vật lý của chỉ số (Bảng~\ref{tab:4-metric-ranges}).
+
+\paragraph{Kết quả.} Như đã nêu ở Mục~\ref{sec:4-br04}, phiên bản hiện tại của \code{field\_daily} tổng hợp mọi giá trị khác rỗng, kể cả giá trị có cờ \code{out\_of\_range}, nên lần đo này \emph{được dự đoán} sẽ tìm thấy giá trị phi lý. \dien{Số dòng phi lý trước khi sửa.} Sau khi giới hạn model ở \code{quality\_flag = 'ok'} và thêm test khoảng giá trị, \dien{số dòng phi lý sau khi sửa (mong đợi 0) và log \texttt{just dbt-test}.}
+
+\subsection{Không mất, không trùng khi khởi động lại}
+\label{sec:5-no-loss}
+
+Kiểm tra này dùng kết quả của benchmark \#5 (Mục~\ref{sec:5-performance}): dừng tác vụ streaming vài phút trong khi bộ mô phỏng vẫn gửi dữ liệu, khởi động lại, rồi so số dòng và số khóa \code{(device\_id, metric, measured\_at)} trùng lặp trong bronze và Cassandra trước và sau. Cơ chế bảo đảm là checkpoint của Spark (Mục~\ref{sec:2-checkpoint}) cùng các lệnh \code{MERGE} theo khóa (Mục~\ref{sec:2-idempotent}).
+
+\begin{lstlisting}[language=SQL, caption={Kiểm tra khóa trùng trong bronze}, label={lst:5-dup-check}]
+SELECT device_id, metric, measured_at, count(*) AS n
+FROM lakehouse.bronze.sensor_readings
+GROUP BY 1, 2, 3 HAVING count(*) > 1;
+\end{lstlisting}
+
+\paragraph{Kết quả.} \dien{Số dòng trước và sau, số khóa trùng (mong đợi 0), lấy từ \texttt{benchmarks/results/replay.csv}.}
+
+\subsection{Kiểm thử đơn vị}
+\label{sec:5-unit-tests}
+
+Ngoài các kiểm tra trên dữ liệu thật, logic quyết định được kiểm thử độc lập với Spark và Cassandra bằng \code{just test-unit}: 7 kiểm thử cho máy trạng thái cảnh báo và 11 kiểm thử cho logic mất kết nối và khoảng trống dữ liệu. \dien{Kết quả lần chạy: số kiểm thử đạt / tổng.}

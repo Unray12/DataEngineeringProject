@@ -1,0 +1,111 @@
+\section{dbt và kỹ thuật bảo đảm chất lượng dữ liệu}
+\label{sec:2-dbt-quality}
+
+Phần trên giải thích cách dữ liệu được đưa vào hệ thống theo từng micro-batch. Mục này trình bày nhóm kỹ thuật bảo đảm dữ liệu đó \emph{đáng tin cậy}: kiến trúc phân tầng medallion, công cụ biến đổi dbt, cách kiểm định, cách ly bản ghi lỗi và lưu vết nguồn gốc (lineage). Đây là cơ sở cho yêu cầu BR4 và cho phần đánh giá tính đúng đắn ở Chương~\ref{chap:5-evaluation}.
+
+\subsection{Kiến trúc medallion}
+\label{sec:2-medallion}
+
+Kiến trúc medallion chia kho dữ liệu thành ba tầng, mỗi tầng có một cam kết chất lượng rõ ràng \cite{databricks_medallion}:
+
+\begin{itemize}
+  \item \textbf{Bronze}: dữ liệu thô gần với nguồn, chỉ bổ sung siêu dữ liệu (thời điểm nhận, nguồn, cờ chất lượng). Tầng này giữ toàn bộ lịch sử để có thể xử lý lại.
+  \item \textbf{Silver}: dữ liệu đã làm sạch, khử trùng lặp và chuẩn hóa kiểu. Mỗi sự kiện chỉ xuất hiện một lần.
+  \item \textbf{Gold}: dữ liệu tổng hợp theo nhu cầu nghiệp vụ (theo ngày, theo thửa ruộng), sẵn sàng cho bảng điều khiển và phân tích.
+\end{itemize}
+
+Ưu điểm chính là \emph{tách bạch trách nhiệm}: lỗi ở tầng sau luôn có thể sửa bằng cách tính lại từ tầng trước, vì tầng bronze không bao giờ bị ghi đè bằng dữ liệu đã biến đổi. Trong đề tài, bronze được ghi bởi tác vụ Spark Structured Streaming, còn silver và gold được dựng bằng dbt.
+
+\subsection{dbt: biến đổi dữ liệu dưới dạng mã}
+\label{sec:2-dbt}
+
+dbt (data build tool) cho phép viết mỗi bước biến đổi thành một \emph{model}, tức một câu lệnh \code{SELECT} lưu trong tệp \code{.sql} \cite{dbt_docs}. dbt tự sinh câu lệnh tạo bảng, tự xác định thứ tự chạy nhờ hàm \code{ref()} và \code{source()}, và chạy câu lệnh trên một engine có sẵn. Đề tài dùng bộ chuyển đổi dbt-spark kết nối tới Spark Thrift Server, nên Spark vẫn là engine thực thi và các bảng đích là bảng Iceberg.
+
+Đoạn mã~\ref{lst:2-silver} là model silver của đề tài. Hàm cửa sổ \code{row\_number()} giữ lại đúng một bản ghi cho mỗi khóa \code{(device\_id, metric, measured\_at)}, ưu tiên bản ghi được nhận sau cùng.
+
+\begin{lstlisting}[language=SQL, caption={Model silver khử trùng lặp (\texttt{dbt/models/silver/sensor\_readings.sql}, rút gọn)}, label={lst:2-silver}]
+{{ config(materialized='table') }}
+with ranked as (
+    select *,
+        row_number() over (
+            partition by device_id, metric, measured_at
+            order by ingested_at desc, source_offset desc
+        ) as row_num
+    from {{ source('bronze', 'sensor_readings') }}
+    where measured_at is not null
+      and device_id is not null and metric is not null
+)
+select event_id, device_id, field_id, farm_id, crop_code, metric,
+       value, unit, measured_at, ingested_at, is_late, quality_flag,
+       source_topic, source_partition, source_offset, batch_id
+from ranked
+where row_num = 1
+\end{lstlisting}
+
+\subsection{Kiểm thử dữ liệu trong dbt}
+\label{sec:2-dbt-tests}
+
+Mỗi model khai báo các \emph{test} trong tệp \code{schema.yml}. Một test là một câu truy vấn trả về các dòng vi phạm; test đạt khi kết quả rỗng. dbt cung cấp sẵn bốn test chung: \code{not\_null}, \code{unique}, \code{accepted\_values} và \code{relationships}. Đoạn mã~\ref{lst:2-silver-tests} là phần khai báo test của model silver.
+
+\begin{lstlisting}[caption={Test của model silver (\texttt{dbt/models/silver/schema.yml}, rút gọn)}, label={lst:2-silver-tests}]
+models:
+  - name: sensor_readings
+    tests:
+      - unique:
+          column_name: "concat(device_id, '|', metric, '|', cast(measured_at as string))"
+    columns:
+      - name: device_id
+        tests: [not_null]
+      - name: metric
+        tests:
+          - not_null
+          - accepted_values:
+              values: [soil_moisture, soil_temperature, air_temperature,
+                       air_humidity, relative_humidity, rainfall]
+\end{lstlisting}
+
+Lệnh \code{dbt build} chạy model và test theo đúng thứ tự phụ thuộc. Khi một test của model silver thất bại, các model gold phía sau bị bỏ qua (\emph{skip}) thay vì được dựng từ dữ liệu sai. Đây là cơ chế đề tài dùng để đáp ứng FR4.7: một test thất bại sẽ chặn lần làm mới tầng gold tương ứng.
+
+\subsection{Kiểm định, cách ly và gắn cờ}
+\label{sec:2-validation}
+
+Không phải lỗi nào cũng nên xử lý giống nhau. Đề tài phân biệt hai mức:
+
+\begin{itemize}
+  \item \textbf{Lỗi cấu trúc} (payload không phải JSON, thiếu trường bắt buộc, thời gian không đọc được, giá trị không phải số, thiết bị không có trong danh mục): bản ghi không thể gán cho thửa ruộng nào, nên được \emph{cách ly} (quarantine) sang một bảng riêng kèm lý do và payload gốc. Tác vụ không dừng lại vì một bản ghi hỏng.
+  \item \textbf{Lỗi nội dung} (giá trị rỗng, ngoài khoảng vật lý, bước nhảy bất thường, bản ghi trùng): bản ghi vẫn được lưu nhưng mang \emph{cờ chất lượng} (\code{quality\_flag}), để bảng điều khiển có thể loại bỏ hoặc đánh dấu.
+\end{itemize}
+
+Cách làm này giữ được toàn bộ bằng chứng: không có bản ghi nào bị xóa âm thầm, và số lượng của từng loại lỗi có thể đếm lại. Đoạn mã~\ref{lst:2-quarantine-ddl} là cấu trúc bảng cách ly.
+
+\begin{lstlisting}[language=SQL, caption={Bảng cách ly trên Iceberg (\texttt{src/streaming/ddl.py}, rút gọn)}, label={lst:2-quarantine-ddl}]
+CREATE TABLE IF NOT EXISTS lakehouse.ops.quarantine (
+    reason string NOT NULL,      -- invalid_json | missing_field | ...
+    raw_payload string,          -- original payload, unchanged
+    device_id string, metric string, reading_ts string, value_raw string,
+    source_topic string NOT NULL, source_partition int NOT NULL,
+    source_offset bigint NOT NULL,
+    ingested_at timestamp, detected_at timestamp, batch_id bigint
+) USING iceberg PARTITIONED BY (days(detected_at))
+\end{lstlisting}
+
+\subsection{Lưu vết nguồn gốc (lineage)}
+\label{sec:2-lineage}
+
+Lineage là khả năng trả lời câu hỏi ``con số này đến từ đâu''. Ở mức bản ghi, đề tài gắn vào mọi dòng các cột sau: chủ đề, phân vùng và offset Kafka (\code{source\_topic}, \code{source\_partition}, \code{source\_offset}), thời điểm Kafka nhận sự kiện (\code{ingested\_at}), mã micro-batch đã ghi dòng đó (\code{batch\_id}) và cờ chất lượng. Vì offset Kafka là duy nhất trong một phân vùng, bộ ba (topic, partition, offset) định danh chính xác một sự kiện gốc. Kết hợp với khả năng phát lại của Kafka (Mục~\ref{sec:2-kafka}), mọi giá trị trên bảng điều khiển đều truy ngược được tới sự kiện và lô đã tạo ra nó.
+
+\subsection{Ghi idempotent và tính đúng đắn khi phát lại}
+\label{sec:2-idempotent}
+
+Mục~\ref{sec:2-checkpoint} cho thấy một lô có thể được chạy lại sau sự cố. Để kết quả không bị nhân đôi, mọi lệnh ghi phải \emph{idempotent}: chạy một lần hay nhiều lần cho cùng kết quả. Đề tài dùng lệnh \code{MERGE INTO} của Iceberg với khóa tự nhiên của từng bảng, như trong Đoạn mã~\ref{lst:2-merge}.
+
+\begin{lstlisting}[language=SQL, caption={Ghi idempotent bằng MERGE (\texttt{src/streaming/ddl.py})}, label={lst:2-merge}]
+MERGE INTO lakehouse.bronze.sensor_readings AS t
+USING src_bronze AS s
+ON t.device_id = s.device_id AND t.metric = s.metric
+   AND t.measured_at = s.measured_at
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+\end{lstlisting}
+
+Khóa của bảng cách ly là (topic, partition, offset); khóa của bảng đếm chất lượng là (\code{batch\_id}, \code{device\_id}, \code{metric}). Cột \code{detected\_at} trong bảng cách ly lấy bằng \code{ingested\_at} chứ không lấy giờ hệ thống, để lần phát lại sinh ra dòng giống hệt lần đầu.
