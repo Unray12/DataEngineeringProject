@@ -10,3 +10,4 @@ sources:
     tables:
       - name: quarantine
       - name: quality_counters
+      - name: crop_targets

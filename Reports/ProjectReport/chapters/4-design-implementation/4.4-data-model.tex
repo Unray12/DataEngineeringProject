@@ -1,0 +1,135 @@
+% Mục 4.4 (người phụ trách: Khang).
+\section{Thiết kế mô hình dữ liệu}
+\label{sec:4-data-model}
+
+Dữ liệu được tổ chức thành bốn không gian tên (namespace) Iceberg. Ba tầng medallion giữ dữ liệu cảm biến, còn \code{ops} giữ dữ liệu vận hành mà tác vụ streaming sinh ra. Hình~\ref{fig:4-medallion} cho thấy dòng chảy giữa các tầng.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=0.6cm and 0.8cm,
+  box/.style={rectangle, rounded corners, draw, minimum width=2.6cm, minimum height=1cm, align=center, font=\footnotesize, fill=gray!10},
+  arr/.style={-{Stealth}, thick}]
+\node[box, fill=blue!10] (k) {Kafka};
+\node[box, fill=orange!20, right=of k] (b) {bronze\\sensor\_readings};
+\node[box, fill=gray!25, right=of b] (s) {silver\\sensor\_readings};
+\node[box, fill=yellow!25, right=of s] (g) {gold\\field\_daily\\field\_indicators\\quality\_daily};
+\node[box, below=of b] (o) {ops\\quarantine\\quality\_counters\\device\_gaps};
+\draw[arr] (k)--node[above, font=\scriptsize]{Spark}(b);
+\draw[arr] (b)--node[above, font=\scriptsize]{dbt}(s);
+\draw[arr] (s)--node[above, font=\scriptsize]{dbt}(g);
+\draw[arr] (k)--(o);
+\draw[arr] (o) -| (g);
+\end{tikzpicture}
+\caption{Các tầng dữ liệu trong lakehouse}
+\label{fig:4-medallion}
+\end{figure}
+
+\subsection{Tầng bronze}
+\label{sec:4-bronze}
+
+Bronze giữ mọi bản ghi hợp lệ về cấu trúc, kể cả bản ghi mang cờ lỗi, và không bao giờ bị xóa (FR6.1). Bản ghi sai cấu trúc không vào đây mà đi vào \code{ops.quarantine}. Bảng do tác vụ streaming tạo với schema tường minh, phân vùng theo ngày của thời điểm đo, như Đoạn mã~\ref{lst:4-bronze-ddl}.
+
+\begin{lstlisting}[language=SQL, caption={Bảng bronze (\texttt{src/streaming/ddl.py})}, label={lst:4-bronze-ddl}]
+CREATE TABLE IF NOT EXISTS lakehouse.bronze.sensor_readings (
+    event_id string,
+    device_id string NOT NULL,  field_id string NOT NULL,
+    farm_id string NOT NULL,    crop_code string NOT NULL,
+    metric string NOT NULL,     value double,   unit string,
+    measured_at timestamp NOT NULL,
+    ingested_at timestamp,      is_late boolean,
+    quality_flag string NOT NULL,
+    source_topic string, source_partition int, source_offset bigint,
+    batch_id bigint,            simulated_fault string
+)
+USING iceberg
+PARTITIONED BY (days(measured_at))
+TBLPROPERTIES ('format-version' = '2')
+\end{lstlisting}
+
+Ba điểm thiết kế đáng chú ý. Thứ nhất, khóa tự nhiên (\code{device\_id}, \code{metric}, \code{measured\_at}) dùng cho \code{MERGE}, nên một lô được phát lại cập nhật tại chỗ thay vì nhân đôi. Thứ hai, các cột \code{source\_topic}, \code{source\_partition}, \code{source\_offset}, \code{ingested\_at}, \code{batch\_id} và \code{quality\_flag} là cột lineage của FR4.4, nên mọi con số ở tầng sau truy ngược được tới sự kiện Kafka gốc. Thứ ba, cột \code{farm\_id} và \code{crop\_code} được điền sẵn từ dữ liệu danh mục ngay lúc ghi, để tầng sau không phải nối lại bảng thiết bị.
+
+\subsection{Tầng silver}
+\label{sec:4-silver}
+
+Silver là bản bronze đã khử trùng lặp: mỗi khóa tự nhiên chỉ còn một dòng (Đoạn mã~\ref{lst:2-silver}). Tầng này do dbt dựng, có test \code{not\_null}, \code{unique} và \code{accepted\_values} (Đoạn mã~\ref{lst:2-silver-tests}) do thành viên phụ trách chất lượng dữ liệu trình bày. Điểm cần nhớ với BR5 và BR6 là mọi bảng gold \emph{chỉ đọc từ silver}, không đọc bronze.
+
+\subsection{Tầng gold}
+\label{sec:4-gold}
+
+Gold là các bảng tổng hợp theo nhu cầu của bảng điều khiển phân tích, mỗi bảng phục vụ một nhóm câu hỏi. Mọi bảng gold về thửa ruộng \emph{chỉ dùng các bản ghi có \code{quality\_flag = 'ok'}} cho các số thống kê, để một giá trị bị gắn cờ không bao giờ tới bảng điều khiển (FR4.6). Bảng~\ref{tab:4-gold-tables} liệt kê các bảng.
+
+\begin{table}[H]
+\centering
+\caption{Các bảng gold (\texttt{dbt/models/gold/})}
+\label{tab:4-gold-tables}
+\small
+\begin{tblr}{
+  colspec = {X[1.3,l]X[1.5,l]X[3.2,l]X[1.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Bảng & Hạt (grain) & Nội dung & Phục vụ \\
+\code{field\_hourly} & thửa ruộng, chỉ số, giờ & Nhỏ nhất, lớn nhất, trung bình, số bản ghi, khoảng mục tiêu của cây trồng, số bản ghi trong khoảng mục tiêu & BR5, BR6 \\
+\code{field\_daily} & thửa ruộng, chỉ số, ngày & Nhỏ nhất, lớn nhất, trung bình trên bản ghi hợp lệ; tổng số, số hợp lệ, số bị gắn cờ & BR5, BR6 \\
+\code{field\_indicators} & thửa ruộng, chỉ số, ngày & Các cột của \code{field\_daily} cộng \code{time\_in\_range\_pct}, \code{hours\_below\_target} và tỷ lệ dữ liệu hợp lệ & BR5, BR6 \\
+\code{quality\_daily} & ngày & Số bản ghi hợp lệ, trùng, ngoài khoảng, bị cách ly & BR4 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Ba bảng đầu là model incremental.} Ba model của BR5 và BR6 dùng \code{materialized='incremental'} với chiến lược \code{merge}, khóa là (thửa ruộng, chỉ số, ngày hoặc giờ) và phân vùng theo \code{day}. Có hai lý do. Thứ nhất, \code{merge} cập nhật tại chỗ nên mỗi lần làm mới chỉ thêm một snapshot Iceberg chứ không xóa rồi tạo lại bảng; nhờ vậy lịch sử snapshot của gold được giữ, và có thể du hành thời gian trên gold (Mục~\ref{sec:4-br06}). Thứ hai, model có thể chỉ tính lại một số ngày gần nhất qua biến \code{gold\_lookback\_days}. Giá trị mặc định tính lại toàn bộ lịch sử, vì khi đổi khoảng mục tiêu, chỉ báo của \emph{mọi} ngày cũ phải đổi theo (BR5); biến này chỉ nên giảm khi lịch sử đã lớn.
+
+Đoạn mã~\ref{lst:4-field-daily} là model \code{field\_daily}, nền của mọi phân tích lịch sử: lịch sử theo thửa ruộng, so sánh giữa thửa ruộng và so sánh giữa các giai đoạn đều là truy vấn trên bảng này.
+
+\begin{lstlisting}[language=SQL, caption={Model gold \texttt{field\_daily} (\texttt{dbt/models/gold/field\_daily.sql})}, label={lst:4-field-daily}]
+{{ config(materialized='incremental', file_format='iceberg',
+          incremental_strategy='merge', on_schema_change='append_new_columns',
+          unique_key=['field_id', 'metric', 'day'], partition_by=['day']) }}
+
+select
+    field_id, farm_id, metric,
+    cast(date_trunc('day', measured_at) as date) as day,
+    min(case when quality_flag = 'ok' then value end) as min_value,
+    max(case when quality_flag = 'ok' then value end) as max_value,
+    avg(case when quality_flag = 'ok' then value end) as avg_value,
+    count(*) as reading_count,
+    sum(case when quality_flag = 'ok' then 1 else 0 end) as valid_count,
+    sum(case when quality_flag <> 'ok' then 1 else 0 end) as flagged_count
+from {{ ref('sensor_readings') }}
+where value is not null
+  {% if is_incremental() %}
+  and cast(measured_at as date) >= date_sub(current_date(), {{ var('gold_lookback_days') }})
+  {% endif %}
+group by 1, 2, 3, 4
+\end{lstlisting}
+
+Cột \code{reading\_count} đếm mọi bản ghi có giá trị, còn thống kê chỉ lấy bản ghi hợp lệ, nên tỷ lệ \code{flagged\_count} trên \code{reading\_count} vẫn cho biết một ngày có bao nhiêu dữ liệu bị loại. Tùy chọn \code{on\_schema\_change='append\_new\_columns'} cần thiết: khi bảng gold đã tồn tại từ phiên bản cũ, model incremental không tự thêm cột mới, và các test sẽ báo lỗi ``cột không tồn tại'' (đã gặp khi chạy thực tế).
+
+\paragraph{Hạt theo ngày.} Hạt ``thửa ruộng--chỉ số--ngày'' là sự cân bằng có chủ ý. Một thiết bị báo cáo 5 giây một lần, nên mỗi chuỗi (thiết bị, chỉ số) sinh tới 17\,280 dòng mỗi ngày và toàn hệ thống sinh hàng trăm nghìn dòng mỗi ngày ở tầng silver; gold giảm con số này xuống $8 \times 5 = 40$ dòng mỗi ngày (8 thửa ruộng nhân 5 chỉ số), hoặc 960 dòng mỗi ngày với bảng theo giờ. Bảng điều khiển hiển thị lịch sử 90 ngày chỉ đọc vài nghìn dòng thay vì hàng chục triệu.
+
+\subsection{Khoảng mục tiêu: dữ liệu danh mục vào dbt}
+\label{sec:4-targets-ops}
+
+dbt chỉ đọc được bảng trong lakehouse, nhưng khoảng mục tiêu nằm trong \code{reference\_data.json}. Để vẫn giữ một nguồn sự thật duy nhất, bước khởi tạo (\code{just lakehouse-init}) nạp khoảng mục tiêu vào bảng \code{ops.crop\_targets} (một dòng cho mỗi cặp cây trồng và chỉ số) bằng \code{INSERT OVERWRITE}, và model \code{field\_hourly} nối với bảng này. Muốn đổi khoảng mục tiêu, chỉ cần sửa tệp JSON rồi chạy lại \code{just lakehouse-init} và \code{just dbt-run}.
+
+\subsection{Đối chiếu yêu cầu của tầng gold}
+\label{sec:4-gold-gap}
+
+Bảng~\ref{tab:4-gold-gap} đối chiếu từng yêu cầu chức năng liên quan với hiện trạng. Mọi dòng đều đã được hiện thực; các số kiểm chứng nằm ở Mục~\ref{sec:5-effectiveness}.
+
+\begin{table}[H]
+\centering
+\caption{Yêu cầu của tầng gold và hiện trạng}
+\label{tab:4-gold-gap}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[2.4,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Mã & Yêu cầu & Hiện trạng \\
+FR5.1 & Tổng hợp theo giờ và theo ngày, kèm thời gian ngoài khoảng mục tiêu & \code{field\_hourly} và \code{field\_daily}; số bản ghi trong khoảng mục tiêu ở \code{field\_hourly} \\
+FR5.2 & Khoảng mục tiêu theo cây trồng là dữ liệu danh mục cấu hình được & \code{reference\_data.json} nạp vào \code{ops.crop\_targets} \\
+FR5.3 & Chỉ báo time-in-range và chỉ báo tưới tiêu & \code{time\_in\_range\_pct} và \code{hours\_below\_target} trong \code{field\_indicators} \\
+FR6.2 & Gold phân vùng theo ngày & \code{partition\_by=['day']} trên cả ba model; bronze phân vùng theo \code{days(measured\_at)} \\
+FR4.7 & Test khoảng giá trị ở tầng gold & Test chung \code{accepted\_range} (\code{dbt/macros/tests.sql}) trên giá trị, tỷ lệ phần trăm và số giờ \\
+\end{tblr}
+\end{table}

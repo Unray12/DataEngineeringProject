@@ -1,0 +1,97 @@
+% Mục 2.7 (người phụ trách: Khang).
+\section{Lakehouse: Apache Iceberg, HDFS, Hive Metastore và Trino}
+\label{sec:2-lakehouse}
+
+Các mục trên giải thích dữ liệu đi vào hệ thống và được làm sạch ra sao. Mục này trình bày nơi dữ liệu được \emph{lưu lâu dài} và cách nó được \emph{truy vấn} để phục vụ phân tích lịch sử, tức là cơ sở của BR5 và BR6. Bốn thành phần phối hợp với nhau: HDFS giữ tệp, Apache Iceberg tổ chức các tệp đó thành bảng, Hive Metastore ghi nhớ bảng nào nằm ở đâu, và Trino là engine truy vấn trên các bảng đó.
+
+\subsection{Từ data lake đến lakehouse}
+\label{sec:2-lake-to-lakehouse}
+
+Một \emph{data lake} lưu dữ liệu dưới dạng tệp (thường là Parquet) trên hệ thống tệp phân tán. Cách này rẻ và co giãn tốt, nhưng thiếu những gì cơ sở dữ liệu quan hệ có sẵn: giao dịch, ghi đè an toàn, sửa schema và xem lại quá khứ. Với đường xử lý micro-batch, thiếu sót này có hậu quả cụ thể. Mỗi 30 giây một lô mới ghi thêm tệp; nếu người đọc mở bảng đúng lúc lô đang ghi dở, họ có thể thấy dữ liệu không nhất quán, và việc ghi lại một lô sau sự cố có thể sinh bản ghi trùng.
+
+\emph{Lakehouse} giải quyết điều đó bằng cách đặt một \emph{định dạng bảng} (table format) lên trên tệp Parquet. Định dạng bảng là một lớp siêu dữ liệu cho biết \emph{tập tệp nào hiện là bảng}. Đề tài chọn Apache Iceberg \cite{iceberg_spec}; các lựa chọn tương tự là Delta Lake và Apache Hudi.
+
+\subsection{Apache Iceberg}
+\label{sec:2-iceberg}
+
+\paragraph{Cấu trúc siêu dữ liệu.} Iceberg không liệt kê thư mục để biết bảng có tệp nào. Thay vào đó, một bảng là một cây siêu dữ liệu: tệp \emph{metadata} chứa schema, cách phân vùng và danh sách các \emph{snapshot}; mỗi snapshot trỏ tới một \emph{manifest list}; manifest list trỏ tới các \emph{manifest}; mỗi manifest liệt kê các tệp dữ liệu cùng thống kê cột (giá trị nhỏ nhất, lớn nhất, số dòng). Mỗi lần ghi (commit) tạo một snapshot mới và hoán đổi con trỏ tới tệp metadata theo kiểu nguyên tử.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=0.5cm and 0.55cm,
+  box/.style={rectangle, rounded corners, draw, minimum width=2.3cm, minimum height=0.9cm, align=center, font=\footnotesize, fill=gray!10},
+  arr/.style={-{Stealth}, thick}]
+\node[box, fill=blue!10] (cat) {Hive Metastore\\con trỏ tới metadata};
+\node[box, right=of cat] (meta) {Tệp metadata\\schema, phân vùng,\\danh sách snapshot};
+\node[box, right=of meta] (ml) {Manifest list\\của snapshot};
+\node[box, below=of ml] (mf) {Manifest\\tệp dữ liệu + thống kê};
+\node[box, fill=green!10, left=of mf] (df) {Tệp Parquet\\trên HDFS};
+\draw[arr] (cat)--(meta); \draw[arr] (meta)--(ml); \draw[arr] (ml)--(mf); \draw[arr] (mf)--(df);
+\end{tikzpicture}
+\caption{Cây siêu dữ liệu của một bảng Iceberg}
+\label{fig:2-iceberg-tree}
+\end{figure}
+
+Cấu trúc này mang lại các khả năng mà thư mục Parquet thuần không có, và mỗi khả năng gắn với một yêu cầu của đề tài:
+
+\begin{itemize}
+  \item \textbf{Ghi nguyên tử và cô lập snapshot.} Người đọc luôn thấy một snapshot hoàn chỉnh. Lô streaming đang ghi dở không bao giờ lộ ra ngoài. Điều này cần cho BR3 và BR4.
+  \item \textbf{Phân vùng ẩn (hidden partitioning).} Bảng được phân vùng theo một \emph{phép biến đổi} của cột, ví dụ \code{days(measured\_at)}. Người viết truy vấn chỉ lọc theo \code{measured\_at}, Iceberg tự bỏ qua các phân vùng không liên quan. Đây là cơ sở của FR6.2.
+  \item \textbf{Tiến hóa schema.} Thêm, đổi tên hoặc bỏ cột chỉ sửa siêu dữ liệu, không viết lại dữ liệu cũ. Cột được định danh bằng số chứ không bằng tên.
+  \item \textbf{Du hành thời gian (time travel).} Vì các snapshot cũ còn nguyên, có thể truy vấn bảng ở một thời điểm hoặc phiên bản trong quá khứ. Đây là cơ sở của việc tái tạo một báo cáo cũ (BR6).
+  \item \textbf{Cập nhật theo dòng.} Phiên bản bảng 2 hỗ trợ xóa và cập nhật theo dòng, nên lệnh \code{MERGE INTO} dùng được cho ghi idempotent (Mục~\ref{sec:2-idempotent}).
+\end{itemize}
+
+\paragraph{Vấn đề tệp nhỏ và compaction.} Mỗi micro-batch là một commit, và một commit thường sinh ra ít nhất một tệp mới trong mỗi phân vùng nó chạm tới. Với trigger 30 giây, một ngày có khoảng 2\,880 commit; dữ liệu của cả ngày bị chia thành hàng nghìn tệp rất nhỏ. Truy vấn phải mở và đọc siêu dữ liệu của từng tệp nên chậm đi. Iceberg cung cấp thủ tục \code{rewrite\_data\_files} để gộp các tệp nhỏ thành tệp lớn (chiến lược \emph{binpack}) \cite{iceberg_procedures}. Việc gộp tạo một snapshot mới nên không làm gián đoạn người đọc đang truy vấn snapshot cũ. Hiệu quả của bước này được đo ở Mục~\ref{sec:5-bench-compaction}.
+
+\subsection{HDFS làm kho lưu trữ}
+\label{sec:2-hdfs}
+
+HDFS (Hadoop Distributed File System) chia tệp thành các khối lớn (mặc định 128 MB), sao chép mỗi khối trên nhiều DataNode và để NameNode giữ danh mục tệp \cite{hdfs_design}. HDFS được tối ưu cho tệp lớn được ghi một lần và đọc tuần tự, nên \emph{không hợp} với hàng nghìn tệp nhỏ: mỗi tệp, dù nhỏ đến đâu, chiếm một mục trong bộ nhớ của NameNode. Đây là một lý do nữa để compaction là bắt buộc chứ không chỉ là tối ưu. Trong đề tài, một NameNode và một DataNode chạy trong Docker; hệ số sao chép là 1 vì chỉ có một nút.
+
+\subsection{Hive Metastore làm catalog}
+\label{sec:2-hms}
+
+Iceberg cần một \emph{catalog} để trả lời câu hỏi ``bảng \code{gold.field\_daily} hiện có tệp metadata nào''. Hive Metastore (HMS) là một dịch vụ lưu danh mục bảng và con trỏ tới metadata hiện tại \cite{hive_metastore}. Điểm quan trọng là cả Spark (ghi) và Trino (đọc) cùng đăng ký với \emph{một} metastore, nên cả hai thấy cùng một bảng với cùng một snapshot. Không có catalog dùng chung, hai engine sẽ thấy hai thế giới khác nhau.
+
+\subsection{Trino làm engine truy vấn phân tích}
+\label{sec:2-trino}
+
+Trino là engine truy vấn SQL phân tán, không tự lưu dữ liệu, mà đọc qua các \emph{connector} \cite{trino_docs}. Connector Iceberg đọc siêu dữ liệu Iceberg qua catalog và đọc tệp Parquet từ HDFS. Có ba lý do Trino được chọn làm đường đọc phân tích thay vì để API gọi Spark:
+
+\begin{itemize}
+  \item Trino khởi động truy vấn trong mili-giây tới giây, trong khi một job Spark cần khởi tạo ngữ cảnh. Với bảng điều khiển tương tác, độ trễ này quan trọng.
+  \item Trino có sẵn máy khách Python (\code{trino.dbapi}) với tham số hóa truy vấn, phù hợp với lớp FastAPI.
+  \item Trino đọc được bảng Iceberg \emph{do Spark ghi} mà không cần sao chép dữ liệu, nên không có hệ thống thứ hai phải đồng bộ.
+\end{itemize}
+
+Đoạn mã~\ref{lst:2-trino-catalog} là toàn bộ cấu hình catalog của Trino trong đề tài (đã lược chú thích).
+
+\begin{lstlisting}[caption={Catalog Iceberg của Trino (\texttt{trino/catalog/lakehouse.properties})}, label={lst:2-trino-catalog}]
+connector.name=iceberg
+iceberg.catalog.type=hive_metastore
+hive.metastore.uri=thrift://hive-metastore:9083
+hive.config.resources=/etc/hadoop/conf/core-site.xml,/etc/hadoop/conf/hdfs-site.xml
+iceberg.file-format=PARQUET
+iceberg.compression-codec=SNAPPY
+\end{lstlisting}
+
+Trino mở rộng SQL để dùng các khả năng của Iceberg. Đoạn mã~\ref{lst:2-trino-timetravel} liệt kê các snapshot của bảng bronze bằng bảng siêu dữ liệu \texttt{\$snapshots}, rồi đọc bảng ở trạng thái của một snapshot hoặc một thời điểm.
+
+\begin{lstlisting}[language=SQL, caption={Du hành thời gian trong Trino (cú pháp của connector Iceberg)}, label={lst:2-trino-timetravel}]
+-- cac snapshot cua bang va thoi diem tao
+SELECT snapshot_id, committed_at, operation
+FROM lakehouse.bronze."sensor_readings$snapshots"
+ORDER BY committed_at DESC;
+
+-- doc bang o trang thai cua mot snapshot
+SELECT count(*) FROM lakehouse.bronze.sensor_readings
+FOR VERSION AS OF 1234567890123456789;
+
+-- doc bang tai mot thoi diem
+SELECT count(*) FROM lakehouse.bronze.sensor_readings
+FOR TIMESTAMP AS OF TIMESTAMP '2026-11-01 00:00:00 UTC';
+\end{lstlisting}
+
+\paragraph{Giới hạn.} Trino không thay thế được kho gần thời gian thực. Mỗi truy vấn phải đọc siêu dữ liệu Iceberg và tệp Parquet, nên độ trễ nằm ở cỡ trăm mili-giây tới giây, so với cỡ mười mili-giây của tra cứu theo khóa trong Cassandra. Đó là lý do hệ thống có hai đường phục vụ và không trộn nguồn trong cùng một biểu đồ; benchmark ở Mục~\ref{sec:5-bench-lookups} đo chênh lệch này.

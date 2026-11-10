@@ -1,0 +1,24 @@
+# date_utc: 2026-11-10 17:23:34
+# host_cpu: Apple M5
+# host_cores: 10
+# host_ram_gb: 24
+# docker_memory_gb: 11.73GiB
+# trino: 438 (single node, query.max-memory-per-node=1GB)
+# iceberg: 1.7.1, Parquet/Snappy
+# spark: 3.5.3 local[*]
+# benchmark: 4 compaction
+# commits: 240
+# rows_per_commit: 5000
+# total_rows: 1200000
+# strategy: rewrite_data_files binpack
+# timed_runs_per_query: 20
+# warmup_runs: 3
+item,before,after,unit
+data files,720,30,files
+average file size,47.6,236.7,KiB
+snapshots,241,242,snapshots
+a_one_day p50,34.9,34.2,ms
+a_one_day p95,44.9,39.2,ms
+b_week_by_field p50,116.1,54.2,ms
+b_week_by_field p95,186.6,64.0,ms
+compaction run time (just compact),,15.0,s

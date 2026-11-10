@@ -1,0 +1,134 @@
+% Các benchmark #2, #3 và #4 của Mục 5.3 (người phụ trách: Khang).
+% Các benchmark #1 và #5 (Nhân) và #6 (Đạt) được thêm vào cùng mục này.
+\subsection{Benchmark lớp lưu trữ và truy vấn phân tích}
+\label{sec:5-bench-khang}
+
+Ba benchmark dưới đây đo lớp lakehouse. Mỗi benchmark là một recipe \code{just} (\code{just bench-lookups}, \code{just bench-storage}, \code{just bench-compaction}) gọi một tệp Python trong \code{benchmarks/} chạy trong cùng mạng Docker với Trino và Cassandra. Kết quả được ghi vào \code{benchmarks/results/*.csv}, và các dòng đầu của mỗi tệp ghi lại cấu hình (quy tắc 4 của dự án). Bảng~\ref{tab:5-bench-config} là cấu hình chung.
+
+\begin{table}[H]
+\centering
+\caption{Cấu hình chung của ba benchmark}
+\label{tab:5-bench-config}
+\small
+\begin{tblr}{
+  colspec = {X[1.4,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Hạng mục & Giá trị \\
+Máy & Apple M5, 10 nhân, 24~GB RAM; Docker được cấp 11,7~GiB \\
+Trino & 438, một nút, \code{query.max-memory-per-node=1GB} \\
+Iceberg, Spark & Iceberg 1.7.1 (Parquet, Snappy); Spark 3.5.3 \code{local[*]}; HDFS một DataNode \\
+Đo & Thời gian của máy khách Python (từ lúc gửi truy vấn tới lúc nhận đủ kết quả), khởi động nóng trước khi đo \\
+Trạng thái máy & Luồng streaming và bộ mô phỏng đã dừng; không có ứng dụng nặng khác \\
+\end{tblr}
+\end{table}
+
+\subsubsection{Benchmark \#2: Cassandra và Trino-trên-Iceberg}
+\label{sec:5-bench-lookups}
+
+\paragraph{Câu hỏi.} Với cùng một câu hỏi của bảng điều khiển, hai đường phục vụ khác nhau bao nhiêu về độ trễ, và độ trễ đó có chịu được nhiều người dùng cùng lúc không? Kết quả quyết định việc tách hai đường phục vụ có xứng đáng với độ phức tạp thêm vào hay không (Mục~\ref{sec:4-alt-cassandra}).
+
+\paragraph{Thiết kế.} Bốn truy vấn cho thửa ruộng F001 và chỉ số độ ẩm đất:
+
+\begin{itemize}
+  \item \textbf{Q0, giá trị mới nhất của một thửa ruộng:} Cassandra đọc \code{latest\_by_field}; Trino tính giá trị mới nhất theo từng chỉ số từ bảng bronze.
+  \item \textbf{Q1, chuỗi 24 giờ của một chỉ số:} Cassandra đọc \code{readings\_by\_field\_24h}; Trino đọc bronze trong cùng khoảng thời gian.
+  \item \textbf{Q2, lịch sử theo ngày trong 30 ngày} và \textbf{Q3, so sánh mọi thửa ruộng trong 30 ngày:} chỉ có đường Trino (bảng gold), vì Cassandra không có bảng tương ứng (Mục~\ref{sec:4-alt-cassandra}).
+\end{itemize}
+
+Mỗi truy vấn được khởi động nóng 10 lần, rồi lặp 100 lần với 1, 5 và 10 máy khách đồng thời. Để so sánh công bằng, hai đường được đọc \emph{đúng cùng một tập dòng}: Cassandra đọc theo các bucket theo giờ, nên Trino bắt đầu từ cùng ranh giới bucket. Kết quả: cả hai trả về 296 dòng cho Q1 (tổng bronze có 41\,179 dòng, bảng \code{field\_daily} có 480 dòng). Lần chạy đầu của benchmark dùng cửa sổ khác nhau và trả về 634 dòng ở Cassandra so với 296 ở Trino, nên kết quả đó bị loại và benchmark được sửa để kiểm tra hai số bằng nhau trước khi đo.
+
+\begin{table}[H]
+\centering
+\caption{Độ trễ p50 / p95 (mili-giây) theo số máy khách đồng thời, và thông lượng ở 10 máy khách (\texttt{benchmarks/results/lookups.csv})}
+\label{tab:5-bench-lookups}
+\small
+\begin{tblr}{
+  colspec = {X[2.3,l]X[1,l]X[1.3,c]X[1.3,c]X[1.3,c]X[1.1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Truy vấn & Kho & 1 máy khách & 5 máy khách & 10 máy khách & Truy vấn/giây (10) \\
+Q0 giá trị mới nhất & Cassandra & 3,1 / 5,1 & 2,6 / 7,7 & 2,8 / 5,9 & 3\,003 \\
+Q0 giá trị mới nhất & Trino & 47,7 / 101,6 & 96,6 / 180,8 & 116,9 / 213,1 & 74 \\
+Q1 chuỗi 24 giờ & Cassandra & 3,0 / 4,6 & 3,8 / 8,8 & 4,4 / 6,6 & 2\,046 \\
+Q1 chuỗi 24 giờ & Trino & 45,5 / 64,5 & 66,7 / 95,9 & 101,8 / 181,3 & 89 \\
+Q2 lịch sử 30 ngày & Trino & 42,2 / 51,3 & 54,8 / 74,1 & 88,4 / 172,8 & 102 \\
+Q3 so sánh thửa ruộng & Trino & 45,1 / 59,1 & 67,4 / 95,3 & 106,6 / 145,0 & 91 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Kết quả.} Với cùng một câu hỏi và cùng các dòng, Cassandra nhanh hơn Trino khoảng 15 lần với một máy khách (Q1: 3,0 ms so với 45,5 ms ở p50) và khoảng 23 lần ở 10 máy khách (4,4 ms so với 101,8 ms), đồng thời xử lý nhiều hơn khoảng 23 lần số truy vấn mỗi giây (2\,046 so với 89). Cassandra gần như không chậm đi khi tăng số máy khách; Trino chậm đi gần gấp đôi từ 1 lên 10 máy khách, vì mỗi truy vấn phải lập kế hoạch và đọc siêu dữ liệu Iceberg.
+
+Đối chiếu với tài liệu yêu cầu: tra cứu theo khóa trong Cassandra có p95 không quá 8,8 ms, thỏa mục tiêu ``cỡ mười mili-giây''. Truy vấn phân tích trên gold có p95 không quá 173 ms ở 10 máy khách, đủ cho một biểu đồ tương tác. Trino vẫn trả lời tốt câu hỏi phân tích (Q2, Q3) với độ trễ cùng cỡ như Q1 ở Trino, nhưng không đạt độ trễ mà bảng điều khiển gần thời gian thực cần. Điều này xác nhận quyết định tách hai đường phục vụ và không trộn nguồn trong một biểu đồ.
+
+\paragraph{Mối đe dọa với kết quả.} Dữ liệu nhỏ (296 dòng ở Q1): chênh lệch của Trino chủ yếu là chi phí cố định mỗi truy vấn, không phải chi phí quét dữ liệu, nên với dữ liệu lớn hơn khoảng cách có thể thu hẹp ở truy vấn phân tích và nới rộng ở truy vấn theo khóa. Cassandra chỉ có một nút; mỗi máy khách Trino dùng một kết nối riêng, còn Cassandra dùng chung một phiên.
+
+\subsubsection{Benchmark \#3: Iceberg và Hive/Parquet}
+\label{sec:5-bench-storage}
+
+\paragraph{Câu hỏi.} Iceberg có tốn thêm chi phí truy vấn và chi phí ghi so với Parquet thuần không, và những tính năng nó thêm vào có thực sự hoạt động không (Mục~\ref{sec:4-alt-parquet})?
+
+\paragraph{Thiết kế.} Cùng một tập dữ liệu tổng hợp có schema của bảng bronze, 1\,200\,000 dòng trải trên 30 ngày, được ghi vào hai bảng bằng 240 lệnh \code{INSERT} riêng rẽ (mỗi lệnh 5\,000 dòng, một commit), mô phỏng việc tác vụ streaming commit liên tục. Một bảng là Iceberg phân vùng theo \code{day(measured\_at)}; bảng kia là Hive/Parquet qua catalog \code{hive} của Trino (\code{trino/catalog/hive.properties}), phân vùng theo cột \code{day} tường minh. Ba truy vấn, mỗi truy vấn đo 20 lần sau 3 lần khởi động: (a) đếm một ngày; (b) trung bình theo thửa ruộng trong 7 ngày; (c) quét toàn bảng. Với Hive, truy vấn (a) và (b) được đo hai kiểu: lọc theo cột phân vùng \code{day}, và lọc theo \code{measured\_at} như người viết truy vấn Iceberg sẽ làm. Sau đó bốn hành vi được thử thật.
+
+\begin{table}[H]
+\centering
+\caption{Iceberg và Hive/Parquet trên cùng 1,2 triệu dòng, 240 commit (\texttt{benchmarks/results/storage.csv})}
+\label{tab:5-bench-storage}
+\small
+\begin{tblr}{
+  colspec = {X[3.4,l]X[1.3,c]X[1.5,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Chỉ số & Iceberg & Hive/Parquet \\
+(a) một ngày, p50 / p95 (ms) & 46,2 / 107,7 & 56,8 / 90,3 \\
+(a) một ngày, Hive lọc theo \code{measured\_at}, p50 (ms) & -- & 303,4 \\
+(b) 7 ngày gộp theo thửa ruộng, p50 / p95 (ms) & 135,6 / 199,5 & 76,7 / 131,2 \\
+(b) 7 ngày, Hive lọc theo \code{measured\_at}, p50 (ms) & -- & 250,0 \\
+(c) quét toàn bảng, p50 / p95 (ms) & 297,6 / 421,4 & 266,8 / 329,2 \\
+Số tệp dữ liệu sau khi nạp & 720 & 720 \\
+Kích thước tệp trung bình (KiB) & 47,6 & 52,2 \\
+Thời gian nạp 240 commit (giây) & 775,8 & 183,0 \\
+Dòng trùng sau khi phát lại một lô & 0 & 5\,000 \\
+Đọc lại trạng thái cũ (time travel) & 5\,000 dòng (lô đầu) & không hỗ trợ \\
+Thêm cột & thành công & thành công \\
+Đổi tên cột \code{unit}: số dòng đọc được dưới tên mới & 1\,200\,000 & 0 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Hiệu năng truy vấn.} Khi truy vấn Hive lọc đúng theo cột phân vùng, Hive/Parquet ngang bằng hoặc nhanh hơn Iceberg: gần gấp đôi ở truy vấn (b) (76,7 ms so với 135,6 ms ở p50) và nhanh hơn 10\% ở (c); Iceberg chỉ nhanh hơn ở (a) (46,2 ms so với 56,8 ms). Lý do chính là cả hai bảng đều có 720 tệp nhỏ, và Iceberg phải đọc thêm lớp siêu dữ liệu (manifest) cho mỗi truy vấn. Lợi thế của Iceberg thể hiện ở chỗ khác: khi Hive bị lọc theo \code{measured\_at} (cách người dùng tự nhiên viết, vì họ không phải biết cột \code{day} tồn tại), thời gian tăng gấp 5,3 lần ở (a) và 3,3 lần ở (b), do không cắt được phân vùng. Phân vùng ẩn của Iceberg cho phép viết truy vấn tự nhiên mà vẫn cắt phân vùng.
+
+\paragraph{Chi phí ghi.} Nạp 240 commit mất 775,8 giây với Iceberg và 183,0 giây với Hive, tức khoảng 3,2 giây so với 0,76 giây mỗi commit (chậm hơn 4,2 lần). Mỗi commit Iceberg ghi thêm tệp metadata, manifest và manifest list lên HDFS. Con số này đo bằng \code{INSERT} của Trino, không phải tác vụ Spark, nên chỉ dùng được để so sánh hai định dạng. Dù vậy, 3,2 giây mỗi commit vẫn nhỏ hơn nhiều so với chu kỳ trigger 30 giây (khoảng 11\%).
+
+\paragraph{Các hành vi chỉ định dạng bảng cung cấp.} Đây là kết quả quan trọng nhất của benchmark. Phát lại một lô đã ghi (việc tác vụ streaming làm sau sự cố): với Iceberg, \code{MERGE INTO} theo khóa sự kiện không sinh dòng trùng nào; với Hive/Parquet, cách duy nhất là \code{INSERT} và bảng tăng thêm 5\,000 dòng trùng. Du hành thời gian trả về đúng 5\,000 dòng của lô đầu ở Iceberg, còn Hive báo không hỗ trợ. Hai định dạng đều thêm cột được, nhưng đổi tên cột đã có dữ liệu cho kết quả khác hẳn: Iceberg theo dõi cột bằng mã định danh nên toàn bộ 1\,200\,000 dòng vẫn đọc được dưới tên mới, còn Hive/Parquet ghép cột theo tên nên không dòng nào còn đọc được (đều trả về rỗng) mà không có thông báo lỗi. Đây là cách một thay đổi schema thành mất dữ liệu âm thầm. Hai tính năng sau cùng phải được bật riêng trong Hive (\code{hive.allow-add-column}, \code{hive.allow-rename-column}).
+
+\paragraph{Mối đe dọa với kết quả.} Dữ liệu tổng hợp 1,2 triệu dòng trên một nút, nhỏ hơn nhiều so với mức mà Iceberg thường được chọn. Thời gian nạp là của Trino chứ không phải Spark. Mỗi truy vấn chỉ đo 20 lần, nên p95 chỉ mang tính tham khảo.
+
+\subsubsection{Benchmark \#4: hiệu quả của compaction}
+\label{sec:5-bench-compaction}
+
+\paragraph{Câu hỏi.} Sau nhiều commit nhỏ của streaming, \code{rewrite\_data\_files} giảm bao nhiêu số tệp và rút ngắn truy vấn bao nhiêu (Mục~\ref{sec:4-compaction})?
+
+\paragraph{Thiết kế.} Một bảng Iceberg mới nhận 240 commit, mỗi commit 5\,000 dòng trải trên 3 ngày liên tiếp, tổng 1\,200\,000 dòng, nên mỗi ngày có khoảng 24 tệp nhỏ. Sau khi đo số tệp và thời gian hai truy vấn, recipe chạy chính \code{just compact} (macro dbt gọi \code{rewrite\_data\_files}, chiến lược binpack, Mục~\ref{sec:4-compaction}), rồi đo lại. Kiểm tra số dòng không đổi sau khi gộp.
+
+\begin{table}[H]
+\centering
+\caption{Ảnh hưởng của compaction, 240 commit (\texttt{benchmarks/results/compaction.csv})}
+\label{tab:5-bench-compaction}
+\small
+\begin{tblr}{
+  colspec = {X[3,l]X[1.3,c]X[1.3,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Chỉ số & Trước & Sau \\
+Số tệp dữ liệu & 720 & 30 \\
+Kích thước tệp trung bình (KiB) & 47,6 & 236,7 \\
+Số snapshot & 241 & 242 \\
+(a) đếm một ngày, p50 / p95 (ms) & 34,9 / 44,9 & 34,2 / 39,2 \\
+(b) 7 ngày gộp theo thửa ruộng, p50 / p95 (ms) & 116,1 / 186,6 & 54,2 / 64,0 \\
+Thời gian chạy \code{just compact} (giây) & -- & 15 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Kết quả.} Compaction giảm số tệp từ 720 xuống 30 (24 lần) và nâng kích thước trung bình của tệp từ 47,6 KiB lên 236,7 KiB, trong 15 giây. Truy vấn gộp 7 ngày nhanh hơn 2,1 lần ở p50 (116,1 ms xuống 54,2 ms) và p95 giảm hơn 2,9 lần (186,6 ms xuống 64,0 ms), tức là truy vấn cũng ổn định hơn. Truy vấn đếm một ngày không đổi (34,9 ms và 34,2 ms) vì \code{count(*)} theo một ngày đọc được từ thống kê trong manifest mà không cần mở tệp dữ liệu; lợi ích của compaction chỉ xuất hiện ở truy vấn phải đọc dữ liệu.
+
+\paragraph{Điều cần ghi nhận thêm.} Số snapshot tăng thêm 1 (từ 241 lên 242): compaction tạo một snapshot mới chứ không xóa snapshot cũ, nên các tệp nhỏ cũ vẫn nằm trên HDFS cho tới khi chạy \code{expire\_snapshots}. Vì vậy compaction làm \emph{nhanh} truy vấn nhưng không tự giải phóng dung lượng, và việc dọn snapshot phải là một bước vận hành riêng. Việc chạy benchmark còn lộ ra một lỗi của recipe: lệnh \code{just compact table="..."} truyền nguyên chuỗi \code{table=...} thay cho tên bảng, nên bước compaction của \code{just batch-run} thất bại; lỗi đã được sửa bằng cách truyền tên bảng như đối số vị trí.

@@ -90,8 +90,22 @@ def test_attach_lineage_groups_records_per_device() -> None:
 
     devices = [{"device_id": "A", "total": 3}, {"device_id": "B", "total": 0}]
     lineage = [
-        {"device_id": "A", "batch_id": 2, "topic": "t", "partition": 0, "offset": 9, "ingested_at": "2026-01-01T00:00:02Z"},
-        {"device_id": "A", "batch_id": 1, "topic": "t", "partition": 0, "offset": 4, "ingested_at": "2026-01-01T00:00:01Z"},
+        {
+            "device_id": "A",
+            "batch_id": 2,
+            "topic": "t",
+            "partition": 0,
+            "offset": 9,
+            "ingested_at": "2026-01-01T00:00:02Z",
+        },
+        {
+            "device_id": "A",
+            "batch_id": 1,
+            "topic": "t",
+            "partition": 0,
+            "offset": 4,
+            "ingested_at": "2026-01-01T00:00:01Z",
+        },
     ]
     result = attach_lineage(devices, lineage)
     assert [entry["batch_id"] for entry in result[0]["lineage"]] == [2, 1]

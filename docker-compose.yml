@@ -239,6 +239,10 @@ services:
   trino:
     profiles: ["core"]
     image: trinodb/trino:438
+    environment:
+      # Trino writes Iceberg and Hive tables for the benchmarks; HDFS has no real authentication,
+      # so act as the user that owns the warehouse (the same as Spark and the metastore).
+      HADOOP_USER_NAME: ${HDFS_USER:-root}
     volumes:
       - ./trino/config.properties:/etc/trino/config.properties:ro
       - ./trino/node.properties:/etc/trino/node.properties:ro

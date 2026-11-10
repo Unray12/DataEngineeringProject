@@ -14,14 +14,32 @@ import { usePathname } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useSidebarCollapse } from "./use-sidebar-collapse";
 
+const ICON_PATHS: Record<string, string> = {
+  overview: "M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10",
+  live: "M3 12h4l2.5-6 4 12 2.5-6H21",
+  alerts: "M12 4 2.8 19.5h18.4L12 4Zm0 5.5v5m0 2.5v.01",
+  analytics: "M4 19V5m0 14h16M8 15l3.5-4 3 2.5L19 8",
+  insights: "M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.7L12 15.6 7 18.5l1.2-5.7L4 9l5.6-.6L12 3Z",
+  quality: "M12 3 4.5 6v5.5c0 4.4 3.1 7.6 7.5 9.5 4.4-1.9 7.5-5.1 7.5-9.5V6L12 3Zm-3 9 2.2 2.2L15.5 10",
+  devices: "M7 4h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm5 13.5v.01M9 7.5h6",
+};
+
+function NavIcon({ name }: { name: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={ICON_PATHS[name]} />
+    </svg>
+  );
+}
+
 const NAV = [
-  { href: "/", label: "Overview", icon: "⌂" },
-  { href: "/live", label: "Live monitor", icon: "◉" },
-  { href: "/alerts", label: "Alerts", icon: "!" },
-  { href: "/analytics", label: "Analytics", icon: "↗" },
-  { href: "/insights", label: "Insights", icon: "★" },
-  { href: "/quality", label: "Data quality", icon: "✓" },
-  { href: "/devices", label: "Devices", icon: "▣" },
+  { href: "/", short: "Home", label: "Overview", icon: "overview" },
+  { href: "/live", short: "Live", label: "Live monitor", icon: "live" },
+  { href: "/alerts", short: "Alerts", label: "Alerts", icon: "alerts" },
+  { href: "/analytics", short: "Trends", label: "Analytics", icon: "analytics" },
+  { href: "/insights", short: "Insights", label: "Insights", icon: "insights" },
+  { href: "/quality", short: "Quality", label: "Data quality", icon: "quality" },
+  { href: "/devices", short: "Devices", label: "Devices", icon: "devices" },
 ];
 
 type M3ShellProps = {
@@ -117,8 +135,8 @@ export function M3Shell({ eyebrow, title, description, headerAction, children }:
               aria-current={isActive(item.href) ? "page" : undefined}
               title={collapsed ? item.label : undefined}
             >
-              <span className="w-5 text-center text-lg" aria-hidden="true">
-                {item.icon}
+              <span className="flex w-5 justify-center" aria-hidden="true">
+                <NavIcon name={item.icon} />
               </span>
               <span className="sidebar-label">{item.label}</span>
             </Link>
@@ -175,10 +193,10 @@ export function M3Shell({ eyebrow, title, description, headerAction, children }:
             className={`mobile-nav-item rounded-lg ${isActive(item.href) ? "bg-emerald-500/20 font-bold text-emerald-500" : ""}`}
             aria-current={isActive(item.href) ? "page" : undefined}
           >
-            <span className="block text-lg" aria-hidden="true">
-              {item.icon}
+            <span className="mx-auto mb-0.5 flex justify-center" aria-hidden="true">
+              <NavIcon name={item.icon} />
             </span>
-            {item.label}
+            {item.short}
           </Link>
         ))}
       </nav>
