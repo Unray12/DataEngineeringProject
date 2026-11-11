@@ -23,12 +23,12 @@ Các bảng gold của BR5 và BR6 cũng được phân vùng theo \code{day} (\
 
 \begin{lstlisting}[language=SQL, caption={So sánh hai giai đoạn, trung bình có trọng số (Trino, \texttt{field\_daily})}, label={lst:4-period-sql}]
 WITH cur AS (
-  SELECT sum(avg_value * reading_count) / sum(reading_count) AS avg_now
+  SELECT sum(avg_value * valid_count) / sum(valid_count) AS avg_now
   FROM lakehouse.gold.field_daily
   WHERE field_id = 'F001' AND metric = 'soil_moisture'
     AND day BETWEEN DATE '2026-11-09' AND DATE '2026-11-10'
 ), prev AS (
-  SELECT sum(avg_value * reading_count) / sum(reading_count) AS avg_before
+  SELECT sum(avg_value * valid_count) / sum(valid_count) AS avg_before
   FROM lakehouse.gold.field_daily
   WHERE field_id = 'F001' AND metric = 'soil_moisture'
     AND day BETWEEN DATE '2026-11-07' AND DATE '2026-11-08'
@@ -37,7 +37,7 @@ SELECT avg_now, avg_before, avg_now - avg_before AS delta
 FROM cur CROSS JOIN prev;
 \end{lstlisting}
 
-Phải dùng trung bình \emph{có trọng số} theo \code{reading\_count}: trung bình đơn giản của các trung bình ngày sẽ sai khi số bản ghi mỗi ngày khác nhau (ở dữ liệu thật, 582 bản ghi ngày 9/11 và 296 bản ghi ngày 10/11 cho 44,79 khi có trọng số và 44,51 khi không).
+Phải dùng trung bình \emph{có trọng số} theo \code{valid\_count}, số bản ghi hợp lệ đứng sau \code{avg\_value}: trung bình đơn giản của các trung bình ngày sẽ sai khi số bản ghi mỗi ngày khác nhau (ở dữ liệu thật, 581 bản ghi hợp lệ ngày 9/11 và 296 bản ghi ngày 10/11 cho 44,79 khi có trọng số và 44,51 khi không). Trọng số cũng không được là \code{reading\_count}, vì số này gồm cả bản ghi bị gắn cờ, vốn không góp vào \code{avg\_value}; trung bình có trọng số theo \code{valid\_count} (44,78565) trùng với trung bình tính thẳng từ silver.
 
 \paragraph{Góc nhìn theo mùa vụ.} Mùa vụ là so sánh các khoảng dài (tuần hoặc tháng) chồng lên nhau. Với bảng \code{field\_daily}, trung bình theo tuần là một \code{GROUP BY date\_trunc('week', day)}, không cần bảng mới. Tuy nhiên, dữ liệu mô phỏng chỉ trải trên một khoảng ngắn, nên góc nhìn này chỉ minh họa được cơ chế, không cho kết luận về mùa vụ thật (Mục~\ref{sec:5-eff-br06}).
 

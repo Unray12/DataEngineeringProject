@@ -109,7 +109,7 @@ Các model đều có test (\code{dbt/models/gold/schema.yml}): khóa duy nhất
 
 \begin{lstlisting}[language=SQL, caption={Truy vấn chỉ báo theo ngày (\texttt{src/api/analytics.py}, \texttt{indicators})}, label={lst:4-compare}]
 SELECT cast(day AS varchar) AS bucket, metric, min_value AS min,
-       max_value AS max, avg_value AS avg, reading_count AS count,
+       max_value AS max, avg_value AS avg, valid_count AS count,
        time_in_range_pct, hours_below_target
 FROM field_indicators
 WHERE field_id = ? AND day >= CAST(? AS date) AND day <= CAST(? AS date)

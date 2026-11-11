@@ -42,7 +42,7 @@ class AnalyticsReader:
                 SELECT {HOUR_BUCKET} AS bucket, metric, min_value AS min, max_value AS max,
                        avg_value AS avg, reading_count AS count,
                        CASE WHEN targeted_count > 0
-                            THEN cast(in_range_count * 100.0 / targeted_count AS double)
+                            THEN cast(in_range_count AS double) * 100 / targeted_count
                        END AS time_in_range_pct,
                        CASE WHEN metric = 'soil_moisture' AND avg_value < target_min
                             THEN cast(1 AS integer) ELSE cast(0 AS integer)
@@ -56,7 +56,7 @@ class AnalyticsReader:
         return self.query(
             """
             SELECT cast(day AS varchar) AS bucket, metric, min_value AS min, max_value AS max,
-                   avg_value AS avg, reading_count AS count, time_in_range_pct, hours_below_target
+                   avg_value AS avg, valid_count AS count, time_in_range_pct, hours_below_target
             FROM field_indicators
             WHERE field_id = ? AND day >= CAST(? AS date) AND day <= CAST(? AS date)
             ORDER BY day, metric
@@ -67,16 +67,20 @@ class AnalyticsReader:
     def history(
         self, field_id: str, start: str, end: str, metric: str, granularity: str
     ) -> list[dict[str, Any]]:
-        """Per-field history of one metric, daily or hourly (FR6.3)."""
-        table, bucket, order = (
-            ("field_hourly", HOUR_BUCKET, "hour_start")
+        """Per-field history of one metric, daily or hourly (FR6.3).
+
+        ``count`` is the number of validated readings behind ``avg``, the weight a client needs to
+        average several buckets (``field_hourly`` holds validated readings only).
+        """
+        table, bucket, order, count = (
+            ("field_hourly", HOUR_BUCKET, "hour_start", "reading_count")
             if granularity == "hourly"
-            else ("field_daily", "cast(day AS varchar)", "day")
+            else ("field_daily", "cast(day AS varchar)", "day", "valid_count")
         )
         return self.query(
             f"""
             SELECT {bucket} AS bucket, metric, min_value AS min, max_value AS max,
-                   avg_value AS avg, reading_count AS count
+                   avg_value AS avg, {count} AS count
             FROM {table}
             WHERE field_id = ? AND metric = ? AND day >= CAST(? AS date) AND day <= CAST(? AS date)
             ORDER BY {order}

@@ -31,7 +31,7 @@ Trạng thái máy & Luồng streaming và bộ mô phỏng đã dừng; không 
 \paragraph{Thiết kế.} Bốn truy vấn cho thửa ruộng F001 và chỉ số độ ẩm đất:
 
 \begin{itemize}
-  \item \textbf{Q0, giá trị mới nhất của một thửa ruộng:} Cassandra đọc \code{latest\_by_field}; Trino tính giá trị mới nhất theo từng chỉ số từ bảng bronze.
+  \item \textbf{Q0, giá trị mới nhất của một thửa ruộng:} Cassandra đọc \code{latest\_by\_field}; Trino tính giá trị mới nhất theo từng chỉ số từ bảng bronze.
   \item \textbf{Q1, chuỗi 24 giờ của một chỉ số:} Cassandra đọc \code{readings\_by\_field\_24h}; Trino đọc bronze trong cùng khoảng thời gian.
   \item \textbf{Q2, lịch sử theo ngày trong 30 ngày} và \textbf{Q3, so sánh mọi thửa ruộng trong 30 ngày:} chỉ có đường Trino (bảng gold), vì Cassandra không có bảng tương ứng (Mục~\ref{sec:4-alt-cassandra}).
 \end{itemize}
@@ -57,7 +57,7 @@ Q3 so sánh thửa ruộng & Trino & 45,1 / 59,1 & 67,4 / 95,3 & 106,6 / 145,0 &
 \end{tblr}
 \end{table}
 
-\paragraph{Kết quả.} Với cùng một câu hỏi và cùng các dòng, Cassandra nhanh hơn Trino khoảng 15 lần với một máy khách (Q1: 3,0 ms so với 45,5 ms ở p50) và khoảng 23 lần ở 10 máy khách (4,4 ms so với 101,8 ms), đồng thời xử lý nhiều hơn khoảng 23 lần số truy vấn mỗi giây (2\,046 so với 89). Cassandra gần như không chậm đi khi tăng số máy khách; Trino chậm đi gần gấp đôi từ 1 lên 10 máy khách, vì mỗi truy vấn phải lập kế hoạch và đọc siêu dữ liệu Iceberg.
+\paragraph{Kết quả.} Với cùng một câu hỏi và cùng các dòng, Cassandra nhanh hơn Trino khoảng 15 lần với một máy khách (Q1: 3,0 ms so với 45,5 ms ở p50) và khoảng 23 lần ở 10 máy khách (4,4 ms so với 101,8 ms), đồng thời xử lý nhiều hơn khoảng 23 lần số truy vấn mỗi giây (2\,046 so với 89). Ở Cassandra, p50 chỉ tăng khoảng 1 ms khi tăng từ 1 lên 10 máy khách; ở Trino, p50 tăng 2,2 lần (Q1) đến 2,5 lần (Q0), vì mỗi truy vấn phải lập kế hoạch và đọc siêu dữ liệu Iceberg.
 
 Đối chiếu với tài liệu yêu cầu: tra cứu theo khóa trong Cassandra có p95 không quá 8,8 ms, thỏa mục tiêu ``cỡ mười mili-giây''. Truy vấn phân tích trên gold có p95 không quá 173 ms ở 10 máy khách, đủ cho một biểu đồ tương tác. Trino vẫn trả lời tốt câu hỏi phân tích (Q2, Q3) với độ trễ cùng cỡ như Q1 ở Trino, nhưng không đạt độ trễ mà bảng điều khiển gần thời gian thực cần. Điều này xác nhận quyết định tách hai đường phục vụ và không trộn nguồn trong một biểu đồ.
 
