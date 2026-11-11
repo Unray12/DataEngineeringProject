@@ -1,0 +1,22 @@
+% Phần BR5 và BR6 của Mục 3.4 (người phụ trách: Khang).
+\subsection{Nhu cầu dữ liệu của BR5 và BR6}
+\label{sec:3-needs-br5-br6}
+
+BR5 và BR6 đều là nhu cầu \emph{phân tích}: người dùng không hỏi ``giá trị bây giờ là bao nhiêu'' mà hỏi ``so với mục tiêu và so với trước đây thì thế nào''. Vì vậy cả hai chấp nhận độ trễ của một lần làm mới tầng gold (theo giờ hoặc theo ngày) và đổi lại cần cái mà đường gần thời gian thực không có: toàn bộ lịch sử và khả năng gộp tùy ý. Bảng~\ref{tab:3-needs-br5-br6} tóm tắt.
+
+\begin{table}[H]
+\centering
+\caption{Nhu cầu sử dụng dữ liệu của BR5 và BR6}
+\label{tab:3-needs-br5-br6}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[1.4,l]X[2.4,l]X[1.6,l]X[1.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+BR & Người dùng & Câu hỏi cần trả lời & Loại xử lý & Độ trễ chấp nhận \\
+BR5 & U1 quản lý trang trại & Thửa ruộng nào đang thiếu nước? Mỗi thửa ruộng nằm trong khoảng mục tiêu bao nhiêu phần trăm thời gian? Thửa ruộng nào cần ưu tiên tưới? & Tổng hợp theo giờ và theo ngày, so với khoảng mục tiêu của cây trồng, bằng dbt & Một lần làm mới gold (theo giờ cho trong ngày, theo ngày cho tổng kết) \\
+BR6 & U3 nhà phân tích, U1 quản lý & Tuần này khác tuần trước ra sao? Mùa này khác mùa trước thế nào? Báo cáo tôi xuất tháng trước nếu chạy lại có ra đúng số cũ không? & Truy vấn theo khoảng ngày trên toàn bộ lịch sử, so sánh giai đoạn, xem lại snapshot cũ & Vài giây cho một truy vấn tương tác; dữ liệu theo lần làm mới gần nhất \\
+\end{tblr}
+\end{table}
+
+Hai điều rút ra từ bảng này chi phối thiết kế ở Chương~\ref{chap:4-design}. Thứ nhất, câu hỏi của BR6 chạm tới dữ liệu cũ hơn 24--48 giờ, vốn đã hết hạn trong Cassandra, nên phải có một kho giữ toàn bộ lịch sử. Thứ hai, câu hỏi ``chạy lại có ra đúng số cũ không'' đòi hỏi kho đó nhớ được trạng thái trong quá khứ, nên chọn công nghệ có snapshot thay vì thư mục tệp thuần.

@@ -3,6 +3,12 @@ version: "1.0.0"
 config-version: 2
 profile: agri
 model-paths: ["models"]
+macro-paths: ["macros"]
+vars:
+  # Gold models recompute the days since (today - lookback) on every run and merge them in place.
+  # The default recomputes the whole history, which keeps the indicators correct after a target
+  # range change (BR5) while preserving Iceberg snapshots; lower it once the history grows.
+  gold_lookback_days: 36500
 models:
   agri:
     +materialized: table

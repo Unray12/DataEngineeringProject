@@ -4,7 +4,7 @@
 ``bronze`` and ``ops`` exist (the streaming job also creates them, idempotently)
 and so the dbt-built ``silver``/``gold`` namespaces are ready.
 
-    python -m batch.iceberg_init            # create namespaces
+    python -m batch.iceberg_init            # create namespaces and load crop targets
     python -m batch.iceberg_init --drop-all # drop every lakehouse table first
 """
 
@@ -13,12 +13,54 @@ from __future__ import annotations
 import argparse
 import logging
 
+from common.reference import ReferenceData, load_reference
 from streaming.spark import build_spark
 
 log = logging.getLogger("batch.iceberg_init")
 
 NAMESPACES = ("bronze", "silver", "gold", "ops")
 CATALOG = "lakehouse"
+CROP_TARGETS = f"{CATALOG}.ops.crop_targets"
+
+CROP_TARGETS_DDL = f"""
+CREATE TABLE IF NOT EXISTS {CROP_TARGETS} (
+    crop_code string NOT NULL,
+    metric string NOT NULL,
+    target_min double,
+    target_max double,
+    alert_below double,
+    alert_above double
+) USING iceberg
+TBLPROPERTIES ('format-version' = '2')
+"""
+
+
+def crop_target_rows(
+    reference: ReferenceData,
+) -> list[tuple[str, str, float | None, float | None, float | None, float | None]]:
+    """One row per (crop, metric) target range, the contract of ``ops.crop_targets`` (FR5.2)."""
+    return [
+        (crop.crop_code, metric, target.min, target.max, target.alert_below, target.alert_above)
+        for crop in reference.crops.values()
+        for metric, target in sorted(crop.targets.items())
+    ]
+
+
+def load_crop_targets(spark, reference: ReferenceData) -> int:
+    """Replace ``ops.crop_targets`` with the reference data so dbt gold models can join the targets.
+
+    The JSON file stays the single source of truth: edit it, rerun ``just lakehouse-init`` and the
+    next ``just dbt-run`` recomputes the indicators with the new ranges (BR5 acceptance criterion).
+    """
+    spark.sql(CROP_TARGETS_DDL)
+    rows = crop_target_rows(reference)
+    columns = (
+        "crop_code string, metric string, target_min double, target_max double, "
+        "alert_below double, alert_above double"
+    )
+    spark.createDataFrame(rows, schema=columns).createOrReplaceTempView("src_crop_targets")
+    spark.sql(f"INSERT OVERWRITE {CROP_TARGETS} SELECT * FROM src_crop_targets")
+    return len(rows)
 
 
 def main() -> None:
@@ -36,6 +78,9 @@ def main() -> None:
         for namespace in NAMESPACES:
             spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{namespace}")
         log.info("initialized Iceberg namespaces: %s", ", ".join(NAMESPACES))
+        log.info(
+            "loaded %d crop target ranges into %s", load_crop_targets(spark, load_reference()), CROP_TARGETS
+        )
     finally:
         spark.stop()
 

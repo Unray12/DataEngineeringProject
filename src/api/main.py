@@ -19,9 +19,9 @@ from typing import Any, Literal
 from fastapi import Body, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from common.reference import ReferenceData, load_reference
 from api.analytics import AnalyticsReader
 from api.live import find_gaps, gap_multiplier, outage_counts, target_state
+from common.reference import ReferenceData, load_reference
 from streaming.alerts import ALLOWED_TRANSITIONS, STATUS_ACKNOWLEDGED, STATUS_OPEN, STATUS_RESOLVED
 from streaming.cassandra_io import CassandraWriter
 
@@ -81,7 +81,9 @@ def _session():
 
 def _analytics() -> AnalyticsReader:
     if analytics is None:
-        raise HTTPException(status_code=503, detail="analytical tables are not ready; run the batch flow first")
+        raise HTTPException(
+            status_code=503, detail="analytical tables are not ready; run the batch flow first"
+        )
     return analytics
 
 
@@ -173,16 +175,22 @@ def list_devices() -> list[dict[str, Any]]:
     gaps = _gap_counts({device.field_id for device in ref.devices.values()})
     rows = []
     for device in ref.devices.values():
-        row = _session().execute("SELECT * FROM device_status WHERE device_id = %s", (device.device_id,)).one()
-        rows.append(_rows([row])[0] if row is not None else {
-            "device_id": device.device_id,
-            "field_id": device.field_id,
-            "status": "unknown",
-            "last_seen": None,
-            "battery_pct": device.battery_pct,
-            "signal_quality": device.signal_quality,
-            "gap_count_24h": 0,
-        })
+        row = (
+            _session().execute("SELECT * FROM device_status WHERE device_id = %s", (device.device_id,)).one()
+        )
+        rows.append(
+            _rows([row])[0]
+            if row is not None
+            else {
+                "device_id": device.device_id,
+                "field_id": device.field_id,
+                "status": "unknown",
+                "last_seen": None,
+                "battery_pct": device.battery_pct,
+                "signal_quality": device.signal_quality,
+                "gap_count_24h": 0,
+            }
+        )
     for row in rows:
         row["gap_count_24h"] = gaps.get(row["device_id"], 0)
     return rows
@@ -300,9 +308,20 @@ def field_indicators(
     start: str | None = Query(None, alias="from"),
     end: str | None = Query(None, alias="to"),
     granularity: Literal["hourly", "daily"] = "daily",
+    metric: str | None = Query(None, description="adds the crop target range of this metric to the response"),
 ) -> dict[str, Any]:
     _require_field(field_id)
-    return {"field_id": field_id, "rows": _analytics().indicators(field_id, _date(start), _date(end, 0), granularity)}
+    rows = _analytics().indicators(field_id, _date(start), _date(end, 0), granularity)
+    return {"field_id": field_id, "rows": rows, "target": _target(field_id, metric)}
+
+
+def _target(field_id: str, metric: str | None) -> dict[str, float] | None:
+    """Target range of the field's crop for ``metric`` (FR5.2), or ``None`` when it has none."""
+    crop = _ref().crop(_ref().fields[field_id].crop_code)
+    target = crop.target(metric) if crop and metric else None
+    if target is None or target.min is None or target.max is None:
+        return None
+    return {"min": target.min, "max": target.max}
 
 
 @app.get("/fields/{field_id}/history")
@@ -316,7 +335,10 @@ def field_history(
     _require_field(field_id)
     if metric not in _ref().metrics:
         raise HTTPException(status_code=400, detail=f"unknown metric {metric}")
-    return {"field_id": field_id, "rows": _analytics().history(field_id, _date(start), _date(end, 0), metric, granularity)}
+    return {
+        "field_id": field_id,
+        "rows": _analytics().history(field_id, _date(start), _date(end, 0), metric, granularity),
+    }
 
 
 @app.get("/summary")

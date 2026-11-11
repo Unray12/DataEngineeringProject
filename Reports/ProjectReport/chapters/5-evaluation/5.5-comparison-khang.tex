@@ -1,0 +1,50 @@
+% Đầu vào của Khang cho Mục 5.5 (người phụ trách mục: Đạt): so sánh lớp lưu trữ và phục vụ phân tích.
+\subsection{Lớp lưu trữ và phục vụ phân tích}
+\label{sec:5-comparison-storage}
+
+Mục~\ref{sec:4-alternative} đặt ra hai phương án thay thế; mục này đối chiếu chúng với giải pháp chính bằng số đo của Mục~\ref{sec:5-bench-khang}. Bảng~\ref{tab:5-compare-storage} so sánh Iceberg với Hive/Parquet thuần, Bảng~\ref{tab:5-compare-serving} so sánh hai đường phục vụ.
+
+\begin{table}[H]
+\centering
+\caption{Iceberg và Hive/Parquet thuần: kết quả đo (Benchmark \#3, 1,2 triệu dòng, 240 commit)}
+\label{tab:5-compare-storage}
+\small
+\begin{tblr}{
+  colspec = {X[2.4,l]X[2,l]X[2,l]X[1.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí & Iceberg (giải pháp chính) & Hive/Parquet & Bên thắng \\
+Truy vấn 7 ngày, p50 & 135,6 ms & 76,7 ms (lọc theo cột phân vùng) & Hive \\
+Cùng truy vấn nếu lọc theo \code{measured\_at} & 135,6 ms & 250,0 ms & Iceberg \\
+Thời gian nạp mỗi commit & 3,2 s & 0,76 s & Hive \\
+Phát lại một lô: dòng trùng & 0 & 5\,000 & Iceberg \\
+Xem lại trạng thái cũ & có & không & Iceberg \\
+Đổi tên cột có dữ liệu & 1\,200\,000 dòng còn đọc được & 0 dòng đọc được & Iceberg \\
+Số tệp nhỏ & 720 & 720 & hòa \\
+Độ phức tạp vận hành & cao hơn (dọn snapshot) & thấp & Hive \\
+\end{tblr}
+\end{table}
+
+Hive/Parquet nhanh hơn và rẻ hơn khi ghi, nhưng chỉ khi người viết truy vấn biết lọc theo cột phân vùng, và nó không có ba thứ mà đề tài cần: phát lại không sinh dòng trùng (BR3, BR4), xem lại quá khứ (BR6) và đổi schema không mất dữ liệu. Với dữ liệu nông nghiệp được tích lũy hằng ngày và phải tái tạo được báo cáo cũ, chi phí khoảng 4 lần ở thời gian commit (vẫn dưới 11\% chu kỳ trigger) là chấp nhận được. Nếu hệ thống chỉ cần ghi một lần và đọc, không phát lại, không đổi schema, Hive/Parquet đơn giản hơn là lựa chọn hợp lý.
+
+\begin{table}[H]
+\centering
+\caption{Hai đường phục vụ và phương án chỉ dùng Cassandra (Benchmark \#2)}
+\label{tab:5-compare-serving}
+\small
+\begin{tblr}{
+  colspec = {X[2.4,l]X[2,l]X[2.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí & Cassandra & Trino trên Iceberg \\
+Chuỗi 24 giờ (Q1), p50 ở 1 / 10 máy khách & 3,0 ms / 4,4 ms & 45,5 ms / 101,8 ms \\
+Thông lượng Q1 ở 10 máy khách & 2\,046 truy vấn/giây & 89 truy vấn/giây \\
+Lịch sử 30 ngày (Q2), p50 ở 1 máy khách & cần thêm một bảng và nạp lại dữ liệu & 42,2 ms từ bảng gold có sẵn \\
+So sánh mọi thửa ruộng (Q3) & cần thêm một bảng & 45,1 ms từ bảng gold có sẵn \\
+Giữ toàn bộ lịch sử thô để xử lý lại & không (TTL 24--48 giờ) & có (bronze) \\
+\end{tblr}
+\end{table}
+
+Cassandra nhanh hơn Trino 15 đến 23 lần cho câu hỏi gần thời gian thực, và đây là lý do bảng điều khiển gần thời gian thực chỉ đọc Cassandra. Ngược lại, phương án chỉ dùng Cassandra buộc phải tạo một bảng cho mỗi câu hỏi phân tích mới và không giữ được dữ liệu thô để xử lý lại, hai thứ mà BR5 và BR6 đòi hỏi. Phương án chỉ dùng Trino cũng không đạt: p95 của tra cứu giá trị mới nhất ở 10 máy khách là 213 ms, cao hơn nhiều so với yêu cầu ``cỡ mười mili-giây''. Giải pháp hai đường phục vụ là phương án duy nhất đáp ứng cả hai nhóm yêu cầu, và cái giá là phải vận hành thêm một hệ thống.
+
+\paragraph{Hiệu quả của việc gộp tệp.} Các con số của cả hai định dạng ở Bảng~\ref{tab:5-compare-storage} đều đo khi bảng còn 720 tệp nhỏ, chưa gộp. Với Iceberg, \code{rewrite\_data\_files} gộp còn 30 tệp trong 15 giây và làm truy vấn 7 ngày nhanh gấp 2,1 lần (Bảng~\ref{tab:5-bench-compaction}), nên khoảng cách với Hive ở truy vấn đó thu hẹp lại. Với Hive/Parquet, đề tài không đo việc gộp; muốn gộp phải tự viết lại các phân vùng.

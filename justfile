@@ -12,6 +12,10 @@ set dotenv-load := true
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 compose := "docker compose"
+bench-cpu := `sysctl -n machdep.cpu.brand_string 2>/dev/null || uname -m`
+bench-cores := `sysctl -n hw.ncpu 2>/dev/null || nproc`
+bench-ram := `echo $(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))`
+bench-docker := `docker info 2>/dev/null | awk '/Total Memory/ {print $3}'`
 all-profiles := "--profile core --profile processing --profile serving --profile app"
 
 # Show the recipe list
@@ -161,8 +165,10 @@ kafka-reset:
 # -----------------------------------------------------------------------------
 
 # Run a Trino query: just trino-sql "SELECT count(*) FROM lakehouse.bronze.sensor_readings"
+# The query goes through stdin, so Iceberg metadata tables work too:
+#   just trino-sql 'SELECT snapshot_id, committed_at FROM lakehouse.gold."field_daily$snapshots"'
 trino-sql query="SHOW SCHEMAS FROM lakehouse":
-    {{compose}} exec -T trino trino --server localhost:8080 --user ${TRINO_USER} --execute "{{query}}"
+    printf '%s\n' {{quote(query)}} | {{compose}} exec -T trino trino --server localhost:8080 --user ${TRINO_USER}
 
 # List the Iceberg tables registered in the Hive Metastore
 lakehouse-tables:
@@ -250,12 +256,18 @@ dbt-run:
     @just _hdfs-ready
     {{compose}} --profile core --profile processing run --rm dbt dbt build --project-dir /app/dbt --profiles-dir /app/dbt
 
+# Rebuild the incremental gold tables from scratch. Needed once after a change of their partitioning
+# or columns: an existing table keeps its old layout and loses its Iceberg snapshot history.
+dbt-full-refresh:
+    @just _hdfs-ready
+    {{compose}} --profile core --profile processing run --rm dbt dbt build --full-refresh --select gold --project-dir /app/dbt --profiles-dir /app/dbt
+
 # Complete batch flow: initialize Iceberg tables, build silver/gold, test, then compact bronze.
 batch-run:
     @just lakehouse-init
     @just dbt-run
     @just dbt-test
-    @just compact table="bronze.sensor_readings"
+    @just compact bronze.sensor_readings
 
 # Start the API and Next.js frontend against the processed lakehouse.
 up-app:
@@ -294,9 +306,7 @@ test:
 
 # Pure-Python unit tests (eval rules), no containers needed
 test-unit:
-    docker run --rm -v "${PWD}:/app" -w /app \
-      -e PYTHONPATH=/app/src \
-      python:3.11-slim sh -c "pip install -q pytest && pytest -q tests/unit"
+    uv run pytest -q tests/unit
 
 # Lint with ruff
 lint:
@@ -321,20 +331,31 @@ bench-trigger interval="30s" duration="120":
     @echo "NOT IMPLEMENTED: trigger-interval sweep {{interval}} over {{duration}}s"
     @echo "implement benchmarks/run_trigger_benchmark.py (record trigger, volume, hardware)"
 
-# Point lookups: Cassandra vs Trino-on-Iceberg (deferred)
+# Run one benchmark script inside the api image on the Compose network. The scripts write
+# benchmarks/results/*.csv, whose first lines record the configuration (AGENTS.md rule 4).
+_bench script *args:
+    {{compose}} --profile core --profile serving run --rm --no-deps \
+      -v "${PWD}/benchmarks:/app/benchmarks" \
+      -e BENCH_HOST_CPU="{{bench-cpu}}" -e BENCH_HOST_CORES="{{bench-cores}}" \
+      -e BENCH_HOST_RAM_GB="{{bench-ram}}" -e BENCH_DOCKER_MEM_GB="{{bench-docker}}" \
+      -e COMPACT_SECONDS \
+      api python /app/benchmarks/{{script}} {{args}}
+
+# Benchmark #2: Cassandra vs Trino-on-Iceberg for the same dashboard query (needs the stream
+# running and `just batch-run` done, so both stores hold data)
 bench-lookups:
-    @echo "NOT IMPLEMENTED: Cassandra vs Trino for the same dashboard query"
-    @echo "implement benchmarks/run_lookup_benchmark.py (record query, rows, hardware)"
+    @just _bench run_lookup_benchmark.py
 
-# Iceberg vs plain Parquet on the same data (deferred)
+# Benchmark #3: Iceberg vs plain Hive/Parquet on the same data (restart Trino once after adding
+# trino/catalog/hive.properties: `docker compose restart trino`)
 bench-storage:
-    @echo "NOT IMPLEMENTED: Iceberg vs plain Hive/Parquet"
-    @echo "implement benchmarks/run_storage_benchmark.py (record schema, volume, hardware)"
+    @just _bench run_storage_benchmark.py
 
-# Effect of compaction on query time (deferred)
+# Benchmark #4: effect of compaction (rewrite_data_files through `just compact`) on file count and query time
 bench-compaction:
-    @echo "NOT IMPLEMENTED: query time before/after rewrite_data_files"
-    @echo "implement benchmarks/run_compaction_benchmark.py (record file counts, hardware)"
+    @just _bench run_compaction_benchmark.py --phase before
+    start=$(date +%s); just compact bench.sensor_compaction; end=$(date +%s); \
+      COMPACT_SECONDS=$((end - start)) just _bench run_compaction_benchmark.py --phase after
 
 # Recovery and replay: no loss, no duplicates (deferred)
 bench-replay:

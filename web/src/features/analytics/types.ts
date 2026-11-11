@@ -13,6 +13,7 @@ export const analyticsQuerySchema = z.object({
   from: z.string().date(),
   to: z.string().date(),
 });
+export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>;
 
 export const historyRowSchema = z.object({
   bucket: z.string(),
@@ -30,18 +31,31 @@ export const indicatorRowSchema = historyRowSchema.extend({
 
 export const comparisonRowSchema = z.object({
   field_id: z.string(),
+  name: z.string(),
+  farm_name: z.string(),
   min: z.number(),
   max: z.number(),
   avg: z.number(),
   count: z.number(),
+  /** `null` means "no target range for this metric", never 0. */
+  time_in_range_pct: z.number().nullable(),
+  hours_below_target: z.number().nullable(),
 });
 
 export type HistoryRow = z.infer<typeof historyRowSchema>;
 export type IndicatorRow = z.infer<typeof indicatorRowSchema>;
 export type ComparisonRow = z.infer<typeof comparisonRowSchema>;
 
+const rangeSchema = z.object({ from: z.string(), to: z.string() });
+
 export const analyticsResponseSchema = z.object({
+  field: z.object({ id: z.string(), name: z.string(), farmName: z.string() }),
+  range: rangeSchema,
+  previousRange: rangeSchema,
+  /** Target range of the crop for the selected metric, when the backend knows it. */
+  target: z.object({ min: z.number(), max: z.number() }).nullable(),
   history: z.array(historyRowSchema),
+  previousHistory: z.array(historyRowSchema),
   indicators: z.array(indicatorRowSchema),
   comparison: z.array(comparisonRowSchema),
   asOf: z.string().datetime(),

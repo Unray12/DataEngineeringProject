@@ -75,3 +75,14 @@ def test_loader_rejects_unknown_device_field(tmp_path: Path) -> None:
     path.write_text(json.dumps(broken), encoding="utf-8")
     with pytest.raises(ValueError, match="unknown field"):
         load_reference(str(path))
+
+
+def test_crop_target_rows_cover_every_crop_metric_pair() -> None:
+    from batch.iceberg_init import crop_target_rows
+
+    reference = load_reference("reference/reference_data.json")
+    rows = crop_target_rows(reference)
+    expected = sum(len(crop.targets) for crop in reference.crops.values())
+    assert len(rows) == expected
+    rice = {metric: (low, high) for crop, metric, low, high, *_ in rows if crop == "RICE"}
+    assert rice["soil_moisture"] == (30.0, 60.0)

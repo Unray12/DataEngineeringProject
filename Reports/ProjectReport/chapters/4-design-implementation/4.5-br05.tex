@@ -1,0 +1,130 @@
+\subsection{BR05 -- Hỗ trợ quản lý trang trại dựa trên dữ liệu}
+\label{sec:4-br05}
+
+\paragraph{Yêu cầu.} Người quản lý cần các chỉ báo đủ cô đọng để quyết định tưới tiêu và phân bổ tài nguyên: thửa ruộng nào đang khô, thửa ruộng nào nằm ngoài khoảng mục tiêu lâu nhất (FR5.1--FR5.4). Số đo thô, 5 giây một lần, không dùng được cho việc đó; cần tổng hợp theo giờ, theo ngày, và so với khoảng mục tiêu của từng cây trồng.
+
+\paragraph{Luồng dữ liệu.} Hình~\ref{fig:4-br05-flow} mô tả luồng. Dữ liệu đi từ bronze (do streaming ghi), qua silver (khử trùng lặp), tới các bảng gold do dbt dựng; khoảng mục tiêu theo cây trồng đi vào từ dữ liệu danh mục. FastAPI đọc gold qua Trino và trả về cho trang \emph{Analytics}.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=0.5cm and 0.55cm,
+  box/.style={rectangle, rounded corners, draw, minimum width=2.1cm, minimum height=0.9cm, align=center, font=\footnotesize, fill=gray!10},
+  arr/.style={-{Stealth}, thick}]
+\node[box, fill=orange!20] (b) {bronze};
+\node[box, right=of b] (s) {silver\\sensor\_readings};
+\node[box, right=of s] (g) {gold\\chỉ báo};
+\node[box, right=of g] (t) {Trino};
+\node[box, below=of s, fill=blue!10] (r) {Khoảng mục tiêu\\theo cây trồng};
+\node[box, below=of t] (a) {FastAPI\\\texttt{/indicators}};
+\draw[arr] (b)--(s); \draw[arr] (s)--(g); \draw[arr] (g)--(t);
+\draw[arr] (r)--(g); \draw[arr] (t)--(a);
+\end{tikzpicture}
+\caption{Luồng dữ liệu của BR05}
+\label{fig:4-br05-flow}
+\end{figure}
+
+\paragraph{Bước 1: khoảng mục tiêu là dữ liệu danh mục (FR5.2).} Khoảng mục tiêu nằm trong \code{reference/reference\_data.json}, theo từng cây trồng và chỉ số. Đoạn mã~\ref{lst:4-targets} là phần của cây lúa. Đổi một số trong tệp này là đổi định nghĩa ``nằm trong khoảng''; không cần sửa mã.
+
+\begin{lstlisting}[caption={Khoảng mục tiêu của cây lúa (\texttt{reference/reference\_data.json})}, label={lst:4-targets}]
+{
+  "crop_code": "RICE",
+  "targets": {
+    "soil_moisture":   {"min": 30.0, "max": 60.0, "alert_below": 32.0},
+    "air_temperature": {"min": 10.0, "max": 38.0, "alert_below": 5.0, "alert_above": 38.0}
+  }
+}
+\end{lstlisting}
+
+Bảng~\ref{tab:4-targets} tóm tắt khoảng mục tiêu độ ẩm đất của bốn loại cây. Khoảng này khác nhau theo cây, nên cùng một giá trị độ ẩm đất 33\% là ``đạt'' với lúa nhưng ``thiếu nước'' với cà phê.
+
+\begin{table}[H]
+\centering
+\caption{Khoảng mục tiêu độ ẩm đất theo cây trồng (\texttt{reference/reference\_data.json})}
+\label{tab:4-targets}
+\small
+\begin{tblr}{
+  colspec = {X[1.4,l]X[1,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Cây trồng & Nhỏ nhất (\%) & Lớn nhất (\%) \\
+Lúa (RICE) & 30 & 60 \\
+Ngô (MAIZE) & 25 & 55 \\
+Cà chua (TOMATO) & 35 & 65 \\
+Cà phê (COFFEE) & 35 & 70 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Bước 2: nạp khoảng mục tiêu vào lakehouse (FR5.2).} dbt không đọc được tệp JSON, nên \code{just lakehouse-init} nạp các khoảng này vào bảng \code{ops.crop\_targets} (Mục~\ref{sec:4-targets-ops}). Mỗi dòng gồm cây trồng, chỉ số, giá trị nhỏ nhất, lớn nhất của khoảng mục tiêu và các ngưỡng cảnh báo.
+
+\paragraph{Bước 3: tổng hợp theo giờ (FR5.1).} Model \code{field\_hourly} gom silver theo giờ, chỉ lấy bản ghi hợp lệ, và nối với \code{ops.crop\_targets} để mỗi giờ biết bao nhiêu số đo nằm trong khoảng mục tiêu của cây trồng đó.
+
+\begin{lstlisting}[language=SQL, caption={Model \texttt{field\_hourly} (\texttt{dbt/models/gold/field\_hourly.sql}, rút gọn)}, label={lst:4-field-hourly}]
+select
+    s.field_id, s.farm_id, s.crop_code, s.metric,
+    date_trunc('hour', s.measured_at) as hour_start,
+    cast(date_trunc('day', s.measured_at) as date) as day,
+    t.target_min, t.target_max,
+    min(s.value) as min_value, max(s.value) as max_value,
+    avg(s.value) as avg_value,
+    count(*) as reading_count,
+    sum(case when t.target_min is not null then 1 else 0 end) as targeted_count,
+    sum(case when s.value between t.target_min and t.target_max
+             then 1 else 0 end) as in_range_count
+from {{ ref('sensor_readings') }} s
+left join {{ source('ops', 'crop_targets') }} t
+       on t.crop_code = s.crop_code and t.metric = s.metric
+where s.value is not null and s.quality_flag = 'ok'
+group by 1, 2, 3, 4, 5, 6, 7, 8
+\end{lstlisting}
+
+Cột \code{targeted\_count} đếm riêng các bản ghi có khoảng mục tiêu. Nếu không có cột này, một chỉ số không có khoảng mục tiêu (ví dụ lượng mưa) sẽ cho time-in-range bằng 0\% thay vì ``không áp dụng''.
+
+\paragraph{Bước 4: chỉ báo time-in-range và tưới tiêu (FR5.3).} Model \code{field\_indicators} gộp \code{field\_hourly} theo ngày. \code{time\_in\_range\_pct} là tỷ lệ số đo trong khoảng mục tiêu (rỗng khi chỉ số không có mục tiêu); vì thiết bị báo cáo đều đặn, tỷ lệ số đo xấp xỉ tỷ lệ thời gian. \code{hours\_below\_target} là số giờ mà độ ẩm đất trung bình thấp hơn mục tiêu nhỏ nhất, tức là chỉ báo tưới tiêu.
+
+\begin{lstlisting}[language=SQL, caption={Chỉ báo trong \texttt{field\_indicators} (\texttt{dbt/models/gold/field\_indicators.sql}, rút gọn)}, label={lst:4-indicators}]
+with hourly as (
+    select field_id, metric, day,
+           sum(in_range_count) as in_range_count,
+           sum(targeted_count) as targeted_count,
+           count(distinct case
+               when metric = 'soil_moisture' and target_min is not null
+                    and avg_value < target_min
+               then hour_start end) as hours_below_target
+    from {{ ref('field_hourly') }}
+    group by 1, 2, 3
+)
+select d.*,
+       cast(h.in_range_count * 100.0 / nullif(h.targeted_count, 0) as double)
+           as time_in_range_pct,
+       cast(coalesce(h.hours_below_target, 0) as int) as hours_below_target
+from {{ ref('field_daily') }} d
+left join hourly h
+  on h.field_id = d.field_id and h.metric = d.metric and h.day = d.day
+\end{lstlisting}
+
+Các model đều có test (\code{dbt/models/gold/schema.yml}): khóa duy nhất, \code{not\_null}, và test khoảng giá trị \code{accepted\_range} (tỷ lệ phần trăm từ 0 đến 100, số giờ từ 0 đến 24, giá trị đo từ $-30$ đến 200). Một test thất bại chặn các model phía sau theo cơ chế của \code{dbt build} (FR4.7).
+
+\paragraph{Bước 5: phục vụ qua FastAPI (FR5.4).} Điểm cuối \code{GET /fields/\{id\}/indicators} đọc \code{field\_indicators} (hoặc \code{field\_hourly} khi \code{granularity=hourly}) qua Trino, và trả thêm khoảng mục tiêu của cây trồng khi có tham số \code{metric} để giao diện vẽ dải mục tiêu. Giao diện gọi điểm cuối này cho từng thửa ruộng để dựng bảng so sánh cạnh nhau (FR5.4).
+
+\begin{lstlisting}[language=SQL, caption={Truy vấn chỉ báo theo ngày (\texttt{src/api/analytics.py}, \texttt{indicators})}, label={lst:4-compare}]
+SELECT cast(day AS varchar) AS bucket, metric, min_value AS min,
+       max_value AS max, avg_value AS avg, valid_count AS count,
+       time_in_range_pct, hours_below_target
+FROM field_indicators
+WHERE field_id = ? AND day >= CAST(? AS date) AND day <= CAST(? AS date)
+ORDER BY day, metric
+\end{lstlisting}
+
+Truy vấn dùng tham số hóa (\code{?}) chứ không ghép chuỗi, và chỉ đọc từ bảng gold, đúng quy tắc ``đường phân tích chỉ đọc Trino và gold''.
+
+\paragraph{Bước 6: hiển thị.} Trang \emph{Analytics} (Hình~\ref{fig:4-br05-ui}) cho chọn thửa ruộng, chỉ số, độ chi tiết (theo giờ hoặc theo ngày) và khoảng ngày bằng các nút chọn nhanh (hôm nay, 7, 30, 90 ngày) hoặc nhập tay; bộ lọc nằm trên URL nên đường dẫn chia sẻ được. Trang có bốn thẻ chỉ số (trung bình, time-in-range, số giờ dưới mục tiêu, số bản ghi), biểu đồ lịch sử kèm dải mục tiêu, khối ``What to do'' với câu khuyến nghị tưới, và bảng xếp hạng các thửa ruộng. Mọi trạng thái đều dùng biểu tượng và chữ chứ không chỉ dùng màu. Dữ liệu được ghi chú ``historical data, not live'' để không nhầm với dữ liệu thời gian thực.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{analytics-overview.png}
+\caption{Trang Analytics: thẻ chỉ số, lịch sử một thửa ruộng và khuyến nghị tưới (chạy trên dữ liệu mô phỏng thật qua FastAPI và Trino)}
+\label{fig:4-br05-ui}
+\end{figure}
+
+\paragraph{Kết quả.} Chuỗi dữ liệu từ bronze tới trang Analytics chạy được trên hệ thống thật, và việc đổi khoảng mục tiêu làm đổi chỉ báo ở lần làm mới kế tiếp (Mục~\ref{sec:5-eff-br05}). Có hai điểm cần ghi nhận. Thứ nhất, \code{time\_in\_range\_pct} đo theo số bản ghi, không theo thời gian thực, nên chính xác khi thiết bị báo cáo đều và chỉ xấp xỉ khi có khoảng trống dữ liệu. Thứ hai, bảng so sánh các thửa ruộng gọi API một lần cho mỗi thửa ruộng (8 lần với dữ liệu demo); với hàng trăm thửa ruộng cần một điểm cuối tổng hợp.

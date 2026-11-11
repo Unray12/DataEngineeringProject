@@ -1,8 +1,34 @@
 version: 2
 
 models:
+  - name: field_hourly
+    description: >
+      Hourly min, max and average per field and metric from validated readings (quality_flag = 'ok'),
+      with the crop target range and the number of readings inside it. Partitioned by day.
+    tests:
+      - unique:
+          column_name: "concat(field_id, '|', metric, '|', cast(hour_start as string))"
+    columns:
+      - name: field_id
+        tests: [not_null]
+      - name: metric
+        tests: [not_null]
+      - name: hour_start
+        tests: [not_null]
+      - name: reading_count
+        tests:
+          - accepted_range: {min_value: 1}
+      - name: in_range_count
+        tests:
+          - accepted_range: {min_value: 0}
+
   - name: field_daily
-    description: Daily min, max, average and quality counts per field and metric.
+    description: >
+      Daily min, max and average per field and metric over validated readings, plus total, valid and
+      flagged counts. Partitioned by day.
+    tests:
+      - unique:
+          column_name: "concat(field_id, '|', metric, '|', cast(day as string))"
     columns:
       - name: field_id
         tests: [not_null]
@@ -10,14 +36,43 @@ models:
         tests: [not_null]
       - name: day
         tests: [not_null]
+      - name: avg_value
+        description: Average of validated readings; physical limits across all metrics are -30 to 200.
+        tests:
+          - accepted_range: {min_value: -30, max_value: 200}
+      - name: max_value
+        tests:
+          - accepted_range: {min_value: -30, max_value: 200}
+      - name: min_value
+        tests:
+          - accepted_range: {min_value: -30, max_value: 200}
+      - name: reading_count
+        tests:
+          - accepted_range: {min_value: 1}
+
   - name: field_indicators
-    description: Analytical indicators used by the historical dashboard.
+    description: >
+      Daily management indicators used by the analytics dashboard: time in the crop target range
+      and hours below the soil moisture target, next to the daily statistics and data quality shares.
+    tests:
+      - unique:
+          column_name: "concat(field_id, '|', metric, '|', cast(day as string))"
     columns:
       - name: field_id
         tests: [not_null]
       - name: data_quality_pct
         tests:
           - not_null
+          - accepted_range: {min_value: 0, max_value: 100}
+      - name: time_in_range_pct
+        description: Share of readings inside the crop target range; null when the metric has no target.
+        tests:
+          - accepted_range: {min_value: 0, max_value: 100}
+      - name: hours_below_target
+        tests:
+          - not_null
+          - accepted_range: {min_value: 0, max_value: 24}
+
   - name: quality_daily
     description: Daily data quality counts from streaming quality counters and quarantine.
     columns:

@@ -1,0 +1,52 @@
+% Mục 4.6 (người phụ trách: Khang).
+\section{Giải pháp thay thế để so sánh}
+\label{sec:4-alternative}
+
+Đề tài so sánh giải pháp chính với hai phương án thay thế ở lớp lưu trữ và phục vụ phân tích. Phương án thay thế về xử lý (khoảng thời gian trigger, xử lý từng sự kiện kiểu Flink) do thành viên phụ trách xử lý luồng trình bày. Mỗi phương án dưới đây có một benchmark ở Chương~\ref{chap:5-evaluation}, nên so sánh dựa trên số đo chứ không chỉ dựa trên lập luận.
+
+\subsection{Phương án A: Hive/Parquet thuần thay cho Iceberg}
+\label{sec:4-alt-parquet}
+
+\paragraph{Mô tả.} Bảng bronze và gold là bảng ngoài (external table) của Hive trên thư mục Parquet, phân vùng theo thư mục \code{day=YYYY-MM-DD}. Spark ghi tệp vào đúng thư mục ngày, Hive Metastore ghi nhận các phân vùng, Trino đọc qua connector Hive.
+
+\paragraph{Điểm mạnh.} Đơn giản; ít khái niệm; đọc ghi nhanh với tệp lớn; không có lớp siêu dữ liệu để quản lý.
+
+\paragraph{Điểm yếu đối với bài toán này.} Bảng~\ref{tab:4-alt-parquet} đối chiếu từng nhu cầu với hai phương án.
+
+\begin{table}[H]
+\centering
+\caption{Hive/Parquet và Iceberg: so sánh theo thiết kế}
+\label{tab:4-alt-parquet}
+\small
+\begin{tblr}{
+  colspec = {X[1.6,l]X[2.4,l]X[2.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Nhu cầu & Hive/Parquet thuần & Iceberg \\
+Ghi đồng thời với đọc & Người đọc có thể thấy tệp ghi dở & Snapshot nguyên tử, người đọc luôn thấy trạng thái nhất quán \\
+Ghi idempotent khi phát lại & Không có \code{MERGE}; phải tự khử trùng hoặc ghi đè cả phân vùng & \code{MERGE INTO} theo khóa tự nhiên \\
+Lọc theo ngày & Dựa vào tên thư mục và cột phân vùng riêng & Phân vùng ẩn theo \code{days(measured\_at)} \\
+Sửa schema & Đổi tên cột có thể làm hỏng tệp cũ & Cột được định danh bằng số; thêm, đổi tên không viết lại dữ liệu \\
+Xem lại quá khứ & Không có & Du hành thời gian theo snapshot \\
+Tệp nhỏ & Có; phải tự gộp bằng cách viết lại các phân vùng & Có; \code{rewrite\_data\_files} tạo snapshot mới nên không chặn người đọc \\
+Độ phức tạp vận hành & Thấp & Cao hơn (siêu dữ liệu, dọn snapshot) \\
+\end{tblr}
+\end{table}
+
+\paragraph{Cách so sánh.} Benchmark \#3 (Mục~\ref{sec:5-bench-storage}) ghi cùng 1,2 triệu dòng, qua 240 commit, vào hai kiểu bảng (catalog \code{hive} trong \code{trino/catalog/hive.properties}) rồi đo thời gian truy vấn, số tệp và hành vi khi ghi, đồng thời thử thật phát lại một lô, du hành thời gian và đổi tên cột.
+
+\subsection{Phương án B: chỉ dùng Cassandra để phục vụ lịch sử}
+\label{sec:4-alt-cassandra}
+
+\paragraph{Mô tả.} Không có đường Trino. Ngoài các bảng gần thời gian thực, Cassandra giữ cả các bảng tổng hợp theo ngày (ví dụ \code{daily\_by\_field}) và API đọc lịch sử từ đó \cite{cassandra_docs}. Hệ thống chỉ còn một kho phục vụ.
+
+\paragraph{Điểm mạnh.} Một kho thay cho hai; độ trễ đọc thấp và ổn định; ít thành phần phải vận hành.
+
+\paragraph{Điểm yếu đối với bài toán này.} Cassandra là kho \emph{theo truy vấn}: mỗi câu hỏi cần một bảng thiết kế riêng, và một truy vấn chưa được lường trước (ví dụ so sánh hai giai đoạn tùy ý hoặc gộp theo tuần) không thể trả lời bằng truy vấn tùy biến mà phải thêm bảng và nạp lại dữ liệu. Cassandra không có phép nối và gộp tự do. Việc giữ toàn bộ lịch sử thô cho mục đích xử lý lại cũng không phù hợp với một kho tối ưu cho ghi và tra cứu theo khóa. Cuối cùng, dữ liệu bronze, nguồn để dựng lại mọi chỉ báo, vẫn phải nằm ở nơi khác.
+
+\paragraph{Cách so sánh.} Benchmark \#2 (Mục~\ref{sec:5-bench-lookups}) chạy \emph{cùng một câu hỏi} của bảng điều khiển (lịch sử một thửa ruộng, so sánh nhiều thửa ruộng) trên Cassandra và trên Trino, đo độ trễ p50 và p95 theo số truy vấn đồng thời. Kết quả: Cassandra nhanh hơn Trino 15 đến 23 lần cho câu hỏi gần thời gian thực (Bảng~\ref{tab:5-bench-lookups}), nhưng phải thêm bảng cho mỗi câu hỏi phân tích; Mục~\ref{sec:5-comparison-storage} đối chiếu hai phương án.
+
+\subsection{Kết luận về lựa chọn}
+\label{sec:4-alt-conclusion}
+
+Hai phương án thay thế đơn giản hơn giải pháp chính, nhưng mỗi phương án bỏ mất một thứ mà tài liệu yêu cầu: Hive/Parquet bỏ mất giao dịch, ghi idempotent và time travel (BR3, BR4, BR6); Cassandra-only bỏ mất khả năng phân tích tùy ý trên toàn bộ lịch sử (BR5, BR6). Giải pháp chính trả giá bằng độ phức tạp, được đánh giá ở Mục~\ref{sec:5-comparison}.

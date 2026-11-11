@@ -1,0 +1,44 @@
+\subsection{BR06 -- Đánh giá lịch sử và lập kế hoạch}
+\label{sec:4-br06}
+
+\paragraph{Yêu cầu.} Nhà phân tích cần so sánh các giai đoạn (ngày với ngày, tuần với tuần, mùa vụ với mùa vụ), xem lịch sử theo từng thửa ruộng và tái tạo được một báo cáo trong quá khứ (FR6.1--FR6.3). Điều này đòi hỏi ba thứ: dữ liệu được giữ lại đầy đủ, truy vấn theo khoảng ngày đủ nhanh, và khả năng xem lại trạng thái cũ của bảng.
+
+\paragraph{Luồng dữ liệu.} BR06 dùng chung đường dữ liệu với BR05 (Hình~\ref{fig:4-br05-flow}) nhưng khai thác khác đi: thay vì chỉ báo hiện tại, nó đọc \emph{chuỗi} các ngày. Giá trị riêng của BR06 nằm ở lớp lưu trữ, tức là ba tính chất của Iceberg ở Mục~\ref{sec:2-iceberg}.
+
+\paragraph{Tính chất 1: giữ toàn bộ lịch sử (FR6.1).} Bronze nhận mọi bản ghi hợp lệ về cấu trúc và không có chính sách xóa; không có TTL như ở Cassandra. Gold giữ tổng hợp theo ngày cho toàn bộ giai đoạn dự án. Khi cần tính lại một chỉ báo cho giai đoạn cũ, dbt tính từ bronze, nhờ đó một sửa đổi trong công thức áp dụng được cho cả lịch sử.
+
+\paragraph{Tính chất 2: phân vùng theo ngày (FR6.2).} Bronze được phân vùng bởi \code{days(measured\_at)} (Đoạn mã~\ref{lst:4-bronze-ddl}). Truy vấn lọc một khoảng ngày chỉ đọc các phân vùng của khoảng đó nhờ phân vùng ẩn và thống kê trong manifest. Đoạn mã~\ref{lst:4-partition-check} kiểm tra điều này bằng cách đọc bảng siêu dữ liệu \texttt{\$partitions} của Trino.
+
+\begin{lstlisting}[language=SQL, caption={Kiểm tra phân vùng và tệp của bảng bronze (Trino)}, label={lst:4-partition-check}]
+SELECT partition, record_count, file_count, total_size
+FROM lakehouse.bronze."sensor_readings$partitions"
+ORDER BY partition;
+\end{lstlisting}
+
+Các bảng gold của BR5 và BR6 cũng được phân vùng theo \code{day} (\code{partition\_by=['day']}, Mục~\ref{sec:4-gold}). Với tám thửa ruộng và năm chỉ số, bảng ngày chỉ thêm khoảng 40 dòng mỗi ngày và bảng giờ khoảng 960 dòng mỗi ngày, nên bảng nhỏ; phân vùng chủ yếu để giữ cách tổ chức đúng khi dữ liệu lớn lên.
+
+\paragraph{Tính chất 3: du hành thời gian (FR6.3 và tái tạo báo cáo).} Mỗi lần ghi tạo một snapshot, nên một báo cáo được chạy hôm nay có thể được chạy lại \emph{đúng như vậy} sau này, kể cả khi dữ liệu đã đổi do dữ liệu đến muộn, do sửa lỗi hoặc do compaction. Quy trình: khi xuất một báo cáo, ghi lại \code{snapshot\_id} của các bảng nó đọc (liệt kê từ bảng siêu dữ liệu \texttt{\$snapshots}); muốn tái tạo thì đọc lại các bảng đó ở \code{snapshot\_id} đã ghi (Đoạn mã~\ref{lst:2-trino-timetravel}). Cách này dùng được trên cả bronze và gold, vì các model gold là incremental \code{merge}: mỗi lần làm mới thêm một snapshot thay vì xóa và tạo lại bảng (Mục~\ref{sec:4-gold}). Đây là điều đã phải kiểm chứng thay vì giả định: nếu dbt tạo lại bảng ở mỗi lần chạy thì lịch sử snapshot của gold bị mất. Mục~\ref{sec:5-eff-br06} đọc lại được giá trị cũ từ một snapshot đã qua của \code{field\_indicators}.
+
+\paragraph{So sánh giai đoạn (FR6.3).} Việc so sánh giai đoạn là phép tính trên hai khoảng ngày của cùng bảng \code{field\_daily}. Giao diện gọi hai lần điểm cuối \code{history} (giai đoạn hiện tại và giai đoạn trước, cùng độ dài), rồi tính chênh lệch bằng một hàm thuần có kiểm thử đơn vị. Đoạn mã~\ref{lst:4-period-sql} là truy vấn tương đương trong Trino; nó dùng để đối chiếu kết quả của giao diện (Mục~\ref{sec:5-eff-br06}).
+
+\begin{lstlisting}[language=SQL, caption={So sánh hai giai đoạn, trung bình có trọng số (Trino, \texttt{field\_daily})}, label={lst:4-period-sql}]
+WITH cur AS (
+  SELECT sum(avg_value * valid_count) / sum(valid_count) AS avg_now
+  FROM lakehouse.gold.field_daily
+  WHERE field_id = 'F001' AND metric = 'soil_moisture'
+    AND day BETWEEN DATE '2026-11-09' AND DATE '2026-11-10'
+), prev AS (
+  SELECT sum(avg_value * valid_count) / sum(valid_count) AS avg_before
+  FROM lakehouse.gold.field_daily
+  WHERE field_id = 'F001' AND metric = 'soil_moisture'
+    AND day BETWEEN DATE '2026-11-07' AND DATE '2026-11-08'
+)
+SELECT avg_now, avg_before, avg_now - avg_before AS delta
+FROM cur CROSS JOIN prev;
+\end{lstlisting}
+
+Phải dùng trung bình \emph{có trọng số} theo \code{valid\_count}, số bản ghi hợp lệ đứng sau \code{avg\_value}: trung bình đơn giản của các trung bình ngày sẽ sai khi số bản ghi mỗi ngày khác nhau (ở dữ liệu thật, 581 bản ghi hợp lệ ngày 9/11 và 296 bản ghi ngày 10/11 cho 44,79 khi có trọng số và 44,51 khi không). Trọng số cũng không được là \code{reading\_count}, vì số này gồm cả bản ghi bị gắn cờ, vốn không góp vào \code{avg\_value}; trung bình có trọng số theo \code{valid\_count} (44,78565) trùng với trung bình tính thẳng từ silver.
+
+\paragraph{Góc nhìn theo mùa vụ.} Mùa vụ là so sánh các khoảng dài (tuần hoặc tháng) chồng lên nhau. Với bảng \code{field\_daily}, trung bình theo tuần là một \code{GROUP BY date\_trunc('week', day)}, không cần bảng mới. Tuy nhiên, dữ liệu mô phỏng chỉ trải trên một khoảng ngắn, nên góc nhìn này chỉ minh họa được cơ chế, không cho kết luận về mùa vụ thật (Mục~\ref{sec:5-eff-br06}).
+
+\paragraph{Kết quả và hạn chế hiện tại.} Bronze giữ đầy đủ và phân vùng theo ngày; gold phân vùng theo ngày và dựng bằng model incremental nên giữ được lịch sử snapshot; so sánh giai đoạn và góc nhìn theo tuần chạy trên trang \emph{Analytics}. Hạn chế: (1) dữ liệu mô phỏng chỉ trải trên một khoảng ngắn, nên góc nhìn mùa vụ chỉ minh họa cơ chế; (2) snapshot cũ chiếm dung lượng cho tới khi có bước dọn (\code{expire\_snapshots}), chưa được lập lịch; (3) giao diện và truy vấn đều dùng trung bình có trọng số theo số bản ghi, nên giá trị chỉ khớp với một công cụ khác khi công cụ đó cũng dùng trọng số.

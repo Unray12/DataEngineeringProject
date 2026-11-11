@@ -150,19 +150,37 @@ just batch-run
 
 This executes:
 
-1. Iceberg namespace and table initialization
+1. Iceberg namespace initialization and load of the crop target ranges (`ops.crop_targets`, from `reference/reference_data.json`)
 2. dbt silver model build
-3. dbt gold daily aggregates and indicators
-4. dbt data-quality tests
+3. dbt gold hourly and daily aggregates and indicators (time in target range, hours below the soil-moisture target)
+4. dbt data-quality tests (not null, unique key, accepted ranges)
 5. Iceberg file compaction
 
 The main analytical tables are:
 
 ```text
 lakehouse.silver.sensor_readings
+lakehouse.gold.field_hourly
 lakehouse.gold.field_daily
 lakehouse.gold.field_indicators
 lakehouse.gold.quality_daily
+```
+
+The gold aggregates use only readings with `quality_flag = 'ok'` and are dbt
+incremental models (`merge` on the field, metric and hour or day, partitioned by
+day), so every refresh adds an Iceberg snapshot instead of recreating the table.
+`gold_lookback_days` (default: the whole history) limits how many days are
+recomputed; lower it once the history grows. To change a target range, edit
+`reference/reference_data.json`, then run `just lakehouse-init` and `just dbt-run`.
+
+After changing the partitioning or the columns of a gold model, run `just dbt-full-refresh` once: an existing
+incremental table keeps its old layout (and the refresh resets its snapshot history).
+
+Time travel works on the gold tables, for example to reproduce an earlier report:
+
+```bash
+just trino-sql 'SELECT snapshot_id, committed_at FROM lakehouse.gold."field_indicators$snapshots" ORDER BY committed_at'
+just trino-sql 'SELECT * FROM lakehouse.gold.field_indicators FOR VERSION AS OF <snapshot_id> LIMIT 10'
 ```
 
 Run individual stages when debugging:
@@ -254,8 +272,8 @@ PATCH /alerts/{alert_id}
 These read Trino over dbt-built gold Iceberg tables:
 
 ```text
-GET /fields/{field_id}/indicators
-GET /fields/{field_id}/history
+GET /fields/{field_id}/indicators   (daily or hourly; metric=... adds the crop target range)
+GET /fields/{field_id}/history      (daily or hourly)
 GET /summary
 GET /compare
 GET /quality/summary
@@ -264,6 +282,20 @@ GET /quality/devices
 
 If the gold tables have not been built yet, analytical endpoints return a
 clear `503` response instructing the operator to run the batch flow.
+
+## Benchmarks
+
+Benchmarks #2, #3 and #4 of the evaluation run as recipes and write `benchmarks/results/*.csv`, whose first
+lines record the configuration (hardware, versions, data volume):
+
+```bash
+just bench-lookups     # Cassandra vs Trino for the same dashboard query (needs data in both stores)
+just bench-storage     # Iceberg vs plain Hive/Parquet (adds trino/catalog/hive.properties)
+just bench-compaction  # file count and query time before and after `just compact`
+```
+
+Run them on a quiet machine (stop the streaming job and the simulator first). `bench-trigger` and
+`bench-replay` are still to be implemented.
 
 ## Verification and operations
 
