@@ -17,12 +17,13 @@ Mọi lần đo dùng môi trường và quy trình ở Mục~\ref{sec:5-setup}.
 
 \paragraph{Phương pháp.} Bộ mô phỏng gắn nhãn \code{simulated\_fault} cho mỗi sự kiện lỗi. Mỗi loại lỗi có một kết quả mong đợi: hoặc bị cách ly với một lý do cụ thể, hoặc được giữ lại với một cờ chất lượng cụ thể (Bảng~\ref{tab:5-fault-expect}). Số lỗi tiêm vào được đếm từ nhãn; số lỗi phát hiện được đếm từ \code{ops.quarantine} và \code{ops.quality\_counters}. Hai số phải bằng nhau.
 
-\begin{table}[H]
-\centering
-\caption{Kết quả mong đợi cho từng loại lỗi được tiêm vào}
-\label{tab:5-fault-expect}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Kết quả mong đợi cho từng loại lỗi được tiêm vào},
+  label = {tab:5-fault-expect},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.6,l]X[2.8,l]X[2,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -34,8 +35,8 @@ Lỗi tiêm vào & Cách bộ mô phỏng tạo lỗi & Kết quả mong đợi 
 \code{unknown\_device} & Mã thiết bị không có trong danh mục & Cách ly, lý do \code{unknown\_device} \\
 \code{unexpected\_metric} & Tên chỉ số sai (\code{\ldots\_typo}) & Cách ly, lý do \code{unexpected\_metric} \\
 \code{malformed} & JSON hỏng, thiếu trường, thời gian sai, giá trị không phải số & Cách ly, lý do \code{invalid\_json}, \code{missing\_field}, \code{invalid\_timestamp} hoặc \code{malformed\_value} \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 Có ba điểm cần lưu ý khi đếm:
 
@@ -66,12 +67,13 @@ SELECT sum(duplicate) FROM lakehouse.ops.quality_counters;
 
 \paragraph{Kết quả.} Bảng~\ref{tab:5-fault-result} là kết quả của một lần chạy \dien{thời lượng} giây với cấu hình mặc định.
 
-\begin{table}[H]
-\centering
-\caption{Số lỗi tiêm vào so với số lỗi phát hiện được}
-\label{tab:5-fault-result}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Số lỗi tiêm vào so với số lỗi phát hiện được},
+  label = {tab:5-fault-result},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.8,l]X[1,c]X[1,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -84,8 +86,8 @@ Loại lỗi & Tiêm vào & Phát hiện & Tỷ lệ \\
 \code{unexpected\_metric} & \dien{} & \dien{} & \dien{} \\
 \code{malformed} & \dien{} & \dien{} & \dien{} \\
 Tổng & \dien{} & \dien{} & \dien{} \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \dien{Nhận xét kết quả: loại nào đạt 100\%, loại nào lệch và vì sao.}
 

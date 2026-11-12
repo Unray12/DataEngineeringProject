@@ -1,0 +1,95 @@
+\subsection{Giao diện người dùng}
+\label{sec:4-ui}
+
+Ứng dụng web gồm 8 trang, dùng chung một khung điều hướng bên trái. Bảng~\ref{tab:4-ui-pages} nêu đường dẫn, nguồn dữ liệu và yêu cầu nghiệp vụ liên quan của từng trang. Cột BR cho biết yêu cầu nghiệp vụ mà trang phục vụ.
+
+{\small
+\begin{longtblr}[
+  caption = {Các trang của ứng dụng web},
+  label = {tab:4-ui-pages},
+]{
+  width = \linewidth,
+  colspec = {X[1.5,l]X[1.6,l]X[1.6,l]X[1,c]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  rowhead = 1,
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Trang & Đường dẫn & Nguồn dữ liệu & BR & Nội dung chính \\
+Overview & \code{/} & Cassandra & BR1 & Số trang trại, thửa ruộng, thiết bị trực tuyến và cảnh báo mở; danh sách trang trại và thửa ruộng kèm số đo hiện tại; các việc cần chú ý \\
+Live monitor & \code{/live} & Cassandra & BR2, BR3 & Số đo hiện tại và biểu đồ 24 giờ của từng thửa ruộng, mức độ đầy đủ của dữ liệu \\
+Alerts & \code{/alerts} & Cassandra & BR8 & Hàng đợi cảnh báo, bộ lọc, xác nhận và đóng cảnh báo \\
+Analytics & \code{/analytics} & Trino & BR5, BR6 & Chỉ số, lịch sử theo giờ hoặc theo ngày, khuyến nghị tưới \\
+Insights & \code{/insights} & Trino (văn bản chú ý từ Cassandra) & BR7 & Câu mô tả thay đổi và so sánh các thửa ruộng \\
+Data quality & \code{/quality} & Trino & BR4 & Chất lượng theo ngày và theo thiết bị, truy vết nguồn gốc \\
+Devices & \code{/devices} & Cassandra & BR3 & Trạng thái, pin, tín hiệu và các lần mất dữ liệu của thiết bị \\
+Field detail & \code{/fields/\{id\}} & Cassandra; Trino & BR1, BR7 & Thông tin một thửa ruộng: điều kiện hiện tại, thiết bị, cảnh báo và tóm tắt \\
+\end{longtblr}
+}
+
+\paragraph{Các quy tắc thiết kế.} Để người không chuyên cũng đọc được số liệu, các trang tuân theo một số quy tắc chung.
+
+\begin{itemize}
+  \item \textbf{Phạm vi nhất quán.} Bộ lọc trang trại và thửa ruộng được lưu trên địa chỉ URL, nên liên kết giữa các trang (ví dụ từ thẻ thửa ruộng sang trang Live hay Devices) giữ nguyên phạm vi đang chọn và có thể chia sẻ bằng đường dẫn.
+  \item \textbf{Độ mới luôn hiển thị.} Mỗi bảng dữ liệu ghi thời điểm lấy dữ liệu (\emph{Data as of}). Với dữ liệu gần thời gian thực, giao diện cảnh báo khi dữ liệu cũ hơn 90 giây; với dữ liệu phân tích, bảng được ghi rõ là \emph{historical data, not live}.
+  \item \textbf{Mỗi biểu đồ một nguồn.} Một biểu đồ chỉ dùng dữ liệu của Cassandra hoặc của Trino. Nhãn trên bảng cho biết đó là dữ liệu trực tiếp hay dữ liệu phân tích. Trang chi tiết thửa ruộng dùng cả hai nguồn nhưng ở các bảng riêng biệt.
+  \item \textbf{Trạng thái không chỉ biểu thị bằng màu.} Mọi trạng thái (\emph{OK}, \emph{Needs attention}, \emph{Offline}) đều có biểu tượng và chữ đi kèm, để người khó phân biệt màu vẫn đọc được.
+  \item \textbf{Biểu đồ có bảng thay thế.} Các biểu đồ chính có mô tả văn bản và mục ``View chart as a table'' liệt kê cùng các con số.
+  \item \textbf{Trạng thái tải, rỗng và lỗi rõ ràng.} Mỗi bảng dữ liệu có trạng thái đang tải, không có dữ liệu và lỗi kèm nút thử lại, thay vì để trống hoặc hiển thị số không có ý nghĩa.
+\end{itemize}
+
+\paragraph{Overview.} Trang chủ cho một cái nhìn tổng thể (Hình~\ref{fig:4-ui-overview}): 4 thẻ tóm tắt ở trên, danh sách trang trại và thửa ruộng kèm số đo hiện tại ở giữa, và cột ``What needs attention'' bên phải xếp các cảnh báo mở và thiết bị ngừng báo cáo lên trước. Đây là trang đầu tiên phục vụ BR01.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{ui-overview.png}
+\caption{Trang Overview}
+\label{fig:4-ui-overview}
+\end{figure}
+
+\paragraph{Live monitor.} Trang Live (Hình~\ref{fig:4-br01-ui}) hiển thị số đo hiện tại của năm chỉ số cho từng thửa ruộng và mức độ đầy đủ của dữ liệu trong 24 giờ. Từ nút \emph{View field charts}, người dùng xem biểu đồ 24 giờ của thửa ruộng, trong đó các khoảng mất dữ liệu được tô riêng và đường biểu diễn không nối qua khoảng trống.
+
+\paragraph{Alerts.} Trang cảnh báo (Hình~\ref{fig:4-ui-alerts}) liệt kê hàng đợi cảnh báo, lọc theo trạng thái, mức độ, loại, trang trại và thửa ruộng. Người vận hành mở chi tiết một cảnh báo để xem giá trị quan sát so với ngưỡng, rồi xác nhận hoặc đóng cảnh báo kèm ghi chú.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{ui-alerts.png}
+\caption{Trang Alerts}
+\label{fig:4-ui-alerts}
+\end{figure}
+
+\paragraph{Analytics.} Trang phân tích (Hình~\ref{fig:4-ui-analytics}) đọc từ các bảng gold. Người dùng chọn thửa ruộng, chỉ số, mức chi tiết (theo giờ hoặc theo ngày) và khoảng thời gian. Trang hiển thị chỉ số trung bình, tỷ lệ thời gian trong khoảng mục tiêu, biểu đồ lịch sử có dải mục tiêu của cây trồng, và phần ``What to do'' diễn đạt khuyến nghị tưới bằng câu chữ.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{ui-analytics.png}
+\caption{Trang Analytics}
+\label{fig:4-ui-analytics}
+\end{figure}
+
+\paragraph{Insights.} Trang Insights (Hình~\ref{fig:4-br07-ui}) chuyển số liệu của toàn bộ thửa ruộng thành câu mô tả thay đổi và bảng so sánh, như đã trình bày ở Mục~\ref{sec:4-br07}.
+
+\paragraph{Data quality.} Trang chất lượng dữ liệu (Hình~\ref{fig:4-ui-quality}) có khung ghi chú ``Not live'' ngay đầu trang, vì dữ liệu đến từ lần chạy batch gần nhất. Trang có các thẻ tóm tắt, biểu đồ cột chồng theo ngày (hợp lệ, trùng lặp, ngoài khoảng, bị cách ly) và bảng theo thiết bị để xem nguồn gốc của từng giá trị (Mục~\ref{sec:4-br04}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{ui-quality.png}
+\caption{Trang Data quality}
+\label{fig:4-ui-quality}
+\end{figure}
+
+\paragraph{Devices.} Trang thiết bị (Hình~\ref{fig:4-ui-devices}) liệt kê trạng thái, thời điểm thấy gần nhất, pin, tín hiệu và số lần mất dữ liệu trong 24 giờ, có bộ lọc và sắp xếp. Mở chi tiết một thiết bị để xem lịch sử các khoảng mất dữ liệu.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{ui-devices.png}
+\caption{Trang Devices}
+\label{fig:4-ui-devices}
+\end{figure}
+
+\paragraph{Field detail.} Trang chi tiết (Hình~\ref{fig:4-ui-field}) gom thông tin của một thửa ruộng: cây trồng và diện tích, điều kiện hiện tại, khoảng mục tiêu, danh sách thiết bị, các cảnh báo gần nhất, và phần Insights riêng của thửa ruộng cho biết thứ hạng của nó so với các thửa ruộng khác. Từ đây người dùng chuyển sang trang Live hoặc Analytics với đúng thửa ruộng đã chọn.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{ui-field.png}
+\caption{Trang chi tiết thửa ruộng}
+\label{fig:4-ui-field}
+\end{figure}

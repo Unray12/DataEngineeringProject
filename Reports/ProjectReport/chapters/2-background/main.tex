@@ -1,7 +1,7 @@
 \chapter{CƠ SỞ LÝ THUYẾT}
 \label{chap:2-background}
 
-Chương này trình bày nền tảng lý thuyết của kỹ thuật xử lý micro-batch, là kỹ thuật xử lý dữ liệu mà đề tài áp dụng cho lĩnh vực nông nghiệp. Mục~\ref{sec:2-challenges} nêu các thách thức của xử lý luồng thuần túy, là động lực dẫn tới micro-batch. Mục~\ref{sec:2-definition} định nghĩa micro-batch. Mục~\ref{sec:2-mechanism} giải thích cơ chế hoạt động, từ kiến trúc, vòng đời một lô đến cách xử lý lỗi và dữ liệu đến muộn. Mục~\ref{sec:2-tech} giới thiệu bộ công nghệ Apache Kafka và Spark Structured Streaming. Mục~\ref{sec:2-compare} so sánh micro-batch với xử lý theo lô và xử lý luồng, cùng các đánh đổi. Mục~\ref{sec:2-dbt-quality} trình bày dbt và kỹ thuật bảo đảm chất lượng dữ liệu. Mục~\ref{sec:2-lakehouse} trình bày lakehouse gồm Apache Iceberg, HDFS, Hive Metastore và Trino, là nơi lưu lịch sử và phục vụ phân tích.
+Chương này trình bày nền tảng lý thuyết của kỹ thuật xử lý micro-batch, là kỹ thuật xử lý dữ liệu mà đề tài áp dụng cho lĩnh vực nông nghiệp. Mục~\ref{sec:2-challenges} nêu các thách thức của xử lý luồng thuần túy, là động lực dẫn tới micro-batch. Mục~\ref{sec:2-definition} định nghĩa micro-batch. Mục~\ref{sec:2-mechanism} giải thích cơ chế hoạt động, từ kiến trúc, vòng đời một lô đến cách xử lý lỗi và dữ liệu đến muộn. Mục~\ref{sec:2-tech} giới thiệu bộ công nghệ Apache Kafka và Spark Structured Streaming. Mục~\ref{sec:2-compare} so sánh micro-batch với xử lý theo lô và xử lý luồng, cùng các đánh đổi. Mục~\ref{sec:2-dbt-quality} trình bày dbt và kỹ thuật bảo đảm chất lượng dữ liệu. Mục~\ref{sec:2-lakehouse} trình bày lakehouse gồm Apache Iceberg, HDFS, Hive Metastore và Trino, là nơi lưu lịch sử và phục vụ phân tích. Mục~\ref{sec:2-api-web} trình bày FastAPI và ứng dụng web, là lớp đưa dữ liệu đến người dùng.
 
 \input{chapters/2-background/2.1-challenges}
 \input{chapters/2-background/2.2-definition}
@@ -10,3 +10,4 @@ Chương này trình bày nền tảng lý thuyết của kỹ thuật xử lý 
 \input{chapters/2-background/2.5-comparison}
 \input{chapters/2-background/2.6-dbt-quality}
 \input{chapters/2-background/2.7-iceberg-trino}
+\input{chapters/2-background/2.8-fastapi-web}

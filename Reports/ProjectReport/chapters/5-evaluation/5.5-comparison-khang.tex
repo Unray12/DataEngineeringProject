@@ -4,12 +4,13 @@
 
 Mục~\ref{sec:4-alternative} đặt ra hai phương án thay thế; mục này đối chiếu chúng với giải pháp chính bằng số đo của Mục~\ref{sec:5-bench-khang}. Bảng~\ref{tab:5-compare-storage} so sánh Iceberg với Hive/Parquet thuần, Bảng~\ref{tab:5-compare-serving} so sánh hai đường phục vụ.
 
-\begin{table}[H]
-\centering
-\caption{Iceberg và Hive/Parquet thuần: kết quả đo (Benchmark \#3, 1,2 triệu dòng, 240 commit)}
-\label{tab:5-compare-storage}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Iceberg và Hive/Parquet thuần: kết quả đo (Benchmark \#3, 1,2 triệu dòng, 240 commit)},
+  label = {tab:5-compare-storage},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[2.4,l]X[2,l]X[2,l]X[1.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -22,8 +23,8 @@ Xem lại trạng thái cũ & có & không & Iceberg \\
 Đổi tên cột có dữ liệu & 1\,200\,000 dòng còn đọc được & 0 dòng đọc được & Iceberg \\
 Số tệp nhỏ & 720 & 720 & hòa \\
 Độ phức tạp vận hành & cao hơn (dọn snapshot) & thấp & Hive \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 Hive/Parquet nhanh hơn và rẻ hơn khi ghi, nhưng chỉ khi người viết truy vấn biết lọc theo cột phân vùng, và nó không có ba thứ mà đề tài cần: phát lại không sinh dòng trùng (BR3, BR4), xem lại quá khứ (BR6) và đổi schema không mất dữ liệu. Với dữ liệu nông nghiệp được tích lũy hằng ngày và phải tái tạo được báo cáo cũ, chi phí khoảng 4 lần ở thời gian commit (vẫn dưới 11\% chu kỳ trigger) là chấp nhận được. Nếu hệ thống chỉ cần ghi một lần và đọc, không phát lại, không đổi schema, Hive/Parquet đơn giản hơn là lựa chọn hợp lý.
 
