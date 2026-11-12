@@ -56,12 +56,13 @@ just verify-pipeline # row counts in Cassandra, bronze and quarantine
 
 Bảng~\ref{tab:4-recipes} nhóm các recipe theo mục đích.
 
-\begin{table}[H]
-\centering
-\caption{Các recipe \texttt{just} chính}
-\label{tab:4-recipes}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Các recipe \texttt{just} chính},
+  label = {tab:4-recipes},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.2,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -72,8 +73,8 @@ Dữ liệu vào & \code{run-simulator}, \code{sim-for}, \code{ingest-check}, \c
 Theo lô & \code{lakehouse-init}, \code{dbt-run}, \code{dbt-test}, \code{dbt-docs}, \code{compact}, \code{batch-run} \\
 Kiểm tra & \code{verify-pipeline}, \code{trino-sql}, \code{api-health}, \code{test}, \code{test-unit}, \code{lint} \\
 Benchmark & \code{bench-trigger}, \code{bench-lookups}, \code{bench-storage}, \code{bench-compaction}, \code{bench-replay} \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \paragraph{Cấu hình qua biến môi trường.} Tệp \code{.env.example} là mẫu cấu hình duy nhất; \code{just init} sao chép nó thành \code{.env}, tệp này không được commit. Các tham số của tác vụ streaming được truyền vào container qua khối \code{x-spark-env} của Compose, với giá trị mặc định đặt ngay tại đó (Đoạn mã~\ref{lst:4-env}). Nhờ vậy benchmark có thể đổi chu kỳ trigger mà không sửa mã, ví dụ \code{just run-stream trigger=10s}.
 

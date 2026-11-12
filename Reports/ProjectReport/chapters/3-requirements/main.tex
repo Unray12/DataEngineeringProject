@@ -1,43 +1,73 @@
 \chapter{PHÂN TÍCH YÊU CẦU VÀ DỮ LIỆU}
 \label{chap:3-requirements}
 
-% TODO: đoạn dẫn nhập chương
+Chương này xác định hệ thống phục vụ ai và cần những dữ liệu gì, gồm lĩnh vực ứng dụng, các bên liên quan, các yêu cầu nghiệp vụ cùng nhu cầu về dữ liệu, và nguồn dữ liệu sẵn có. Đây là cơ sở để thiết kế giải pháp ở Chương~\ref{chap:4-design}.
 
 \section{Lĩnh vực ứng dụng: giám sát nông nghiệp}
 \label{sec:3-domain}
-% TODO
+
+Nông nghiệp hiện đại ngày càng dựa vào số đo thu thập bởi các thiết bị chuyên dụng thay cho kinh nghiệm cảm tính. Độ ẩm đất cho biết khi nào cần tưới, nhiệt độ và độ ẩm không khí báo trước nguy cơ sốc nhiệt hay bệnh hại, còn lượng mưa quyết định lượng nước cần bổ sung. Khi các số đo này được cảm biến IoT thu thập tự động và gửi về qua mạng diện rộng tầm xa như LoRaWAN, người quản lý có thể theo dõi nhiều thửa ruộng cùng lúc mà không phải ra đồng đo từng điểm.
+
+Tuy vậy, lượng dữ liệu tăng nhanh cũng kéo theo những khó khăn mà một nông trại khó tự giải quyết. Thứ nhất, dữ liệu đến từ nhiều trang trại và nhiều loại thiết bị, mỗi nơi một dạng. Thứ hai, thiết bị có thể mất kết nối hoặc hết pin nên số liệu bị đứt đoạn; ngược lại, một bản tin được gửi lại có thể làm dữ liệu bị trùng. Thứ ba, cảm biến thỉnh thoảng trả về giá trị vô lý, chẳng hạn độ ẩm vượt quá 100\%, và nếu không được kiểm tra, giá trị đó sẽ làm sai lệch cả biểu đồ lẫn quyết định tưới. Cuối cùng, người dùng cần hai góc nhìn khác nhau: tình trạng hiện tại để kịp thời xử lý, và lịch sử dài hạn để so sánh giữa các mùa vụ.
+
+Những khó khăn này không nằm ở giao diện hay thuật toán phân tích, mà nằm ở khâu chuẩn bị dữ liệu, sao cho dữ liệu đáng tin cậy và phục vụ đúng nhu cầu của từng nhóm người dùng. Đó chính là phạm vi của kỹ thuật dữ liệu, và là lý do nhóm chọn giám sát nông nghiệp làm lĩnh vực ứng dụng.
+
+Trong phạm vi đề tài, nhóm xây dựng một hệ thống giám sát mô phỏng gồm bốn trang trại ở các địa phương phía Nam (Thành phố Hồ Chí Minh, Đồng Nai, Tây Ninh và Đồng Tháp), với tám thửa ruộng trồng lúa, ngô, cà chua và cà phê. Dữ liệu của hệ thống được mô phỏng; nguồn dữ liệu cụ thể được trình bày ở mục~\ref{sec:3-data-sources}.
 
 \section{Các bên liên quan}
 \label{sec:3-stakeholders}
-% TODO: quản lý trang trại, vận hành viên đồng ruộng, nhà phân tích dữ liệu, ...
+Hệ thống phục vụ bốn nhóm người dùng: ba nhóm bên ngoài trực tiếp ra quyết định và hành động dựa trên dữ liệu, và một nhóm nội bộ chịu trách nhiệm giữ cho dữ liệu đáng tin cậy. Bảng~\ref{tab:3-stakeholders} tóm tắt nhu cầu chính của từng nhóm và các yêu cầu nghiệp vụ (Mục~\ref{sec:3-br}) phục vụ nhu cầu cho mỗi nhóm.
+
+\begin{table}[H]
+\centering
+\caption{Các nhóm người dùng và nhu cầu chính}
+\label{tab:3-stakeholders}
+\small
+\begin{tblr}{
+  colspec = {X[0.6,c]X[1.7,l]X[5,l]X[1.5,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Mã & Nhóm người dùng & Nhu cầu chính & Yêu cầu liên quan \\
+U1 & Quản lý trang trại & Có cái nhìn tổng hợp trên nhiều trang trại; xem xu hướng và so sánh các thửa ruộng để quyết định việc tưới và phân bổ nguồn lực. & BR01, BR05, BR07 \\
+U2 & Người vận hành trang trại & Nhận cảnh báo kịp thời về điều kiện bất thường và thiết bị ngừng hoạt động; ghi lại việc đã xử lý. & BR02, BR08 \\
+U3 & Nhà phân tích dữ liệu & Truy cập dữ liệu lịch sử, so sánh giữa các mùa vụ và đánh giá hiệu quả của các cách quản lý. & BR06, BR07 \\
+U4 & Nhóm quản lý dữ liệu (nội bộ) & Dữ liệu đáng tin cậy, truy vết được và không bị đứt đoạn. & BR03, BR04 \\
+\end{tblr}
+\end{table}
+
+Điểm chung của ba nhóm đầu là họ không phải chuyên gia kỹ thuật. Người quản lý và người vận hành cần thông tin dễ hiểu để hành động ngay, còn nhà phân tích cần dữ liệu trong khoảng thời gian đủ dài để so sánh giữa các giai đoạn. Vì vậy, hệ thống không chỉ lưu giữ dữ liệu mà còn phải trình bày dữ liệu theo cách mỗi nhóm đọc được ngay. Nhóm quản lý dữ liệu là người dùng nội bộ của chính hệ thống, quan tâm đến chất lượng và tính liên tục của dữ liệu hơn là nội dung về nông nghiệp.
 
 \section{Yêu cầu nghiệp vụ}
 \label{sec:3-br}
 
-\begin{table}[H]
-\centering
-\caption{Danh sách yêu cầu nghiệp vụ (Business Requirements)}
-\label{tab:3-br}
-\small
-\begin{tblr}{
+Từ nhu cầu của các nhóm người dùng ở Mục~\ref{sec:3-stakeholders}, nhóm xác định tám yêu cầu nghiệp vụ liệt kê trong Bảng~\ref{tab:3-br}.
+
+{\small
+\begin{longtblr}[
+  caption = {Danh sách yêu cầu nghiệp vụ (Business Requirements)},
+  label = {tab:3-br},
+]{
+  width = \linewidth,
   colspec = {X[0.9,l]X[2,l]X[5,l]X[1.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  rowhead = 1,
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 ID & Yêu cầu & Mô tả & Phụ trách \\
 BR01 & Tập trung hóa giám sát nông nghiệp & Cung cấp góc nhìn hợp nhất về trang trại, thửa ruộng và thiết bị giám sát để quản lý nhất quán trên nhiều địa điểm. & Đạt \\
-BR02 & Nâng cao nhận biết điều kiện đồng ruộng & Cung cấp kịp thời thông tin về môi trường và điều kiện đồng ruộng, giảm phụ thuộc vào đo thủ công. & \dien{...} \\
+BR02 & Nâng cao nhận biết điều kiện đồng ruộng & Cung cấp kịp thời thông tin về môi trường và điều kiện đồng ruộng, giảm phụ thuộc vào đo thủ công. & Nhân \\
 BR03 & Duy trì tính liên tục của giám sát & Giảm thiểu khoảng trống dữ liệu và bảo toàn thông tin khi thiết bị, kết nối hoặc dịch vụ gián đoạn tạm thời. & Nhân \\
 BR04 & Thiết lập dữ liệu nông nghiệp đáng tin cậy & Bảo đảm thông tin nhất quán, tin cậy, truy vết được; giảm rủi ro do số đo không hợp lệ, trùng lặp hoặc gây hiểu nhầm. & Tịnh \\
 BR05 & Hỗ trợ quản lý trang trại dựa trên dữ liệu & Dùng số đo và xu hướng để định hướng tưới tiêu, phân bổ tài nguyên và quản lý thửa ruộng, giảm lãng phí. & Khang \\
 BR06 & Đánh giá lịch sử và lập kế hoạch & Lưu trữ lịch sử để so sánh giữa các giai đoạn, nhận diện mùa vụ, đánh giá thực hành quản lý và lập kế hoạch. & Khang \\
-BR07 & Làm cho thông tin dễ tiếp cận & Cung cấp tóm tắt, xu hướng và so sánh thửa ruộng dễ hiểu cho quản lý và nhà phân tích. & Duy \\
+BR07 & Làm cho thông tin dễ tiếp cận & Cung cấp tóm tắt, xu hướng và so sánh thửa ruộng dễ hiểu cho quản lý và nhà phân tích. & Đạt \\
 BR08 & Hỗ trợ ứng phó sớm với rủi ro & Phát hiện sớm điều kiện bất thường và thiết bị ngừng hoạt động, theo dõi quá trình xử lý. & Tịnh \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \section{Nhu cầu sử dụng dữ liệu}
 \label{sec:3-data-needs}
-% TODO: ánh xạ BR -> loại phân tích -> độ trễ cần thiết
+Mỗi yêu cầu nghiệp vụ dẫn đến một nhu cầu cụ thể về dữ liệu: người dùng nào đặt câu hỏi gì, cần loại xử lý nào và chấp nhận độ trễ bao nhiêu. Mục này trình bày các nhu cầu đó theo từng cặp yêu cầu, làm cơ sở để lựa chọn cách xử lý và lưu trữ dữ liệu ở Chương~\ref{chap:4-design}.
+\input{chapters/3-requirements/3.4-data-needs-br1-br7}
 \input{chapters/3-requirements/3.4-data-needs-br4-br8}
 \input{chapters/3-requirements/3.4-data-needs-br5-br6}
 

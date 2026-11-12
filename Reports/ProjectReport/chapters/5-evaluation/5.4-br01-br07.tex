@@ -1,0 +1,77 @@
+% Phần BR1 và BR7 của Mục 5.4 (người phụ trách: Đạt).
+\subsection{BR01 -- Tập trung hóa giám sát}
+\label{sec:5-eff-br01}
+
+Bảng~\ref{tab:5-eff-br01} đối chiếu các tiêu chí chấp nhận của BR1 với bằng chứng thu được. Cả hai tiêu chí được kiểm tra trực tiếp trên hệ thống đang chạy với dữ liệu mô phỏng.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR1 và bằng chứng}
+\label{tab:5-eff-br01}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[3.4,l]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Trang trại, thửa ruộng hoặc thiết bị mới thêm vào dữ liệu danh mục xuất hiện trên bảng điều khiển mà không cần sửa mã & Thêm trang trại FM005, thửa ruộng F009 và thiết bị F009-S01 vào tệp danh mục, khởi động lại API, tác vụ streaming và bộ mô phỏng; Hình~\ref{fig:5-br01-newfield} & Đạt \\
+Số đo của thiết bị lạ bị cách ly và được báo cáo, không bị bỏ qua âm thầm hay gán sai & Gửi hai số đo của thiết bị F999-S01 (không có trong danh mục); cả hai xuất hiện trong \code{ops.quarantine} với lý do \code{unknown\_device}, và API trả 404 cho thửa ruộng F999 & Đạt \\
+\end{tblr}
+\end{table}
+
+\paragraph{Thêm thực thể mới.} Ba mục mới được thêm vào tệp \code{reference\_data.json}: trang trại FM005, thửa ruộng F009 thuộc FM005 và thiết bị F009-S01 đo độ ẩm đất và nhiệt độ đất. Sau khi khởi động lại các dịch vụ đọc tệp này, \code{/farms} trả về năm trang trại, \code{/fields/F009/latest} trả về số đo của F009-S01 với \code{farm\_id} là FM005, và trang Live hiển thị thửa ruộng mới khi chọn trang trại tương ứng (Hình~\ref{fig:5-br01-newfield}). Toàn bộ quá trình không phải sửa mã nguồn nào. Việc phải khởi động lại dịch vụ là hệ quả của cách thiết kế: dữ liệu danh mục được nạp một lần khi khởi động (Mục~\ref{sec:4-br01}), nên thay đổi danh mục chỉ có hiệu lực sau lần khởi động kế tiếp.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{br01-newfield.png}
+\caption{Trang Live sau khi thêm trang trại FM005 vào dữ liệu danh mục}
+\label{fig:5-br01-newfield}
+\end{figure}
+
+\paragraph{Thiết bị lạ.} Hai số đo của thiết bị F999-S01 được gửi tới service tiếp nhận. Service chấp nhận cả hai (mã 202) vì phía tiếp nhận chỉ kiểm tra hình thức bản ghi. Sau một micro-batch, cả hai bản ghi nằm trong bảng \code{ops.quarantine} với \code{reason = unknown\_device}, cùng \code{event\_id} và nội dung gốc. Truy vấn \code{/fields/F999/latest} trả lỗi 404, tức không có thửa ruộng hay giá trị nào được tạo ra từ chúng.
+
+\subsection{BR07 -- Thông tin dễ tiếp cận}
+\label{sec:5-eff-br07}
+
+Bảng~\ref{tab:5-eff-br07} đối chiếu các tiêu chí chấp nhận của BR7 với bằng chứng.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR7 và bằng chứng}
+\label{tab:5-eff-br07}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[3.4,l]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Quản lý xem được bản tóm tắt của một thửa ruộng bất kỳ sau tối đa vài lần nhấp & Từ trang Overview, một lần nhấp vào dòng của thửa ruộng mở trang chi tiết có tóm tắt riêng của thửa ruộng (Hình~\ref{fig:4-ui-field}); từ bất kỳ trang nào, một lần nhấp ở thanh điều hướng quay về Overview & Đạt \\
+Các biểu đồ phân tích tải trong thời gian thỏa thuận trên khối lượng dữ liệu demo & \dien{Thời gian tải từng biểu đồ, Mục~\ref{sec:5-performance}} & \dien{Đạt / Chưa đạt} \\
+\end{tblr}
+\end{table}
+
+Tiêu chí thứ nhất đạt với một đến hai lần nhấp tùy trang xuất phát. Tiêu chí thứ hai phụ thuộc vào số đo thời gian tải ở Mục~\ref{sec:5-performance} nên được điền sau khi có kết quả đo.
+
+\paragraph{Các yêu cầu chức năng.} Bảng~\ref{tab:5-fr7} tổng hợp mức độ đáp ứng của từng yêu cầu chức năng của BR7. FR7.4 chỉ được đáp ứng một phần: tài liệu yêu cầu nêu việc lưu đệm phản hồi Trino ngay trong API, trong khi hiện thực hiện tại lưu đệm ở route handler của Next.js (khoảng hai phút) và giới hạn kích thước kết quả bằng tham số \code{limit}, chưa có phân trang đầy đủ bằng con trỏ hay số trang.
+
+\begin{table}[H]
+\centering
+\caption{Mức độ đáp ứng các yêu cầu chức năng của BR7}
+\label{tab:5-fr7}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[4,l]X[1.4,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Mã & Cách đáp ứng & Mức độ \\
+FR7.1 & Trình duyệt chỉ gọi route handler của Next.js, route handler chỉ gọi FastAPI; không có kết nối trực tiếp tới Kafka, HDFS, Cassandra hay Trino & Đạt \\
+FR7.2 & Endpoint tóm tắt, xu hướng và so sánh cho cả đường Cassandra và đường Trino (Bảng~\ref{tab:4-br07-endpoints}) & Đạt \\
+FR7.3 & Cả hai loại bảng điều khiển với bộ lọc trang trại và thửa ruộng lưu trên URL & Đạt \\
+FR7.4 & Lưu đệm ở route handler, giới hạn kích thước kết quả bằng \code{limit} & Một phần \\
+FR7.5 & Nhãn dễ hiểu, đơn vị, khoảng thời gian, thời điểm lấy dữ liệu và câu mô tả bằng ngôn ngữ thông thường & Đạt \\
+\end{tblr}
+\end{table}
+
+\paragraph{Kiểm thử phần diễn đạt.} Các hàm sinh câu mô tả và so sánh của trang Insights là hàm thuần túy, được kiểm thử bằng 22 ca kiểm thử đơn vị (vitest); toàn bộ đều đạt. Các ca này bao gồm trường hợp thiếu dữ liệu của khoảng trước, hai giá trị gần như bằng nhau và đánh giá thay đổi so với khoảng mục tiêu của cây trồng. Phần này kiểm tra tính đúng đắn của câu chữ, còn việc người dùng thực sự hiểu được câu chữ đó nằm ngoài phạm vi đánh giá của đề tài.
+
+\paragraph{Kịch bản minh họa.} Quản lý trang trại mở trang Overview, thấy cột \emph{What needs attention} và nhấp vào thửa ruộng F003. Trang chi tiết cho biết điều kiện hiện tại và thứ hạng độ ẩm đất của F003 so với bảy thửa ruộng còn lại trong 7 ngày gần nhất. Để so sánh toàn bộ, người dùng nhấp \emph{Compare all fields} để sang trang Insights (Hình~\ref{fig:4-br07-ui}).

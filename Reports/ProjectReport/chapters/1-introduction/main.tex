@@ -1,24 +1,55 @@
 \chapter{GIỚI THIỆU TỔNG QUAN}
 \label{chap:1-intro}
 
-% TODO: đoạn dẫn nhập chương
+Chương này giới thiệu bối cảnh, mục tiêu và phạm vi của đề tài, cách phân công công việc trong nhóm và bố cục của báo cáo.
 
 \section{Bối cảnh đề tài}
 \label{sec:1-context}
-% TODO: nông nghiệp thông minh, cảm biến IoT, nhu cầu xử lý dữ liệu gần thời gian thực
+
+Cùng với sự phát triển của Internet vạn vật (IoT), nông nghiệp đang chuyển dần từ canh tác dựa vào kinh nghiệm sang canh tác dựa trên số liệu. Các cảm biến đặt tại thửa ruộng liên tục ghi nhận độ ẩm đất, nhiệt độ, độ ẩm không khí và lượng mưa, tạo ra một dòng dữ liệu lớn và liên tục từ nhiều trang trại. Dòng dữ liệu này chỉ có giá trị khi được thu thập đầy đủ, kiểm tra chất lượng, lưu trữ và đưa đến người dùng đúng lúc: người vận hành cần biết tình trạng hiện tại để kịp thời xử lý, còn người quản lý và nhà phân tích cần lịch sử dài hạn để so sánh và lập kế hoạch.
+
+Đề tài được thực hiện trong khuôn khổ môn học \tenmonhoc, với yêu cầu xây dựng một hệ thống kỹ thuật dữ liệu và chứng minh hiệu quả của hệ thống trong một lĩnh vực ứng dụng cụ thể. Nhóm chọn lĩnh vực giám sát và quản lý nông nghiệp, và lấy xử lý micro-batch làm hướng tiếp cận chính: dữ liệu được gom thành các lô nhỏ và xử lý sau mỗi khoảng thời gian ngắn, nhằm cân bằng giữa độ trễ thấp và độ tin cậy. Lĩnh vực ứng dụng và người dùng được trình bày chi tiết ở Chương~\ref{chap:3-requirements}.
 
 \section{Mục tiêu của đề tài}
 \label{sec:1-objectives}
-% TODO
+
+Mục tiêu chung của đề tài là xây dựng và đánh giá một giải pháp kỹ thuật dữ liệu dựa trên xử lý micro-batch, phục vụ giám sát và quản lý nông nghiệp. Cụ thể, đề tài hướng tới bốn mục tiêu sau.
+
+\begin{itemize}
+  \item Xác định các nhóm người dùng và các yêu cầu nghiệp vụ cần được hỗ trợ bằng dữ liệu trong giám sát nông nghiệp.
+  \item Thiết kế và hiện thực giải pháp kỹ thuật dữ liệu đáp ứng các yêu cầu đó, từ thu thập, xử lý đến lưu trữ và phục vụ dữ liệu.
+  \item Xây dựng một ứng dụng web đưa kết quả của giải pháp đến người dùng.
+  \item Đánh giá giải pháp về tính đúng đắn của dữ liệu, hiệu năng và hiệu quả hỗ trợ khai thác dữ liệu, có so sánh với giải pháp thay thế.
+\end{itemize}
 
 \section{Phạm vi của đề tài}
 \label{sec:1-scope}
-% TODO
+
+Đề tài tập trung vào khâu quản lý và xử lý dữ liệu, cùng một ứng dụng web minh họa kết quả cho người dùng. Hệ thống được thử nghiệm trên dữ liệu cảm biến do bộ mô phỏng sinh ra, mô phỏng nhiều trang trại với nhiều thửa ruộng và thiết bị. Việc triển khai trên thiết bị và mạng truyền thông thực tế, điều khiển thiết bị tưới, xây dựng mô hình dự báo hoặc học máy, quản lý tài khoản người dùng và vận hành trên hạ tầng sản xuất nằm ngoài phạm vi của đề tài.
 
 \section{Phân công công việc}
 \label{sec:1-team}
-% TODO: bảng phân công theo BR (Đạt: BR01, Nhân: BR03, Tịnh: BR05, Duy: BR07, ...)
+
+Công việc được phân chia theo yêu cầu nghiệp vụ (Business Requirement, viết tắt là BR): mỗi thành viên phụ trách hai yêu cầu, từ thiết kế, hiện thực đến đánh giá, đồng thời viết các phần báo cáo tương ứng. Nội dung của từng yêu cầu từ BR01 đến BR08 được trình bày ở Mục~\ref{sec:3-br}. Bảng~\ref{tab:1-team} tóm tắt sự phân công này.
+
+\begin{table}[H]
+\centering
+\caption{Phân công công việc theo yêu cầu nghiệp vụ}
+\label{tab:1-team}
+\small
+\begin{tblr}{
+  colspec = {X[1.8,l]X[1,c]X[1.1,c]X[3.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Thành viên & MSSV & Yêu cầu phụ trách & Nội dung chính \\
+Nguyễn Hồ Tiến Đạt & 2670265 & BR01, BR07 & Ứng dụng web, lớp truy cập dữ liệu và các tóm tắt cho người dùng \\
+Hoàng Chí Nhân & 2670343 & BR02, BR03 & Thu thập và xử lý luồng dữ liệu, bảo đảm tính liên tục của giám sát \\
+Đoàn Trương Thanh Tịnh & 2570761 & BR04, BR08 & Chất lượng dữ liệu, truy vết nguồn gốc và cảnh báo \\
+Lê Duy Khang & 2670301 & BR05, BR06 & Lưu trữ lịch sử, các chỉ số quản lý và phân tích theo thời gian \\
+\end{tblr}
+\end{table}
 
 \section{Bố cục báo cáo}
 \label{sec:1-structure}
-% TODO
+
+Sau chương này, báo cáo gồm năm chương. Chương~\ref{chap:2-background} trình bày cơ sở lý thuyết về xử lý micro-batch. Chương~\ref{chap:3-requirements} phân tích lĩnh vực ứng dụng, người dùng, yêu cầu nghiệp vụ và dữ liệu. Chương~\ref{chap:4-design} trình bày thiết kế giải pháp và hiện thực ứng dụng. Chương~\ref{chap:5-evaluation} đánh giá giải pháp theo tính đúng đắn của dữ liệu, hiệu năng và hiệu quả khai thác dữ liệu. Chương~\ref{chap:6-conclusion} nêu kết luận, hạn chế và hướng phát triển.

@@ -1,0 +1,116 @@
+% Mục 4.1 (người phụ trách: Đạt).
+\section{Kiến trúc tổng thể}
+\label{sec:4-architecture}
+
+Kiến trúc của hệ thống xuất phát từ hai loại nhu cầu về dữ liệu ở Mục~\ref{sec:3-data-needs}: người dùng vừa cần biết tình trạng hiện tại trong vòng khoảng một phút, vừa cần lịch sử đầy đủ để phân tích. Hai nhu cầu này khác nhau về độ trễ và khối lượng truy vấn, nên một kho dữ liệu duy nhất khó đáp ứng tốt cả hai. Vì vậy, kiến trúc được tổ chức theo nguyên tắc \emph{một luồng dữ liệu, hai đường phục vụ}: toàn bộ số đo đi qua cùng một đường thu thập và xử lý, sau đó được ghi ra hai nơi với mục đích khác nhau. Hình~\ref{fig:4-architecture} mô tả kiến trúc tổng thể.
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  box/.style={rectangle, rounded corners, draw, minimum height=1.1cm, align=center, font=\small, fill=gray!10},
+  nrt/.style={box, fill=green!12, draw=green!50!black},
+  ana/.style={box, fill=blue!10, draw=blue!50!black},
+  srv/.style={box, fill=orange!15, draw=orange!70!black},
+  arr/.style={-{Stealth}, thick}]
+\node[box, minimum width=1.8cm] (sen) at (0.9,0) {Cảm biến\\và cổng};
+\node[box, minimum width=1.8cm] (ing) at (3.3,0) {Service\\tiếp nhận};
+\node[box, minimum width=1.8cm] (kaf) at (5.7,0) {Apache\\Kafka};
+\node[box, minimum width=2.8cm] (spk) at (8.8,0) {Spark Structured\\Streaming\\(micro-batch 30 s)};
+\node[nrt, minimum width=2.6cm] (cas) at (13.0,2.9) {Apache\\Cassandra};
+\node[ana, minimum width=2.6cm] (ice) at (13.0,0.9) {Iceberg bronze\\(HDFS)};
+\node[ana, minimum width=2.6cm] (dbt) at (13.0,-0.9) {dbt\\(silver, gold)};
+\node[ana, minimum width=2.6cm] (tri) at (13.0,-2.7) {Trino};
+\node[srv, minimum width=2.2cm, minimum height=6.4cm] (api) at (16.6,0) {FastAPI\\(lớp truy cập\\duy nhất)};
+\node[srv, minimum width=1.8cm] (web) at (19.3,0) {Ứng dụng\\web};
+\begin{scope}[on background layer]
+\node[fit=(cas), inner sep=0.3cm, draw=green!50!black, dashed, rounded corners, fill=green!5,
+  label={[font=\small\bfseries, text=green!40!black]above:Gần thời gian thực}] {};
+\node[fit=(ice)(dbt)(tri), inner sep=0.3cm, draw=blue!50!black, dashed, rounded corners, fill=blue!4,
+  label={[font=\small\bfseries, text=blue!50!black]below:Trong ngày và theo ngày}] {};
+\end{scope}
+\draw[arr] (sen)--(ing); \draw[arr] (ing)--(kaf); \draw[arr] (kaf)--(spk);
+\draw[arr] (spk.east) -- ++(0.7,0) |- (cas.west);
+\draw[arr] (spk.east) -- ++(0.7,0) |- (ice.west);
+\draw[arr] (ice)--(dbt); \draw[arr] (dbt)--(tri);
+\draw[arr] (cas.east) -- (cas.east -| api.west);
+\draw[arr] (tri.east) -- (tri.east -| api.west);
+\draw[arr] (api)--(web);
+\end{tikzpicture}}
+\caption{Kiến trúc tổng thể: một luồng dữ liệu, hai đường phục vụ}
+\label{fig:4-architecture}
+\end{figure}
+
+\subsection{Luồng dữ liệu}
+\label{sec:4-dataflow}
+
+Một số đo đi qua hệ thống theo bốn bước.
+
+\begin{enumerate}
+  \item Cảm biến gửi số đo qua cổng về service tiếp nhận bằng giao thức HTTP. Service này loại bỏ các bản ghi (record) sai hình thức và đưa phần còn lại vào Kafka.
+  \item Sau mỗi 30 giây, Spark đọc các sự kiện (event) mới trên Kafka thành một micro-batch, kiểm định và gắn cờ chất lượng cho từng bản ghi, rồi ghi kết quả ra hai nơi: Cassandra cho đường gần thời gian thực và bảng bronze của Iceberg cho đường phân tích.
+  \item dbt định kỳ biến đổi bảng bronze thành các bảng silver và gold. Trino đọc các bảng gold để trả lời truy vấn phân tích.
+  \item FastAPI đọc từ Cassandra hoặc Trino (tùy loại câu hỏi) và trả kết quả cho ứng dụng web.
+\end{enumerate}
+
+Bảng~\ref{tab:4-components} nêu vai trò của từng thành phần. Lý do chọn công nghệ cho từng thành phần được trình bày ở Mục~\ref{sec:4-storage} và Mục~\ref{sec:4-processing}, còn cách tổ chức dữ liệu được trình bày ở Mục~\ref{sec:4-data-model}.
+
+{\small
+\begin{longtblr}[
+  caption = {Các thành phần của kiến trúc và vai trò},
+  label = {tab:4-components},
+]{
+  width = \linewidth,
+  colspec = {X[1.5,l]X[4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  rowhead = 1,
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Thành phần & Vai trò trong kiến trúc \\
+Cảm biến và cổng & Đo các chỉ số tại thửa ruộng và gửi số đo về hệ thống \\
+Service tiếp nhận & Nhận bản ghi qua HTTP, từ chối bản ghi sai hình thức và chuyển các bản ghi còn lại vào Kafka \\
+Apache Kafka & Bộ đệm bền vững giữa thu thập và xử lý, cho phép phát lại dữ liệu sau sự cố \\
+Spark Structured Streaming & Xử lý theo micro-batch 30 giây: kiểm định, gắn cờ chất lượng, đánh giá cảnh báo và ghi ra hai đường phục vụ \\
+Apache Cassandra & Kho phục vụ gần thời gian thực: giá trị mới nhất, chuỗi số đo 24 giờ, trạng thái thiết bị và cảnh báo \\
+Iceberg trên HDFS (bronze) & Kho lưu dữ liệu thô đầy đủ lịch sử, kèm cờ chất lượng và thông tin nguồn gốc \\
+Hive Metastore & Danh mục (catalog) của các bảng Iceberg \\
+dbt & Biến đổi bảng bronze thành các bảng silver và gold bằng các mô hình có kiểm thử \\
+Trino & Engine truy vấn các bảng gold phục vụ phân tích \\
+FastAPI & Lớp truy cập dữ liệu duy nhất, đọc từ Cassandra hoặc Trino \\
+Ứng dụng web & Bảng điều khiển cho người dùng, chỉ gọi dữ liệu qua FastAPI \\
+\end{longtblr}
+}
+
+\subsection{Hai loại bảng điều khiển (dashboard)}
+\label{sec:4-dashboards}
+
+Hai đường phục vụ tương ứng với hai loại bảng điều khiển trong ứng dụng, với các đặc điểm ở Bảng~\ref{tab:4-dashboards}. Bảng điều khiển gần thời gian thực chỉ đọc từ Cassandra, còn bảng điều khiển theo ngày chỉ đọc từ các bảng gold qua Trino. Một biểu đồ không bao giờ trộn dữ liệu từ hai nguồn này để người dùng luôn biết con số mình đang xem có độ mới như thế nào.
+
+\begin{table}[H]
+\centering
+\caption{Hai loại bảng điều khiển của hệ thống}
+\label{tab:4-dashboards}
+\small
+\begin{tblr}{
+  colspec = {X[1.2,l]X[2.4,l]X[2.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Đặc điểm & Gần thời gian thực & Trong ngày và theo ngày \\
+Đường dữ liệu & FastAPI, Cassandra & FastAPI, Trino, bảng gold \\
+Khung thời gian & 24 giờ gần nhất & Từ vài giờ đến toàn bộ lịch sử \\
+Độ mới của dữ liệu & Từ vài giây đến khoảng một phút & Theo lần làm mới tầng gold (theo giờ hoặc theo ngày) \\
+Nội dung & Giá trị hiện tại, trạng thái thiết bị, cảnh báo đang mở & Xu hướng, so sánh, tóm tắt và chỉ số quản lý \\
+\end{tblr}
+\end{table}
+
+\subsection{Nguyên tắc thiết kế}
+\label{sec:4-principles}
+
+Ba nguyên tắc chi phối toàn bộ kiến trúc.
+
+\begin{itemize}
+  \item \textbf{Tách thu thập khỏi xử lý.} Kafka đứng giữa nên sự cố ở phía xử lý không làm mất dữ liệu và dữ liệu có thể được phát lại sau khi khôi phục. Nguyên tắc này phục vụ BR3.
+  \item \textbf{Ghi lại được mà không trùng lặp.} Mọi thao tác ghi đều có thể thực hiện lại mà không tạo bản ghi trùng, nên việc phát lại sau sự cố cho kết quả giống lần đầu. Nguyên tắc này phục vụ BR3 và BR4.
+  \item \textbf{Một điểm truy cập duy nhất.} Ứng dụng web chỉ lấy dữ liệu qua FastAPI và không truy cập trực tiếp Kafka, HDFS, Cassandra hay Trino (Mục~\ref{sec:2-api-web}). Nguyên tắc này phục vụ BR1 và BR7.
+\end{itemize}
+
+Các mục tiếp theo đi vào từng phần của kiến trúc này: công nghệ lưu trữ, công nghệ xử lý và mô hình dữ liệu, trước khi trình bày cách hiện thực từng yêu cầu nghiệp vụ.

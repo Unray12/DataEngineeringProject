@@ -1,11 +1,9 @@
 \chapter{THIẾT KẾ GIẢI PHÁP VÀ HIỆN THỰC ỨNG DỤNG}
 \label{chap:4-design}
 
-% TODO: đoạn dẫn nhập chương
+Chương này trình bày giải pháp kỹ thuật dữ liệu của đề tài, từ kiến trúc tổng thể đến cách từng yêu cầu nghiệp vụ được hiện thực, cùng giải pháp thay thế và ứng dụng đi kèm.
 
-\section{Kiến trúc tổng thể}
-\label{sec:4-architecture}
-% TODO
+\input{chapters/4-design-implementation/4.1-architecture}
 
 \input{chapters/4-design-implementation/4.2-storage}
 
@@ -18,13 +16,13 @@
 \section{Pipeline micro-batch theo từng yêu cầu nghiệp vụ}
 \label{sec:4-pipeline}
 
-\subsection{BR01 -- Tập trung hóa giám sát nông nghiệp}
+\input{chapters/4-design-implementation/4.5-br01}
 \subsection{BR02 -- Nâng cao nhận biết điều kiện đồng ruộng}
 \subsection{BR03 -- Duy trì tính liên tục của giám sát}
 \input{chapters/4-design-implementation/4.5-br04}
 \input{chapters/4-design-implementation/4.5-br05}
 \input{chapters/4-design-implementation/4.5-br06}
-\subsection{BR07 -- Làm cho thông tin dễ tiếp cận}
+\input{chapters/4-design-implementation/4.5-br07}
 \input{chapters/4-design-implementation/4.5-br08}
 
 \input{chapters/4-design-implementation/4.6-alternative}
@@ -33,5 +31,5 @@
 \label{sec:4-application}
 
 \subsection{Mô phỏng và thu thập dữ liệu}
-\subsection{Giao diện người dùng}
+\input{chapters/4-design-implementation/4.7-ui}
 \input{chapters/4-design-implementation/4.7-deployment}

@@ -9,12 +9,13 @@
 
 Bảng~\ref{tab:4-alert-conditions} liệt kê các điều kiện được đánh giá trên mỗi lô. Ngưỡng theo cây trồng nằm trong dữ liệu danh mục; ngưỡng thiết bị lấy từ biến môi trường.
 
-\begin{table}[H]
-\centering
-\caption{Các điều kiện cảnh báo (\texttt{src/streaming/pipeline.py}, \texttt{\_build\_conditions})}
-\label{tab:4-alert-conditions}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Các điều kiện cảnh báo (\texttt{src/streaming/pipeline.py}, \texttt{\_build\_conditions})},
+  label = {tab:4-alert-conditions},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.6,l]X[3,l]X[1,l]X[1,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -25,8 +26,8 @@ Thay đổi đột ngột (\code{rapid\_change}) & Có bản ghi cờ \code{impl
 Mất kết nối (\code{device\_offline}) & Thiết bị im lặng lâu hơn 4 lần chu kỳ báo cáo & warning & FR8.2 \\
 Pin yếu (\code{battery\_low}) & Pin $\le$ 20\% & warning & FR8.2 \\
 Sóng yếu (\code{signal\_poor}) & Chất lượng tín hiệu $<$ 0,3 & info & FR8.2 \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 Ví dụ với lúa (\code{RICE}): khoảng độ ẩm đất mục tiêu là 30--60\% và ngưỡng cảnh báo \code{alert\_below} là 32\%. Nếu trung bình độ ẩm các bản ghi hợp lệ trong một lô của thửa F001 là 29,5\%, điều kiện \code{low\_soil\_moisture} của F001 ở trạng thái vi phạm.
 

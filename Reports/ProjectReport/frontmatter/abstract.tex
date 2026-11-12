@@ -4,6 +4,10 @@
     \textbf{TÓM LƯỢC}
 \end{center}
 
-\dien{Tóm lược báo cáo: bối cảnh, giải pháp micro-batch, kết quả đánh giá chính.}
+Cảm biến đặt tại thửa ruộng tạo ra dòng dữ liệu liên tục, nhưng dòng dữ liệu này chỉ hữu ích khi được thu thập đầy đủ, kiểm tra chất lượng, lưu trữ và đưa đến người dùng đúng lúc. Báo cáo này trình bày một giải pháp kỹ thuật dữ liệu cho giám sát và quản lý nông nghiệp, lấy xử lý micro-batch làm hướng tiếp cận chính. Từ nhu cầu của 4 nhóm người dùng, nhóm xác định 8 yêu cầu nghiệp vụ, từ tập trung hóa giám sát, nhận biết điều kiện đồng ruộng, bảo đảm tính liên tục và độ tin cậy của dữ liệu, đến hỗ trợ quản lý, đánh giá lịch sử, thông tin dễ tiếp cận và ứng phó sớm với rủi ro.
 
-\underline{Từ khóa:} Micro-batch, Spark Structured Streaming, Kafka, Nông nghiệp, Data Engineering.
+Giải pháp tổ chức theo nguyên tắc một luồng dữ liệu, hai đường phục vụ. Số đo từ cảm biến đi qua dịch vụ tiếp nhận vào Apache Kafka, rồi được Spark Structured Streaming xử lý theo micro-batch 30 giây: kiểm định, gắn cờ chất lượng, đánh giá cảnh báo và ghi ra hai nơi. Apache Cassandra phục vụ bảng điều khiển gần thời gian thực trong 24 giờ gần nhất. Apache Iceberg trên HDFS lưu toàn bộ lịch sử, được dbt biến đổi thành các bảng silver và gold qua các mô hình có kiểm thử, rồi được Trino truy vấn cho các bảng điều khiển theo ngày. FastAPI là lớp truy cập dữ liệu duy nhất, và ứng dụng web Next.js đưa kết quả đến người dùng. Hệ thống được thử nghiệm với dữ liệu mô phỏng gồm bốn trang trại, tám thửa ruộng và hai mươi bốn thiết bị, có tiêm lỗi.
+
+Kết quả đánh giá cho thấy hai đường phục vụ bổ sung cho nhau. Với câu hỏi chuỗi số đo 24 giờ, Cassandra nhanh hơn Trino trên Iceberg từ 15 đến 23 lần, trong khi các bảng gold phục vụ được lịch sử và so sánh giữa các thửa ruộng mà Cassandra, vốn chỉ giữ dữ liệu 24 đến 48 giờ, không có. Iceberg chậm hơn Hive/Parquet ở một số phép đo, nhưng cho phép phát lại một lô mà không sinh dòng trùng, xem lại trạng thái cũ và đổi tên cột mà vẫn đọc được dữ liệu cũ. Các tiêu chí chấp nhận của từng yêu cầu nghiệp vụ được đối chiếu với bằng chứng thu được trên hệ thống chạy thật.
+
+\underline{Từ khóa:} Micro-batch, Spark Structured Streaming, Kafka, Iceberg, Cassandra, Nông nghiệp, Data Engineering.

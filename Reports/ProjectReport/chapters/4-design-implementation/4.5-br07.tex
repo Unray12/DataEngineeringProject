@@ -1,0 +1,73 @@
+\subsection{BR07 -- Làm cho thông tin dễ tiếp cận}
+\label{sec:4-br07}
+
+\paragraph{Yêu cầu.} Quản lý trang trại và nhà phân tích cần các bản tóm tắt, xu hướng và so sánh giữa các thửa ruộng ở dạng dễ hiểu, không phải tự tổng hợp số liệu và không cần biết đến Kafka, Spark hay SQL (FR7.1--FR7.5).
+
+\paragraph{Luồng dữ liệu.} BR07 không tạo thêm dữ liệu mà đưa dữ liệu của các yêu cầu khác đến người dùng qua hai đường đã nêu ở Mục~\ref{sec:4-architecture}. Ứng dụng web chỉ gọi route handler của Next.js, route handler gọi FastAPI, và FastAPI đọc từ Cassandra hoặc Trino tùy loại câu hỏi (FR7.1). Bảng~\ref{tab:4-br07-endpoints} liệt kê các endpoint phục vụ việc này và nguồn dữ liệu của từng endpoint.
+
+{\small
+\begin{longtblr}[
+  caption = {Các endpoint tóm tắt, xu hướng và so sánh},
+  label = {tab:4-br07-endpoints},
+]{
+  width = \linewidth,
+  colspec = {X[2.3,l]X[1,c]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  rowhead = 1,
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Endpoint & Nguồn & Nội dung trả về \\
+\code{/fields/\{id\}/latest} & Cassandra & Giá trị mới nhất của từng chỉ số trong một thửa ruộng \\
+\code{/fields/\{id\}/series} & Cassandra & Chuỗi số đo 24 giờ của một chỉ số \\
+\code{/fields/\{id\}/indicators} & Trino & Chỉ số theo giờ hoặc theo ngày, kèm khoảng mục tiêu của cây trồng \\
+\code{/fields/\{id\}/history} & Trino & Lịch sử một chỉ số theo giờ hoặc theo ngày \\
+\code{/summary} & Trino & Giá trị nhỏ nhất, lớn nhất, trung bình và số bản ghi theo từng chỉ số trong một khoảng thời gian \\
+\code{/compare} & Trino & Giá trị trung bình, nhỏ nhất, lớn nhất của một chỉ số, xếp hạng các thửa ruộng \\
+\end{longtblr}
+}
+
+Các endpoint của Trino chỉ truy vấn các bảng gold do dbt tạo ra (Mục~\ref{sec:4-br05}), nên mỗi truy vấn là một phép gộp trên bảng đã tổng hợp theo ngày, không phải quét lại dữ liệu thô. Đoạn mã~\ref{lst:4-compare} là truy vấn của \code{/compare}: các mã thửa ruộng được truyền qua tham số của câu lệnh thay vì ghép chuỗi, nên đầu vào của người dùng không thể chèn thêm câu lệnh SQL.
+
+\begin{lstlisting}[language=Python, caption={Truy vấn so sánh các thửa ruộng (\texttt{src/api/analytics.py})}, label={lst:4-compare}]
+def compare(self, field_ids, metric, start, end):
+    placeholders = ", ".join("?" for _ in field_ids)
+    return self.query(
+        f"""
+        SELECT field_id, avg(avg_value) AS avg, min(min_value) AS min,
+               max(max_value) AS max, sum(reading_count) AS count
+        FROM field_daily
+        WHERE field_id IN ({placeholders}) AND metric = ?
+          AND day >= CAST(? AS date) AND day <= CAST(? AS date)
+        GROUP BY field_id ORDER BY avg DESC
+        """,
+        (*field_ids, metric, start, end),
+    )
+\end{lstlisting}
+
+Endpoint kiểm tra danh sách thửa ruộng trước khi truy vấn và trả lỗi 400 khi gặp mã không có trong danh mục. Với các endpoint trả danh sách dài, tham số \code{limit} có giới hạn trên (ví dụ tối đa 200 cảnh báo, 5\,000 điểm của chuỗi số đo) để một yêu cầu không kéo về lượng dữ liệu quá lớn (FR7.4). Kết quả của đường Trino được lưu đệm ở route handler của Next.js trong khoảng hai phút, như đã trình bày ở Mục~\ref{sec:2-refresh-cache}.
+
+\paragraph{Từ con số đến câu chữ (FR7.5).} Để người dùng không phải tự đọc và so sánh các con số, trang \emph{Insights} chuyển số liệu thành câu mô tả bằng ngôn ngữ thông thường. Các câu này được sinh bởi những hàm thuần túy từ dữ liệu của hai khoảng thời gian liền kề có độ dài bằng nhau (khoảng hiện tại và khoảng ngay trước đó). Đoạn mã~\ref{lst:4-describe-change} là hàm tạo câu mô tả thay đổi; câu luôn nêu tên cả hai khoảng và cả hai giá trị trung bình để người đọc không phải đoán con số nào thuộc khoảng nào. Hàm chỉ nêu chiều thay đổi (cao hơn, thấp hơn hay như nhau) mà không tính phần trăm chênh lệch, vì với các chỉ số vốn đã tính bằng phần trăm, một ``phần trăm thay đổi'' dễ gây hiểu lầm.
+
+\begin{lstlisting}[caption={Câu mô tả thay đổi giữa hai khoảng thời gian (rút gọn hàm)}, label={lst:4-describe-change}]
+export function describeChange(label, current, previous, { unit, period, previousPeriod }) {
+  const name = capitalise(label);
+  if (!isNumber(current)) return `${name}: no data for ${period}.`;
+  const lead = `${name} averaged ${withUnit(current, unit)} over ${period}`;
+  if (!isNumber(previous))
+    return `${lead}; there is no data for ${previousPeriod} to compare with.`;
+  const earlier = `the ${withUnit(previous, unit)} average over ${previousPeriod}`;
+  if (Math.abs(current - previous) < SAME_THRESHOLD) return `${lead}, the same as ${earlier}.`;
+  return `${lead}, ${current > previous ? "higher" : "lower"} than ${earlier}.`;
+}
+\end{lstlisting}
+
+Các hàm này không phụ thuộc trình duyệt nên được kiểm thử bằng các ca kiểm thử đơn vị. Thông điệp mà chúng tạo ra đều gắn với một ngữ cảnh rõ ràng: nhãn chỉ số dễ hiểu (ví dụ ``Soil moisture'' thay cho \code{soil\_moisture}), đơn vị đi kèm giá trị, tên khoảng thời gian, và nhãn ``historical data, not live'' ở mỗi bảng lấy từ Trino cùng thời điểm lấy dữ liệu (\code{asOf}). Phần ``Needs attention now'' ở đầu trang chỉ gồm văn bản lấy từ Cassandra và không bao giờ được vẽ chung vào biểu đồ lịch sử.
+
+\paragraph{Trang Insights (FR7.3).} Trang Insights gồm ba phần: các câu mô tả thay đổi, bảng và các thanh khoảng giá trị so sánh giữa các thửa ruộng, và bộ chọn khoảng thời gian dùng chung cho cả trang (Hình~\ref{fig:4-br07-ui}). Bảng so sánh có thể xuất ra tệp CSV, trong đó các ô văn bản trông giống công thức bảng tính được vô hiệu hóa để tránh bị thực thi khi mở bằng chương trình bảng tính.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{br07-insights.png}
+\caption{Trang Insights: phần cần chú ý, các chỉ số trung bình trong 7 ngày và bảng so sánh các thửa ruộng}
+\label{fig:4-br07-ui}
+\end{figure}
+
+\paragraph{Truy cập trong vài thao tác.} Thanh điều hướng bên trái đưa người dùng từ bất kỳ trang nào đến Live, Alerts, Analytics, Insights, Data quality hoặc Devices bằng một lần nhấp. Từ trang Live hoặc Overview, một lần nhấp vào thẻ của thửa ruộng mở trang chi tiết, nơi có chỉ số hiện tại, xu hướng và các chỉ số quản lý của thửa ruộng đó. Như vậy bản tóm tắt của một thửa ruộng bất kỳ cách người dùng nhiều nhất hai lần nhấp. Mục~\ref{sec:5-effectiveness} kiểm tra tiêu chí này và thời gian tải của các biểu đồ phân tích.
