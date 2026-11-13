@@ -17,12 +17,13 @@ Mọi lần đo dùng môi trường và quy trình ở Mục~\ref{sec:5-setup}.
 
 \paragraph{Phương pháp.} Bộ mô phỏng gắn nhãn \code{simulated\_fault} cho mỗi sự kiện lỗi. Mỗi loại lỗi có một kết quả mong đợi: hoặc bị cách ly với một lý do cụ thể, hoặc được giữ lại với một cờ chất lượng cụ thể (Bảng~\ref{tab:5-fault-expect}). Script \code{benchmarks/run\_correctness\_checks.py} (\code{just check-correctness}) lấy Kafka làm nguồn sự thật: nó đọc lại mọi thông điệp trong khoảng thời gian kiểm tra, đếm số sự kiện tiêm vào theo nhãn, rồi tìm nơi mỗi nhãn kết thúc trong bronze (với cờ nào) và trong \code{ops.quarantine} (với lý do nào), lọc theo đúng các offset đó. Một sự kiện được tính là \emph{phát hiện} khi nó không đi vào dữ liệu sạch (bị gắn cờ khác \code{ok} hoặc bị cách ly), và \emph{phân loại đúng} khi cờ hoặc lý do khớp Bảng~\ref{tab:5-fault-expect}.
 
-\begin{table}[H]
-\centering
-\caption{Kết quả mong đợi cho từng loại lỗi được tiêm vào}
-\label{tab:5-fault-expect}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Kết quả mong đợi cho từng loại lỗi được tiêm vào},
+  label = {tab:5-fault-expect},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.6,l]X[2.8,l]X[2,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }

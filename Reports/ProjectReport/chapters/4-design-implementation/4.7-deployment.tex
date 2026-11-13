@@ -56,12 +56,13 @@ just verify-pipeline # row counts in Cassandra, bronze and quarantine
 
 Bảng~\ref{tab:4-recipes} nhóm các recipe theo mục đích.
 
-\begin{table}[H]
-\centering
-\caption{Các recipe \texttt{just} chính}
-\label{tab:4-recipes}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Các recipe \texttt{just} chính},
+  label = {tab:4-recipes},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.2,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }

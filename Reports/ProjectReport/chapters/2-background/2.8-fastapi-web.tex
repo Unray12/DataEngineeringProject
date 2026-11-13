@@ -1,0 +1,81 @@
+% Mục 2.8 (người phụ trách: Đạt).
+\section{FastAPI và ứng dụng web}
+\label{sec:2-api-web}
+
+Các mục trước trình bày cách dữ liệu được thu thập, làm sạch và lưu trữ. Mục này trình bày lớp cuối cùng, đưa dữ liệu đến người dùng: một dịch vụ API đứng trước các kho dữ liệu và một ứng dụng web chạy trên trình duyệt.
+
+\subsection{Lớp truy cập dữ liệu}
+\label{sec:2-access-layer}
+
+Dữ liệu của hệ thống nằm ở hai kho với cách truy vấn khác nhau: Cassandra dùng CQL cho dữ liệu gần thời gian thực, còn Trino dùng SQL cho dữ liệu phân tích. Nếu trình duyệt truy cập trực tiếp vào các kho này, thông tin kết nối sẽ bị lộ ra phía người dùng, giao diện bị gắn chặt với lược đồ lưu trữ, và mọi thay đổi ở kho dữ liệu đều kéo theo thay đổi ở giao diện. Giải pháp thông thường là đặt một \emph{lớp truy cập dữ liệu} ở giữa: lớp này nhận yêu cầu từ ứng dụng, kiểm tra tham số, truy vấn kho thích hợp và trả kết quả theo một định dạng thống nhất.
+
+Trong đề tài, lớp truy cập dữ liệu là một dịch vụ API theo kiểu REST. Mỗi tài nguyên (thửa ruộng, thiết bị, cảnh báo) có một địa chỉ riêng, được truy cập bằng các phương thức HTTP như \code{GET}, và dữ liệu được trao đổi dưới dạng JSON.
+
+\subsection{FastAPI}
+\label{sec:2-fastapi}
+
+FastAPI là một framework Python để xây dựng API, dựa trên Starlette cho phần web bất đồng bộ (ASGI) và Pydantic cho phần kiểm tra dữ liệu \cite{fastapi_docs}. Mỗi điểm truy cập (endpoint) được khai báo bằng một hàm Python thông thường. FastAPI dùng chú thích kiểu của hàm để tự kiểm tra tham số đầu vào, trả mã lỗi 422 khi tham số không hợp lệ, và tự sinh tài liệu theo chuẩn OpenAPI. Tài liệu này có giao diện thử trực tiếp tại đường dẫn \code{/docs} (Hình~\ref{fig:2-fastapi-docs}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\linewidth]{fastapi-docs.png}
+\caption{Tài liệu OpenAPI do FastAPI tự sinh}
+\label{fig:2-fastapi-docs}
+\end{figure}
+
+Đoạn mã~\ref{lst:2-fastapi-endpoint} là một endpoint của hệ thống, trả về giá trị mới nhất của từng chỉ số cho một thửa ruộng, đã lược bớt phần truy vấn chi tiết. Decorator \code{@app.get} gắn hàm với đường dẫn; tham số \code{field\_id} lấy từ đường dẫn và được kiểm tra kiểu chuỗi; hàm \code{\_require\_field} trả lỗi 404 khi thửa ruộng không tồn tại. Kết quả trả về là một từ điển (dictionary / dict) Python và FastAPI tự chuyển thành JSON.
+
+\begin{lstlisting}[language=Python, caption={Endpoint trả giá trị mới nhất của một thửa ruộng (rút gọn)}, label={lst:2-fastapi-endpoint}]
+@app.get("/fields/{field_id}/latest")
+def field_latest(field_id: str) -> dict[str, Any]:
+    _require_field(field_id)
+    rows = _session().execute(...)
+    metrics = _rows(rows)
+    ...
+    return {"field_id": field_id, "metrics": metrics}
+\end{lstlisting}
+
+\subsection{Ứng dụng web với Next.js}
+\label{sec:2-nextjs}
+
+Next.js là framework xây dựng trên React, cho phép viết cả giao diện lẫn mã chạy phía máy chủ trong cùng một dự án \cite{nextjs_docs}. Với \emph{App Router}, mỗi tệp \code{route.ts} trong thư mục \code{app/api} định nghĩa một \emph{route handler}, là hàm chạy phía máy chủ và trả về phản hồi HTTP. Đề tài dùng các route handler làm lớp trung gian giữa trình duyệt và FastAPI: trình duyệt chỉ gọi route handler của Next.js, còn việc gọi FastAPI, giữ khóa truy cập và xử lý lỗi diễn ra phía máy chủ. Cách tổ chức này giúp ứng dụng chỉ có một điểm tiếp xúc duy nhất với dữ liệu, và cho phép thay đổi địa chỉ hay cách xác thực của API mà không phải sửa giao diện.
+
+Phía trình duyệt, ứng dụng dùng TypeScript để kiểm tra kiểu khi viết mã, TanStack Query để quản lý việc lấy dữ liệu, lưu đệm và tải lại \cite{tanstack_query}, và thư viện Zod để kiểm tra cấu trúc dữ liệu nhận về tại thời điểm chạy \cite{zod_docs}. Việc kiểm tra tại thời điểm chạy là cần thiết, vì kiểu của TypeScript chỉ tồn tại lúc biên dịch: nếu API trả về dữ liệu sai cấu trúc, ứng dụng phát hiện ngay thay vì hiển thị số liệu sai.
+
+\subsection{Làm mới và lưu đệm dữ liệu}
+\label{sec:2-refresh-cache}
+
+Giao diện có hai cách nhận dữ liệu mới: máy chủ chủ động đẩy xuống (ví dụ qua WebSocket) hoặc trình duyệt hỏi lại định kỳ (polling). Vì dữ liệu của hệ thống chỉ thay đổi sau mỗi micro-batch, khoảng 30 giây một lần, việc hỏi lại sau mỗi 30 giây là đủ để người dùng theo kịp và đơn giản hơn nhiều so với duy trì kết nối liên tục. Ứng dụng áp dụng các quy tắc ở Đoạn mã~\ref{lst:2-polling}: dữ liệu gần thời gian thực được tải lại sau mỗi 30 giây khi trang đang hiển thị, tạm dừng khi thẻ trình duyệt bị ẩn để tránh các lệnh gọi không cần thiết, và hiển thị cảnh báo khi dữ liệu cũ hơn 90 giây.
+
+\begin{lstlisting}[caption={Tùy chọn tải lại dữ liệu gần thời gian thực}, label={lst:2-polling}]
+export const liveQueryOptions = {
+  staleTime: 0,
+  refetchInterval: 30_000,
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: "always" as const,
+  retry: false as const,
+};
+\end{lstlisting}
+
+Dữ liệu phân tích chỉ thay đổi sau mỗi lần làm mới tầng gold, nên có thể được lưu đệm trong thời gian ngắn mà không làm người dùng thấy số liệu lỗi thời. Việc này được điều khiển bằng tiêu đề HTTP \code{Cache-Control}: \code{s-maxage} cho phép bộ đệm trung gian giữ phản hồi trong một khoảng thời gian, còn \code{stale-while-revalidate} cho phép trả bản cũ ngay trong khi bản mới được tải ở nền \cite{rfc9111,rfc5861}. Đoạn mã~\ref{lst:2-cache-header} là tiêu đề mà route handler của các tóm tắt phân tích sử dụng.
+
+\begin{lstlisting}[caption={Tiêu đề lưu đệm (cache headers) của route handler phân tích}, label={lst:2-cache-header}]
+const CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=300",
+};
+\end{lstlisting}
+
+Cuối cùng, mỗi phản hồi của hệ thống mang theo thông tin về chính nó dưới dạng một \emph{phong bì} (envelope) gồm trường \code{data} và trường \code{meta}. Trường \code{meta} ghi thời điểm dữ liệu được lấy (\code{asOf}) và nguồn của dữ liệu (\code{cassandra} hoặc \code{trino}), như trong Đoạn mã~\ref{lst:2-envelope}. Nhờ đó, giao diện luôn hiển thị được thời điểm cập nhật cho người dùng và tránh trộn hai nguồn có độ mới khác nhau trong cùng một biểu đồ.
+
+\begin{lstlisting}[caption={Cấu trúc phong bì của phản hồi (\texttt{web/src/lib/api/schemas.ts})}, label={lst:2-envelope}]
+export const envelopeMetaSchema = z.object({
+  asOf: z.string().min(1),
+  source: z.enum(["cassandra", "trino"]),
+});
+
+export function envelopeSchema<T extends z.ZodTypeAny>(data: T) {
+  return z.object({ data, meta: envelopeMetaSchema });
+}
+\end{lstlisting}
+
+Các lựa chọn này được áp dụng cụ thể trong phần thiết kế ở Chương~\ref{chap:4-design}.

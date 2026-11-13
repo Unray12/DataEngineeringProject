@@ -1,0 +1,22 @@
+% Phần BR1 và BR7 của Mục 3.4 (người phụ trách: Đạt).
+\subsection{Nhu cầu dữ liệu của BR1 và BR7}
+\label{sec:3-needs-br1-br7}
+
+BR1 và BR7 cùng phục vụ người quản lý nhưng đặt ra hai kiểu nhu cầu khác nhau. BR1 cần nắm \emph{hiện trạng}: những đơn vị nào đang được giám sát và tình trạng của từng đơn vị tại thời điểm hiện tại. BR7 cần \emph{diễn giải}: tóm tắt và so sánh dữ liệu trong một khoảng thời gian thành thông tin mà người không chuyên cũng đọc được. Bảng~\ref{tab:3-needs-br1-br7} tóm tắt hai nhu cầu này.
+
+\begin{table}[H]
+\centering
+\caption{Nhu cầu sử dụng dữ liệu của BR1 và BR7}
+\label{tab:3-needs-br1-br7}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[1.4,l]X[2.4,l]X[1.6,l]X[1.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+BR & Người dùng & Câu hỏi cần trả lời & Loại xử lý & Độ trễ chấp nhận \\
+BR1 & U1 quản lý trang trại, U2 người vận hành trang trại & Hiện có những trang trại, thửa ruộng và thiết bị nào? Tình trạng hiện tại của từng đơn vị là gì, và thiết bị nào đang hoạt động? & Kết hợp danh mục tham chiếu (trang trại, thửa ruộng, thiết bị) với số đo và trạng thái mới nhất; lọc theo trang trại và thửa ruộng & Vài chục giây đến khoảng một phút; mỗi thông tin kèm thời điểm cập nhật \\
+BR7 & U1 quản lý trang trại, U3 nhà phân tích dữ liệu & Giá trị trung bình của từng chỉ số trong kỳ này so với kỳ trước như thế nào? Thửa ruộng nào cao nhất, thấp nhất? Hiện có điều gì cần chú ý ngay? & Tổng hợp theo khoảng thời gian, so sánh giữa các thửa ruộng và giữa hai kỳ liên tiếp, diễn đạt kết quả bằng câu mô tả; xuất bảng kết quả dưới dạng tệp CSV & Số liệu phân tích theo lần làm mới gần nhất (theo giờ hoặc theo ngày); phần cần chú ý theo trạng thái hiện tại \\
+\end{tblr}
+\end{table}
+
+Bảng trên dẫn tới hai hệ quả cho thiết kế ở Chương~\ref{chap:4-design}. Thứ nhất, BR1 có cùng yêu cầu về độ mới của dữ liệu với các nhu cầu theo dõi tình trạng hiện tại, nên cần được phục vụ từ nguồn dữ liệu gần thời gian thực thay vì từ dữ liệu phân tích đã tổng hợp. Thứ hai, BR7 gồm hai loại nhu cầu có độ trễ khác nhau, vì vậy một màn hình chứa cả hai phải nêu rõ nguồn và thời điểm cập nhật của từng phần. Đồng thời, mọi kết quả cần được trình bày bằng ngôn ngữ thông thường, kèm đơn vị đo và khoảng thời gian áp dụng.

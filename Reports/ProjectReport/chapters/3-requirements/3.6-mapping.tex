@@ -3,12 +3,13 @@
 
 Mục này nối các yêu cầu nghiệp vụ ở Mục~\ref{sec:3-br} với các thành phần xử lý dữ liệu sẽ được thiết kế ở Chương~\ref{chap:4-design}. Bảng~\ref{tab:3-traceability} là ma trận truy vết: một dấu \checkmark{} nghĩa là thành phần đó tham gia trực tiếp vào việc đáp ứng yêu cầu.
 
-\begin{table}[H]
-\centering
-\caption{Ma trận truy vết giữa yêu cầu nghiệp vụ và thành phần xử lý dữ liệu}
-\label{tab:3-traceability}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Ma trận truy vết giữa yêu cầu nghiệp vụ và thành phần xử lý dữ liệu},
+  label = {tab:3-traceability},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[3,l]X[1,c]X[1,c]X[1,c]X[1.3,c]X[1,c]X[1,c]X[1.3,c]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries\footnotesize, bg=gray!20},
 }
@@ -21,8 +22,8 @@ BR5 Quản lý dựa trên dữ liệu & & & & \checkmark & \checkmark & \checkm
 BR6 Đánh giá lịch sử & & & & \checkmark & \checkmark & \checkmark & \checkmark \\
 BR7 Thông tin dễ tiếp cận & & & \checkmark & \checkmark & & \checkmark & \checkmark \\
 BR8 Ứng phó sớm với rủi ro & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \subsection{Cách đọc ma trận}
 \label{sec:3-mapping-read}
@@ -40,12 +41,13 @@ Ma trận cho thấy ba nhóm yêu cầu, tương ứng với ba đường dữ 
 
 Bảng~\ref{tab:3-mapping-br4-br8} chi tiết hóa hai yêu cầu xuyên suốt BR4 và BR8 thành các yêu cầu chức năng (FR) và nơi chúng được hiện thực.
 
-\begin{table}[H]
-\centering
-\caption{Ánh xạ yêu cầu chức năng của BR4 và BR8 sang bước xử lý}
-\label{tab:3-mapping-br4-br8}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Ánh xạ yêu cầu chức năng của BR4 và BR8 sang bước xử lý},
+  label = {tab:3-mapping-br4-br8},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[0.8,l]X[2.6,l]X[1.6,l]X[2.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -63,5 +65,5 @@ FR8.3 & Lưu cảnh báo với loại, mức độ, thửa ruộng, trạng thá
 FR8.4 & Vòng đời open, acknowledged, resolved & Spark, FastAPI & Máy trạng thái thuần trong \code{alerts.py}; \code{PATCH /alerts/\{id\}} \\
 FR8.5 & Chống bão cảnh báo (debounce, cooldown) & Spark, Cassandra & Bảng \code{alert\_state\_by\_field} \\
 FR8.6 & Danh sách cảnh báo đang mở và lịch sử & FastAPI, web & \code{GET /alerts?status=} \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}

@@ -6,12 +6,13 @@ Mọi kết quả trong chương này được đo trên cùng một môi trư�
 \subsection{Phần cứng và phần mềm}
 \label{sec:5-hardware}
 
-\begin{table}[H]
-\centering
-\caption{Môi trường thực nghiệm}
-\label{tab:5-environment}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Môi trường thực nghiệm},
+  label = {tab:5-environment},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.4,l]X[3,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -24,8 +25,8 @@ Hệ điều hành & macOS 27.2.1 \\
 Docker Engine, Compose & Docker Engine 29.8.2, Compose 5.5.0 \\
 Thành phần hệ thống & Theo Bảng~\ref{tab:4-versions} \\
 Spark & \code{local[*]}, driver 2~GB, 4 nhân, 4 phân vùng shuffle \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \subsection{Dữ liệu thực nghiệm}
 \label{sec:5-data}
@@ -34,12 +35,13 @@ Dữ liệu được sinh bởi bộ mô phỏng cảm biến (Mục~\ref{sec:4-
 
 Bộ mô phỏng tiêm lỗi có chủ đích và đánh dấu mỗi sự kiện lỗi bằng trường \code{simulated\_fault}. Trường này đi theo bản ghi vào bronze (và nằm trong \code{raw\_payload} của bản ghi bị cách ly), nên có thể so số lỗi tiêm vào với số lỗi hệ thống phát hiện được mà không cần nhãn bên ngoài.
 
-\begin{table}[H]
-\centering
-\caption{Cấu hình bộ mô phỏng (\texttt{.env.example})}
-\label{tab:5-simulator}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Cấu hình bộ mô phỏng (\texttt{.env.example})},
+  label = {tab:5-simulator},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.8,l]X[1.2,l]X[2.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -57,12 +59,13 @@ Tham số & Mặc định & Ý nghĩa \\
 \subsection{Tham số của đường xử lý}
 \label{sec:5-params}
 
-\begin{table}[H]
-\centering
-\caption{Tham số mặc định của tác vụ streaming và cảnh báo}
-\label{tab:5-params}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Tham số mặc định của tác vụ streaming và cảnh báo},
+  label = {tab:5-params},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[2,l]X[1,l]X[2.6,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -76,8 +79,8 @@ Tham số & Giá trị & Ý nghĩa \\
 \code{DEVICE\_OFFLINE\_MULTIPLIER} & 4 & Im lặng quá 4 lần chu kỳ báo cáo (20 s) thì coi là mất kết nối \\
 \code{BATTERY\_LOW\_PCT} & 20 & Ngưỡng pin yếu (\%) \\
 \code{SIGNAL\_POOR\_MAX} & 0,3 & Ngưỡng sóng yếu \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \subsection{Quy trình chạy lại}
 \label{sec:5-procedure}

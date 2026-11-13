@@ -13,12 +13,13 @@
 
 \paragraph{Điểm yếu đối với bài toán này.} Bảng~\ref{tab:4-alt-parquet} đối chiếu từng nhu cầu với hai phương án.
 
-\begin{table}[H]
-\centering
-\caption{Hive/Parquet và Iceberg: so sánh theo thiết kế}
-\label{tab:4-alt-parquet}
-\small
-\begin{tblr}{
+{\small
+\begin{longtblr}[
+  caption = {Hive/Parquet và Iceberg: so sánh theo thiết kế},
+  label = {tab:4-alt-parquet},
+]{
+  width = \linewidth,
+  rowhead = 1,
   colspec = {X[1.6,l]X[2.4,l]X[2.4,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
@@ -30,8 +31,8 @@ Sửa schema & Đổi tên cột có thể làm hỏng tệp cũ & Cột đượ
 Xem lại quá khứ & Không có & Du hành thời gian theo snapshot \\
 Tệp nhỏ & Có; phải tự gộp bằng cách viết lại các phân vùng & Có; \code{rewrite\_data\_files} tạo snapshot mới nên không chặn người đọc \\
 Độ phức tạp vận hành & Thấp & Cao hơn (siêu dữ liệu, dọn snapshot) \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \paragraph{Cách so sánh.} Benchmark \#3 (Mục~\ref{sec:5-bench-storage}) ghi cùng 1,2 triệu dòng, qua 240 commit, vào hai kiểu bảng (catalog \code{hive} trong \code{trino/catalog/hive.properties}) rồi đo thời gian truy vấn, số tệp và hành vi khi ghi, đồng thời thử thật phát lại một lô, du hành thời gian và đổi tên cột.
 
