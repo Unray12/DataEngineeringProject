@@ -38,7 +38,7 @@ Bảng chuỗi sử dụng TTL 48 giờ, dài hơn cửa sổ 24 giờ mà giao 
 \paragraph{API.}
 Endpoint \code{/fields/\{field\_id\}/latest} trả về giá trị mới nhất của từng chỉ số trong thửa ruộng, kèm đơn vị, thời điểm đo, thời điểm nhận, chất lượng và trạng thái so với khoảng mục tiêu của cây trồng. Endpoint \code{/fields/\{field\_id\}/series} trả về chuỗi của một chỉ số trong tối đa 48 giờ và tính các khoảng bị mất dữ liệu.
 
-Để tránh một partition Cassandra tăng quá lớn, chuỗi số đo được chia theo bucket giờ. API xác định các bucket tương ứng với khoảng thời gian yêu cầu, đọc chúng rồi sắp xếp lại theo \code{measured\_at}.
+Chuỗi số đo được sắp xếp theo \code{bucket} giờ và \code{measured\_at} trong partition của từng cặp \code{(field\_id, metric)}. TTL 48 giờ giới hạn lượng dữ liệu được giữ trong partition, còn \code{bucket} là cột clustering giúp API giới hạn khoảng thời gian cần đọc. API xác định các bucket tương ứng với khoảng thời gian yêu cầu, đọc chúng rồi sắp xếp lại theo \code{measured\_at}.
 
 \paragraph{Hiển thị.}
 Trang \emph{Live monitor} dùng hai endpoint trên để hiển thị năm chỉ số của thửa ruộng. Mỗi panel có giá trị hiện tại, đơn vị, trạng thái so với khoảng mục tiêu, thời điểm \emph{Data as of} và biểu đồ 24 giờ. Dữ liệu gần thời gian thực cũ hơn 90 giây được cảnh báo là stale thay vì tiếp tục được trình bày như dữ liệu mới.

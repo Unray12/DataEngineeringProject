@@ -47,7 +47,7 @@ Kiến trúc của hệ thống xuất phát từ hai loại nhu cầu về dữ
 Một số đo đi qua hệ thống theo bốn bước.
 
 \begin{enumerate}
-  \item Cảm biến gửi số đo qua cổng về service tiếp nhận bằng giao thức HTTP. Service này loại bỏ các bản ghi (record) sai hình thức và đưa phần còn lại vào Kafka.
+  \item Cảm biến gửi số đo qua cổng về service tiếp nhận bằng giao thức HTTP. Service tiếp nhận kiểm tra envelope HTTP tối thiểu và đưa các sự kiện dạng object vào Kafka; việc kiểm tra schema nghiệp vụ và cách ly bản ghi lỗi được thực hiện trong Spark.
   \item Sau mỗi 30 giây, Spark đọc các sự kiện (event) mới trên Kafka thành một micro-batch, kiểm định và gắn cờ chất lượng cho từng bản ghi, rồi ghi kết quả ra hai nơi: Cassandra cho đường gần thời gian thực và bảng bronze của Iceberg cho đường phân tích.
   \item dbt định kỳ biến đổi bảng bronze thành các bảng silver và gold. Trino đọc các bảng gold để trả lời truy vấn phân tích.
   \item FastAPI đọc từ Cassandra hoặc Trino (tùy loại câu hỏi) và trả kết quả cho ứng dụng web.
@@ -67,7 +67,7 @@ Bảng~\ref{tab:4-components} nêu vai trò của từng thành phần. Lý do c
 }
 Thành phần & Vai trò trong kiến trúc \\
 Cảm biến và cổng & Đo các chỉ số tại thửa ruộng và gửi số đo về hệ thống \\
-Service tiếp nhận & Nhận bản ghi qua HTTP, từ chối bản ghi sai hình thức và chuyển các bản ghi còn lại vào Kafka \\
+Service tiếp nhận & Kiểm tra envelope HTTP tối thiểu và chuyển sự kiện dạng object vào Kafka; Spark kiểm tra schema nghiệp vụ và cách ly bản ghi lỗi \\
 Apache Kafka & Bộ đệm bền vững giữa thu thập và xử lý, cho phép phát lại dữ liệu sau sự cố \\
 Spark Structured Streaming & Xử lý theo micro-batch 30 giây: kiểm định, gắn cờ chất lượng, đánh giá cảnh báo và ghi ra hai đường phục vụ \\
 Apache Cassandra & Kho phục vụ gần thời gian thực: giá trị mới nhất, chuỗi số đo 24 giờ, trạng thái thiết bị và cảnh báo \\

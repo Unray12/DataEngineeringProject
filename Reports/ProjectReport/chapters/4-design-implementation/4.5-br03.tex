@@ -27,7 +27,7 @@ update_device_status(...)
 \end{lstlisting}
 
 \paragraph{Dữ liệu đến muộn (FR3.4).}
-Pipeline sử dụng event time từ \code{reading\_ts} thay vì giả định thứ tự Kafka chính là thứ tự xảy ra ngoài đồng. Watermark mặc định là một giờ. Một số đo có thể đến sau các số đo mới hơn nhưng vẫn được giữ; nếu chậm hơn 600 giây, nó được gắn cờ \code{is\_late}. Cơ chế này cho phép phân biệt dữ liệu đến muộn với dữ liệu thực sự bị mất.
+Pipeline sử dụng event time từ \code{reading\_ts}, được ánh xạ thành \code{measured\_at}, thay vì giả định thứ tự Kafka chính là thứ tự xảy ra ngoài đồng. Watermark mặc định một giờ thể hiện chính sách event-time và giới hạn state cho các phép xử lý stateful nếu có. Hiện tại chưa có phép xử lý stateful sử dụng watermark để loại bản ghi đến muộn; bản ghi hợp lệ về cấu trúc vẫn được xử lý và lưu ngay cả khi đến muộn hơn một giờ. Nếu chậm hơn 600 giây, số đo được gắn cờ \code{is\_late} và vẫn được lưu vào bronze. Cơ chế này cho phép phân biệt dữ liệu đến muộn với dữ liệu thực sự bị mất.
 
 \paragraph{Phát hiện khoảng trống (FR3.5).}
 Trạng thái mới nhất của mỗi thiết bị được lưu trong \code{device\_status}. Nếu thời gian kể từ \code{last\_seen} vượt quá một bội số cấu hình của chu kỳ báo cáo, thiết bị chuyển sang trạng thái offline và một khoảng trống được mở. Với fixture hiện tại, thiết bị báo cáo mỗi 5 giây và hệ số mặc định là 4, tương đương ngưỡng im lặng 20 giây.

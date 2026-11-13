@@ -47,7 +47,7 @@ Checkpoint được đặt trên HDFS thay vì filesystem tạm của container.
 
 \subsection{Xử lý dữ liệu đến muộn và khoảng im lặng}
 
-Tác vụ phân biệt event time với processing time. Watermark một giờ cho phép xử lý các sự kiện đến muộn và dữ liệu trễ hơn 600 giây được đánh dấu riêng. Việc đánh dấu không đồng nghĩa với loại bỏ: bản ghi vẫn được lưu vào bronze để lịch sử đầy đủ.
+Tác vụ phân biệt event time với processing time và cấu hình watermark một giờ trên \code{measured\_at}. Watermark thể hiện chính sách event-time và có thể giới hạn state cho các phép xử lý stateful nếu được bổ sung. Trong hiện thực hiện tại, chưa có phép xử lý stateful sử dụng watermark để loại bản ghi đến muộn, nên bản ghi không bị loại chỉ vì vượt một giờ. Ngưỡng \code{LATE\_AFTER\_S=600} đánh dấu các số đo trễ hơn 600 giây bằng \code{is\_late}; các bản ghi này vẫn được lưu vào bronze để giữ lịch sử đầy đủ.
 
 Một vấn đề khác là khi toàn bộ topic không có sự kiện mới, Spark có thể không tạo micro-batch, trong khi hệ thống vẫn cần kiểm tra xem thiết bị có bị mất kết nối hay không. Vì vậy luồng Kafka được ghép với một nguồn \code{rate} đóng vai trò heartbeat. Tick của heartbeat bị lọc trước bước xử lý nghiệp vụ nhưng làm source offset tiếp tục tiến lên, nhờ đó các lượt kiểm tra mất kết nối vẫn được thực hiện khi cảm biến im lặng hoàn toàn.
 
