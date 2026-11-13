@@ -50,3 +50,6 @@ data/
 tmp/
 Video/
 Reports/Submission/
+
+# Report build output
+Reports/ProjectReport/main.pdf
