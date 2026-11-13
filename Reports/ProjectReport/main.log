@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.10.4)  10 NOV 2026 16:17
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.10.4)  13 NOV 2026 18:34
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1446,19 +1446,19 @@ Overfull \hbox (1.40216pt too wide) detected at line 1
 \tf@toc=\write6
 \openout6 = `main.toc'.
 
- [5] (main.lof)
+ [5] (main.lof
+LaTeX Font Info:    Trying to load font information for T5+cmtt on input line 8
+.
+ (D:\App\Miktex\App\tex/latex/vntex\t5cmtt.fd
+File: t5cmtt.fd 1999/05/25 v2.5h Standard LaTeX font definitions
+))
 \tf@lof=\write7
 \openout7 = `main.lof'.
 
  [6
 
-] (main.lot
-LaTeX Font Info:    Trying to load font information for T5+cmtt on input line 1
-2.
-
-(D:\App\Miktex\App\tex/latex/vntex\t5cmtt.fd
-File: t5cmtt.fd 1999/05/25 v2.5h Standard LaTeX font definitions
-))
+]
+(main.lot)
 \tf@lot=\write8
 \openout8 = `main.lot'.
 
@@ -1467,8 +1467,7 @@ File: t5cmtt.fd 1999/05/25 v2.5h Standard LaTeX font definitions
 ]
 \openout2 = `glossary/glossary.aux'.
 
- (glossary/glossary.tex)
-[8
+ (glossary/glossary.tex) [8
 
 
 ]
@@ -1557,15 +1556,39 @@ Ch\uhorn \ohorn ng 4.
 
 
 
-] [18] [19])
-(chapters/4-design-implementation/4.5-br08.tex [20] [21] [22]
+] [18] [19]
+<img/app/quality-chart.png, id=808, 2890.8pt x 1806.75pt>
+File: img/app/quality-chart.png Graphic file (type png)
+<use img/app/quality-chart.png>
+Package pdftex.def Info: img/app/quality-chart.png  used on input line 110.
+(pdftex.def)             Requested size: 218.51521pt x 136.548pt.
+<img/app/quality-lineage.png, id=809, 2890.8pt x 1806.75pt>
+File: img/app/quality-lineage.png Graphic file (type png)
+<use img/app/quality-lineage.png>
+Package pdftex.def Info: img/app/quality-lineage.png  used on input line 115.
+(pdftex.def)             Requested size: 218.51521pt x 136.548pt.
+)
+(chapters/4-design-implementation/4.5-br08.tex [20 <./img/app/quality-chart.png
+ (PNG copy)> <./img/app/quality-lineage.png (PNG copy)>] [21] [22]
 (D:\App\Miktex\App\tex/latex/listings\lstlang1.sty
 File: lstlang1.sty 2025/11/14 1.11b listings language file
 )
 (D:\App\Miktex\App\tex/latex/listings\lstlang1.sty
 File: lstlang1.sty 2025/11/14 1.11b listings language file
-) [23])
-(chapters/4-design-implementation/4.7-deployment.tex [24]
+)
+<img/app/alerts-list.png, id=852, 2890.8pt x 1806.75pt>
+File: img/app/alerts-list.png Graphic file (type png)
+<use img/app/alerts-list.png>
+Package pdftex.def Info: img/app/alerts-list.png  used on input line 111.
+(pdftex.def)             Requested size: 218.51521pt x 136.548pt.
+<img/app/alerts-drawer.png, id=853, 2890.8pt x 1806.75pt>
+File: img/app/alerts-drawer.png Graphic file (type png)
+<use img/app/alerts-drawer.png>
+Package pdftex.def Info: img/app/alerts-drawer.png  used on input line 116.
+(pdftex.def)             Requested size: 218.51521pt x 136.548pt.
+ [23])
+(chapters/4-design-implementation/4.7-deployment.tex [24 <./img/app/alerts-list
+.png (PNG copy)> <./img/app/alerts-drawer.png (PNG copy)>]
 LaTeX Font Info:    Font shape `T5/cmtt/bx/n' in size <10.95> not available
 (Font)              Font shape `T5/cmtt/m/n' tried instead on input line 44.
 LaTeX Font Info:    Font shape `T5/cmtt/bx/n' in size <10> not available
@@ -1620,10 +1643,10 @@ Package logreq Info: Writing requests to 'main.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 39571 strings out of 467871
- 759769 string characters out of 5431360
- 1770699 words of memory out of 5000000
- 67381 multiletter control sequences out of 15000+600000
+ 39608 strings out of 467871
+ 760866 string characters out of 5431360
+ 1771861 words of memory out of 5000000
+ 67418 multiletter control sequences out of 15000+600000
  659574 words of font info for 96 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  93i,12n,109p,881b,2241s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -1642,9 +1665,9 @@ App/Miktex/App/fonts/type1/vntex/vnr/vnr9.pfb><D:/App/Miktex/App/fonts/type1/vn
 tex/vnr/vnti10.pfb><D:/App/Miktex/App/fonts/type1/vntex/vnr/vnti12.pfb><D:/App/
 Miktex/App/fonts/type1/vntex/vnr/vntt10.pfb><D:/App/Miktex/App/fonts/type1/vnte
 x/vnr/vntt12.pfb><D:/App/Miktex/App/fonts/type1/vntex/vnr/vntt9.pfb>
-Output written on main.pdf (46 pages, 631386 bytes).
+Output written on main.pdf (46 pages, 2334092 bytes).
 PDF statistics:
- 1211 PDF objects out of 1440 (max. 8388607)
+ 1217 PDF objects out of 1440 (max. 8388607)
  398 named destinations out of 1000 (max. 500000)
- 730 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 750 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -105,8 +105,17 @@ Cột \code{quarantined} lấy số bản ghi bị cách ly trong ngày; nếu n
 
 \begin{figure}[H]
 \centering
-\hinhtrong{0.9\linewidth}{6cm}{Trang Data quality: biểu đồ theo ngày và bảng lineage của một thiết bị}
-\caption{Trang chất lượng dữ liệu của ứng dụng}
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{img/app/quality-chart.png}
+\caption{Biểu đồ số bản ghi theo ngày}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{img/app/quality-lineage.png}
+\caption{Lineage của một thiết bị}
+\end{subfigure}
+\caption{Trang chất lượng dữ liệu của ứng dụng (ảnh chụp với dữ liệu mô phỏng của chế độ \code{DATA\_MODE=mock}).}
 \label{fig:4-br04-ui}
 \end{figure}
 

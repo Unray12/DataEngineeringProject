@@ -106,8 +106,17 @@ curl -X PATCH http://localhost:8000/alerts/<alert_id> \
 
 \begin{figure}[H]
 \centering
-\hinhtrong{0.9\linewidth}{6cm}{Trang Alerts: danh sách cảnh báo, bộ lọc và timeline của một cảnh báo}
-\caption{Trang cảnh báo của ứng dụng}
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{img/app/alerts-list.png}
+\caption{Hàng đợi cảnh báo và bộ lọc}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{img/app/alerts-drawer.png}
+\caption{Chi tiết, timeline và thao tác}
+\end{subfigure}
+\caption{Trang cảnh báo của ứng dụng (ảnh chụp với dữ liệu mô phỏng của chế độ \code{DATA\_MODE=mock}).}
 \label{fig:4-br08-ui}
 \end{figure}
 
