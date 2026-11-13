@@ -8,8 +8,30 @@
 
 \section{Hiệu năng của giải pháp}
 \label{sec:5-performance}
-% TODO: độ trễ đầu-cuối, thông lượng, tài nguyên
+Mục này trình bày sáu benchmark mà đề tài yêu cầu (\code{AGENTS.md}, \code{REQUIREMENTS.md} mục 7). Bảng~\ref{tab:5-bench-overview} cho biết mỗi benchmark trả lời câu hỏi nào và cho yêu cầu nghiệp vụ nào. Mọi benchmark chạy trên cùng một máy (Bảng~\ref{tab:5-environment}), là một recipe \code{just} và ghi kết quả cùng cấu hình vào \code{benchmarks/results/*.csv}.
+
+\begin{table}[H]
+\centering
+\caption{Sáu benchmark của đề tài}
+\label{tab:5-bench-overview}
+\small
+\begin{tblr}{
+  colspec = {X[0.4,c]X[2.4,l]X[1.6,l]X[1,l]X[1.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+\# & Câu hỏi & Recipe, kết quả & BR & Mục \\
+1 & Chu kỳ trigger 10/30/60 s: độ trễ đầu-cuối, độ trễ cảnh báo, tải, số commit & \code{bench-trigger}, \code{trigger.csv} & BR2, BR3, BR8 & \ref{sec:5-bench-trigger} \\
+2 & Cassandra và Trino cho cùng câu hỏi của bảng điều khiển & \code{bench-lookups}, \code{lookups.csv} & BR2, BR5, BR7 & \ref{sec:5-bench-lookups} \\
+3 & Iceberg và Hive/Parquet & \code{bench-storage}, \code{storage.csv} & BR3, BR6 & \ref{sec:5-bench-storage} \\
+4 & Hiệu quả của compaction & \code{bench-compaction}, \code{compaction.csv} & BR6 & \ref{sec:5-bench-compaction} \\
+5 & Phục hồi và phát lại: không mất, không trùng & \code{bench-replay}, \code{replay.csv} & BR3, BR4 & \ref{sec:5-bench-replay} \\
+6 & Độ phản hồi của API và các trang web & \code{bench-web}, \code{web.csv}, \code{web\_pages.csv} & BR1, BR7 & \ref{sec:5-bench-web} \\
+\end{tblr}
+\end{table}
+
+\input{chapters/5-evaluation/5.3-benchmarks-stream}
 \input{chapters/5-evaluation/5.3-benchmarks}
+\input{chapters/5-evaluation/5.3-benchmarks-web}
 
 \section{Hiệu quả hỗ trợ khai thác dữ liệu qua ứng dụng}
 \label{sec:5-effectiveness}
@@ -19,8 +41,8 @@
 
 \section{So sánh với giải pháp thay thế}
 \label{sec:5-comparison}
-% TODO
 \input{chapters/5-evaluation/5.5-comparison-khang}
+\input{chapters/5-evaluation/5.5-comparison-trigger}
 
 \section{Thảo luận}
 \label{sec:5-discussion}

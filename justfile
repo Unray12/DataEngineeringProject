@@ -12,10 +12,6 @@ set dotenv-load := true
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 compose := "docker compose"
-bench-cpu := `sysctl -n machdep.cpu.brand_string 2>/dev/null || uname -m`
-bench-cores := `sysctl -n hw.ncpu 2>/dev/null || nproc`
-bench-ram := `echo $(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))`
-bench-docker := `docker info 2>/dev/null | awk '/Total Memory/ {print $3}'`
 all-profiles := "--profile core --profile processing --profile serving --profile app"
 
 # Show the recipe list
@@ -262,12 +258,17 @@ dbt-full-refresh:
     @just _hdfs-ready
     {{compose}} --profile core --profile processing run --rm dbt dbt build --full-refresh --select gold --project-dir /app/dbt --profiles-dir /app/dbt
 
-# Complete batch flow: initialize Iceberg tables, build silver/gold, test, then compact bronze.
+# Complete batch flow: initialize Iceberg tables, build silver/gold, test, then compact the tables
+# the stream commits to every micro-batch (bronze and ops; ops.quality_counters gains a file per
+# batch, and before compaction /quality/devices took 5x longer, benchmark #6).
 batch-run:
     @just lakehouse-init
     @just dbt-run
     @just dbt-test
     @just compact bronze.sensor_readings
+    @just compact ops.quality_counters
+    @just compact ops.quarantine
+    @just compact ops.device_gaps
 
 # Start the API and Next.js frontend against the processed lakehouse.
 up-app:
@@ -321,23 +322,29 @@ fmt:
 # -----------------------------------------------------------------------------
 # Benchmarks (AGENTS.md: results must record configuration)
 #
-# Deferred: the streaming path is verified, but the benchmark scripts that drive
-# these are not written yet. Each recipe states the configuration it must record
-# (trigger interval, data volume, hardware) when it is implemented.
+# Every script writes benchmarks/results/<name>.csv whose first lines record the
+# configuration (trigger, data volume, hardware). #2-#4 only query the stores and run
+# inside the api image; #1, #5 and #6 start, stop or kill containers (or time the
+# published ports), so they run on the host with uv.
 # -----------------------------------------------------------------------------
 
-# Micro-batch trigger interval: 10s / 30s / 60s (deferred)
-bench-trigger interval="30s" duration="120":
-    @echo "NOT IMPLEMENTED: trigger-interval sweep {{interval}} over {{duration}}s"
-    @echo "implement benchmarks/run_trigger_benchmark.py (record trigger, volume, hardware)"
+# Benchmark #1: micro-batch trigger interval (latency, alert latency, throughput, CPU/memory).
+# Needs `just up`; restarts spark-stream per interval and leaves it running at 30 s. About 35 min.
+bench-trigger triggers="10s,30s,60s" window="360":
+    uv run python benchmarks/run_trigger_benchmark.py --triggers {{triggers}} --window {{window}}
 
 # Run one benchmark script inside the api image on the Compose network. The scripts write
 # benchmarks/results/*.csv, whose first lines record the configuration (AGENTS.md rule 4).
+# Hardware is detected here, not in justfile variables, so other recipes never call `docker info`.
 _bench script *args:
+    cpu=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || uname -m); \
+    cores=$(sysctl -n hw.ncpu 2>/dev/null || nproc); \
+    ram=$(( $(sysctl -n hw.memsize 2>/dev/null || awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo) / 1073741824 )); \
+    docker_mem=$(docker info 2>/dev/null | awk '/Total Memory/ {print $3}' || true); \
     {{compose}} --profile core --profile serving run --rm --no-deps \
       -v "${PWD}/benchmarks:/app/benchmarks" \
-      -e BENCH_HOST_CPU="{{bench-cpu}}" -e BENCH_HOST_CORES="{{bench-cores}}" \
-      -e BENCH_HOST_RAM_GB="{{bench-ram}}" -e BENCH_DOCKER_MEM_GB="{{bench-docker}}" \
+      -e BENCH_HOST_CPU="$cpu" -e BENCH_HOST_CORES="$cores" \
+      -e BENCH_HOST_RAM_GB="$ram" -e BENCH_DOCKER_MEM_GB="$docker_mem" \
       -e COMPACT_SECONDS \
       api python /app/benchmarks/{{script}} {{args}}
 
@@ -357,7 +364,18 @@ bench-compaction:
     start=$(date +%s); just compact bench.sensor_compaction; end=$(date +%s); \
       COMPACT_SECONDS=$((end - start)) just _bench run_compaction_benchmark.py --phase after
 
-# Recovery and replay: no loss, no duplicates (deferred)
-bench-replay:
-    @echo "NOT IMPLEMENTED: kill/replay the streaming job, assert no loss/duplicates"
-    @echo "implement benchmarks/run_replay_benchmark.py (record offsets, batch counts)"
+# Benchmark #5: recovery and replay. SIGKILL the job mid-batch (and a normal stop) while the
+# simulator keeps sending, restart on the same checkpoint, and check every Kafka message is in
+# bronze or quarantine exactly once and every dashboard reading reached Cassandra. About 35 min.
+bench-replay scenarios="sigkill,stop" outage="180":
+    uv run python benchmarks/run_replay_benchmark.py --scenarios {{scenarios}} --outage {{outage}}
+
+# Data-correctness checks of the evaluation (section 5.2): injected faults vs detected (Kafka as ground
+# truth), gold field_daily recomputed from silver, implausible values in gold. Run after `just batch-run`.
+check-correctness *args:
+    uv run python benchmarks/run_correctness_checks.py {{args}}
+
+# Benchmark #6: API endpoint and page response times (needs `just up-app`): every FastAPI endpoint,
+# and every page as HTML plus its /api/* calls in parallel.
+bench-web *args:
+    uv run python benchmarks/run_web_benchmark.py {{args}}

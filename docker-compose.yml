@@ -456,6 +456,9 @@ services:
     build:
       context: .
       dockerfile: images/web/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-AgriMonitor}
+        NEXT_PUBLIC_TIMEZONE: ${NEXT_PUBLIC_TIMEZONE:-Asia/Ho_Chi_Minh}
     image: agri/web:latest
     environment:
       DATA_MODE: ${DATA_MODE:-api}

@@ -38,6 +38,12 @@ extend-exclude = ["dbt/target", "benchmarks/results"]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+# Pinned so every ruff version sorts imports the same way: `common` and `host` are ours (src/common,
+# benchmarks/common.py, benchmarks/host.py); `cassandra` is the driver, not the repo's cassandra/ CQL folder.
+known-first-party = ["common", "host"]
+known-third-party = ["cassandra"]
+
 [tool.ruff.lint.per-file-ignores]
 # SQL statements are kept on one line so they can be copied into a Trino shell.
 "benchmarks/*" = ["E501"]

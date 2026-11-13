@@ -1,0 +1,63 @@
+% Benchmark #6 của Mục 5.3 (người phụ trách: Đạt). Khang chạy trên cùng máy với các benchmark khác.
+\subsection{Benchmark \#6: độ phản hồi của API và ứng dụng web}
+\label{sec:5-bench-web}
+
+\paragraph{Câu hỏi.} Người dùng chờ bao lâu khi mở một trang hay gọi một endpoint, và độ trễ đó phụ thuộc kho nào phía sau (Cassandra hay Trino)? Cần bao nhiêu thao tác để đi từ trang tổng quan tới tóm tắt của một thửa ruộng? Đây là bằng chứng cho BR1 và BR7.
+
+\paragraph{Thiết kế.} Script \code{benchmarks/run\_web\_benchmark.py} (\code{just bench-web}) gọi từ máy chủ mọi endpoint FastAPI mà ứng dụng web dùng, mỗi endpoint 3 lần khởi động nóng rồi 30 lần đo tuần tự, ghi p50, p95, giá trị lớn nhất và kích thước phản hồi. Các truy vấn phân tích dùng khoảng 7 ngày gần nhất có dữ liệu gold (4--10/11). Với mỗi trang của ứng dụng, script tải tài liệu HTML rồi gọi \emph{song song} mọi yêu cầu \code{/api/*} mà trang đó phát ra khi mở (danh sách được đọc từ resource timing của trình duyệt trên từng trang, ví dụ trang thửa ruộng gọi 11 yêu cầu); thời điểm ``dữ liệu sẵn sàng'' là lúc yêu cầu chậm nhất hoàn tất. Thời gian trình duyệt vẽ trang không được tính. Trong lúc đo, tác vụ streaming (trigger 30 giây) và bộ mô phỏng vẫn chạy như khi sử dụng thật.
+
+\begin{table}[H]
+\centering
+\caption{Độ trễ của các endpoint FastAPI, 30 lần đo tuần tự (\texttt{benchmarks/results/web.csv})}
+\label{tab:5-bench-web-api}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[1.2,l]X[1,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Endpoint & Kho & p50 (ms) & p95 (ms) \\
+\code{/farms}, \code{/farms/\{id\}/fields} & danh mục & 0,5 & 0,6 \\
+\code{/fields/\{id\}/latest} & Cassandra & 3,7 & 7,1 \\
+\code{/fields/\{id\}/series} (24 giờ, 1\,482 điểm) & Cassandra & 10,1 & 13,0 \\
+\code{/fields/\{id\}/alerts}, \code{/alerts} & Cassandra & 3,0--3,1 & 4,9--5,8 \\
+\code{/devices/\{id\}/status} & Cassandra & 8,2 & 12,3 \\
+\code{/devices} (24 thiết bị; 32 truy vấn tuần tự) & Cassandra & 106,6 & 121,9 \\
+\code{/fields/\{id\}/history}, \code{/indicators} (7 ngày) & Trino (gold) & 56,0--78,9 & 70,2--123,6 \\
+\code{/summary}, \code{/compare} (7 ngày) & Trino (gold) & 55,5--57,7 & 68,0--72,5 \\
+\code{/quality/summary} & Trino (gold) & 25,4 & 41,1 \\
+\code{/quality/devices} & Trino (silver, \code{ops}) & 195,6 & 285,1 \\
+\end{tblr}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Thời gian tới khi dữ liệu của trang sẵn sàng, p50 / p95 (ms) (\texttt{benchmarks/results/web\_pages.csv}); cột cuối là lần đo với máy chủ phát triển \code{next dev} trước khi sửa (\texttt{web\_pages\_dev\_mode.csv})}
+\label{tab:5-bench-web-pages}
+\small
+\begin{tblr}{
+  colspec = {X[1.6,l]X[0.8,c]X[1.4,c]X[1.4,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Trang & Yêu cầu & \code{next start} (sau sửa) & \code{next dev} (p50) \\
+Overview (\code{/}) & 1 & 15 / 19 & 458 \\
+Live & 6 & 27 / 40 & 1\,584 \\
+Devices & 6 & 106 / 127 & 1\,588 \\
+Alerts & 2 & 13 / 18 & 683 \\
+Data quality & 2 & 6 / 7 & 668 \\
+Insights & 4 & 19 / 23 & 1\,123 \\
+Analytics & 2 & 7 / 10 & 672 \\
+Thửa ruộng F001 & 11 & 20 / 26 & 2\,674 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Kết quả.} Các endpoint đọc Cassandra trả lời trong 3--10 ms ở p50 (tối đa 13 ms ở p95), đúng mục tiêu ``cỡ mười mili-giây''; các endpoint phân tích trên Trino trả lời trong khoảng 25--80 ms, phù hợp với kết quả của benchmark \#2. Mọi trang có dữ liệu trong vòng khoảng 130 ms ở p95. Từ trang tổng quan, người quản lý tới tóm tắt của một thửa ruộng bằng \textbf{1 lần nhấp} (mỗi dòng thửa ruộng là một liên kết tới \code{/fields/\{id\}}), đạt tiêu chí ``trong vài lần nhấp'' của BR7; điều này được kiểm tra trực tiếp trên giao diện.
+
+\paragraph{Hai vấn đề được phát hiện và sửa.} Lần chạy đầu cho kết quả kém hơn nhiều, và cả hai nguyên nhân đều nằm ở cách triển khai chứ không ở thiết kế:
+
+\begin{enumerate}
+  \item \textbf{Ứng dụng web chạy ở chế độ phát triển.} Image \code{images/web/Dockerfile} khởi động \code{next dev}, vốn biên dịch lại theo yêu cầu và tắt bộ đệm; mỗi tài liệu HTML và mỗi yêu cầu \code{/api/*} tốn khoảng 200 ms dù FastAPI phía sau chỉ mất dưới 1 ms (ví dụ \code{/api/farms}: 185 ms so với 0,5 ms). Trang thửa ruộng, với 11 yêu cầu, mất 2,7 giây. Image được sửa để chạy \code{next build} khi dựng và \code{next start} khi chạy (các biến \code{NEXT\_PUBLIC\_*} chuyển thành build arg); thời gian sẵn sàng của mọi trang giảm từ 15 lần (Devices) tới khoảng 130 lần (thửa ruộng) (Bảng~\ref{tab:5-bench-web-pages}).
+  \item \textbf{Tệp nhỏ trong các bảng \code{ops}.} \code{/quality/devices} mất 846 ms ở p50 vì \code{ops.quality\_counters}, nhận một commit mỗi lô, có 1\,300 tệp cho 12\,688 dòng. Sau khi gộp tệp bằng cùng macro của benchmark \#4, endpoint còn 150--200 ms; \code{just batch-run} được sửa để gộp cả ba bảng \code{ops} cùng với bronze (\texttt{web\_before\_ops\_compaction.csv} giữ số đo trước khi sửa).
+\end{enumerate}
+
+\paragraph{Mối đe dọa với kết quả.} Các route phân tích của ứng dụng web được đệm có chủ đích 120--300 giây (\code{s-maxage}), vì gold chỉ được làm mới theo giờ hoặc theo ngày; số đo của các trang Insights, Analytics, Data quality và thửa ruộng vì vậy là số đo khi bộ đệm đã ấm. Lần tải đầu sau khi bộ đệm hết hạn tốn thêm đúng thời gian của endpoint Trino chậm nhất mà trang gọi (khoảng 60--200 ms theo Bảng~\ref{tab:5-bench-web-api}). Các route gần thời gian thực (\code{/api/overview}, \code{/api/alerts}, \code{/api/devices}) không được đệm, nên số đo của các trang Overview, Live, Alerts và Devices là chi phí thật của mỗi lần tải. Thời gian trình duyệt vẽ trang không được đo; số đo trên một máy khách, không có tải đồng thời (benchmark \#2 đo tải đồng thời của hai kho).
+

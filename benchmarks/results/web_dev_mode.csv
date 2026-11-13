@@ -1,0 +1,33 @@
+# date_utc: 2026-11-12 20:30:11
+# host_cpu: Apple M5
+# host_cores: 10
+# host_ram_gb: 24
+# docker_memory_gb: 11.73GiB
+# trino: 438 (single node, query.max-memory-per-node=1GB)
+# iceberg: 1.7.1, Parquet/Snappy
+# spark: 3.5.3 local[*]
+# benchmark: #6 API and web responsiveness
+# client: httpx from the host, one client, sequential requests, keep-alive
+# runs: 30
+# warmup: 3
+# date_range: 2026-11-04..2026-11-10 (7 days of gold data)
+# stream: running (30 s trigger) with the simulator, as in normal use
+# web_server: next dev (development server, the image before the fix)
+path,store,used_by,runs,bytes,p50_ms,p95_ms,max_ms
+/health/ready,-,-,30,67,3.1,5.1,5.9
+/farms,reference data,Overview,30,321,0.5,0.6,0.7
+/farms/FM001/fields,reference data + Cassandra,Overview,30,229,0.5,0.7,1.0
+/devices,Cassandra,Devices,30,9445,95.3,124.3,131.9
+/devices/F001-S01/status,Cassandra,Devices,30,383,6.4,10.3,10.9
+/fields/F001/latest,Cassandra,"Live, Field",30,1481,3.6,6.0,6.8
+/fields/F001/series?metric=soil_moisture&hours=24,Cassandra,Live,30,135639,10.7,15.6,79.4
+/fields/F001/alerts,Cassandra,Field,30,29135,3.8,7.1,8.7
+/alerts?status=open,Cassandra,Alerts,30,10295,4.3,9.0,12.1
+/fields/F001/indicators?from=2026-11-04&to=2026-11-10&granularity=daily&metric=soil_moisture,Trino (gold),Analytics,30,5265,57.1,75.4,87.1
+/fields/F001/indicators?from=2026-11-04&to=2026-11-10&granularity=hourly&metric=soil_moisture,Trino (gold),Analytics,30,9654,53.1,71.3,111.2
+/fields/F001/history?from=2026-11-04&to=2026-11-10&granularity=daily&metric=soil_moisture,Trino (gold),Analytics,30,729,48.5,55.4,57.4
+/fields/F001/history?from=2026-11-04&to=2026-11-10&granularity=hourly&metric=soil_moisture,Trino (gold),Analytics,30,1485,47.8,77.8,154.2
+/summary?from=2026-11-04&to=2026-11-10,Trino (gold),Insights,30,456,50.1,67.0,96.2
+"/compare?field_ids=F001,F002,F003,F004&metric=soil_moisture&from=2026-11-04&to=2026-11-10",Trino (gold),Insights,30,338,50.7,65.3,80.3
+/quality/summary?from=2026-11-04&to=2026-11-10,Trino (gold),Data quality,30,269,22.5,32.0,38.9
+/quality/devices,Trino (ops),Data quality,30,12055,148.6,209.0,223.5

@@ -1,0 +1,124 @@
+% Benchmark #1 và #5 của Mục 5.3 (người phụ trách: Nhân). Khang chạy cả hai trên cùng máy với
+% các benchmark #2--#4 để mọi số liệu của chương 5 đến từ một môi trường (Bảng tab:5-bench-config).
+\subsection{Benchmark lớp xử lý luồng}
+\label{sec:5-bench-stream}
+
+Hai benchmark dưới đây đo tác vụ Spark Structured Streaming khi nó \emph{đang chạy} với bộ mô phỏng, khác với ba benchmark lớp lưu trữ đo khi luồng đã dừng. Vì phải tự khởi động lại, dừng và giết container \code{spark-stream}, hai script chạy trên máy chủ bằng \code{uv run} (\code{just bench-trigger}, \code{just bench-replay}) và truy cập Kafka, Cassandra, Trino qua cổng được công bố; mọi thứ khác (máy, phiên bản, cách ghi cấu hình vào đầu tệp CSV) giống Bảng~\ref{tab:5-bench-config}.
+
+\subsubsection{Benchmark \#1: chu kỳ trigger 10, 30 và 60 giây}
+\label{sec:5-bench-trigger}
+
+\paragraph{Câu hỏi.} Chu kỳ trigger ảnh hưởng thế nào tới thời gian một số đo xuất hiện trên bảng điều khiển, thời gian một cảnh báo mất kết nối xuất hiện, tải của tác vụ và số commit vào lakehouse? Chu kỳ 30 giây của giải pháp chính (Mục~\ref{sec:5-params}) có hợp lý không? Đây cũng là phép đo cho phương án thay thế C (Mục~\ref{sec:4-alt-trigger}).
+
+\paragraph{Thiết kế.} Với mỗi chu kỳ, script khởi động lại \code{spark-stream} với \code{TRIGGER\_INTERVAL} tương ứng (cùng checkpoint), chờ 180 giây cho tác vụ ổn định, rồi đo trong một cửa sổ 360 giây. Bộ mô phỏng chạy liên tục với 24 thiết bị báo cáo mỗi 5 giây (khoảng 7 sự kiện/giây) và tỷ lệ lỗi mặc định; riêng tỷ lệ im lặng được tăng lên (\code{SIM\_GAP\_RATE=0.015}, mỗi lần im lặng 180--240 giây, dài hơn mọi thời gian debounce) để có đủ sự cố mất kết nối. Các đại lượng đo:
+
+\begin{itemize}
+  \item \textbf{Độ trễ đầu-cuối} của từng số đo: thời điểm Cassandra ghi dòng (\code{writetime(value)} của \code{readings\_by\_field\_24h}) trừ thời điểm Kafka nhận sự kiện (\code{ingested\_at}). Đây là thời gian từ lúc nền tảng nhận dữ liệu tới lúc API đọc được nó, đúng đại lượng của yêu cầu phi chức năng ``hiển thị trong vòng 90 giây'' (\code{REQUIREMENTS.md}, mục 6).
+  \item \textbf{Độ trễ cảnh báo mất kết nối}: thời điểm Cassandra ghi cảnh báo \code{device\_offline} trừ thời điểm thiết bị vượt ngưỡng im lặng (số đo cuối cùng cộng 20 giây), cho mọi khoảng im lặng bắt đầu trong cửa sổ.
+  \item \textbf{Tải}: thời gian xử lý mỗi lô (từ log của tác vụ), tỷ lệ bận (tổng thời gian xử lý chia độ dài cửa sổ), CPU và bộ nhớ của container Spark (lấy mẫu \code{docker stats} mỗi 5 giây), số commit và số tệp mới của bảng bronze (bảng \code{\$snapshots} của Iceberg), quy ra mỗi giờ.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả theo chu kỳ trigger, cửa sổ đo 360 giây (\texttt{benchmarks/results/trigger.csv})}
+\label{tab:5-bench-trigger}
+\small
+\begin{tblr}{
+  colspec = {X[2.8,l]X[1,c]X[1,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Chỉ số & 10 s & 30 s & 60 s \\
+Sự kiện trong cửa sổ (sự kiện/giây) & 2\,732 (7,6) & 2\,688 (7,5) & 2\,499 (6,9) \\
+Số lô / sự kiện mỗi lô (p50) & 35 / 76 & 12 / 222 & 6 / 417 \\
+Thời gian xử lý một lô, p50 / p95 (s) & 6,3 / 8,4 & 7,5 / 10,7 & 11,8 / 15,5 \\
+Tỷ lệ bận của tác vụ & 63\,\% & 26\,\% & 20\,\% \\
+\textbf{Độ trễ đầu-cuối, p50 / p95 / max (s)} & \textbf{10,9 / 16,1 / 17,8} & \textbf{22,7 / 35,8 / 36,9} & \textbf{36,4 / 63,8 / 67,7} \\
+\textbf{Độ trễ cảnh báo mất kết nối, p50 / max (s)} & \textbf{16,9 / 20,2} & \textbf{48,0 / 49,4} & \textbf{95,1 / 130,5} \\
+Số sự cố mất kết nối / bị bỏ sót & 3 / 0 & 4 / 0 & 6 / 0 \\
+CPU của container Spark, trung bình / p95 (\% một nhân) & 31 / 102 & 13 / 77 & 12 / 89 \\
+Bộ nhớ lớn nhất của container Spark (MiB) & 2\,284 & 2\,574 & 2\,034 \\
+Commit (và tệp mới) của bronze mỗi giờ & 360 & 120 & 60 \\
+\end{tblr}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=9pt, width=0.85\textwidth, height=6cm,
+  symbolic x coords={10 s, 30 s, 60 s}, xtick=data, enlarge x limits=0.25,
+  ylabel={giây}, ymin=0, ymax=140,
+  legend style={at={(0.02,0.98)}, anchor=north west, font=\footnotesize},
+  nodes near coords, nodes near coords style={font=\scriptsize},
+]
+\addplot coordinates {(10 s,10.9) (30 s,22.7) (60 s,36.4)};
+\addplot coordinates {(10 s,17.8) (30 s,36.9) (60 s,67.7)};
+\addplot coordinates {(10 s,16.9) (30 s,48.0) (60 s,95.1)};
+\draw[red, dashed] (rel axis cs:0,0.643) -- (rel axis cs:1,0.643);
+\legend{Độ trễ đầu-cuối p50, Độ trễ đầu-cuối max, Độ trễ cảnh báo p50}
+\end{axis}
+\end{tikzpicture}
+\caption{Độ trễ theo chu kỳ trigger; đường đứt nét là mục tiêu 90 giây của yêu cầu phi chức năng}
+\label{fig:5-bench-trigger}
+\end{figure}
+
+\paragraph{Kết quả.} Ba quan sát chính:
+
+\begin{enumerate}
+  \item \textbf{Độ trễ đầu-cuối bám sát mô hình ``nửa chu kỳ cộng thời gian xử lý''.} Một sự kiện chờ trung bình nửa chu kỳ để vào lô, rồi chờ lô xử lý xong: 5 + 6,3 = 11,3 giây so với p50 đo được 10,9 giây ở 10 giây; 15 + 7,5 = 22,5 so với 22,7 ở 30 giây. Giá trị lớn nhất xấp xỉ một chu kỳ cộng thời gian xử lý (17,8; 36,9; 67,7 giây). Cả ba chu kỳ đều đạt mục tiêu 90 giây; với 30 giây, ngay cả giá trị lớn nhất (36,9 giây) cũng chỉ bằng khoảng 40\,\% mục tiêu.
+  \item \textbf{Độ trễ cảnh báo xấp xỉ 1,5 chu kỳ cộng thời gian xử lý}, vì cảnh báo cần 2 lô liên tiếp thấy thiết bị im lặng: lô đầu tiên sau ngưỡng (trung bình nửa chu kỳ) và lô kế tiếp (thêm một chu kỳ). Đo được 16,9, 48,0 và 95,1 giây ở p50; mọi sự cố đều được cảnh báo, không bỏ sót. Kết quả đáp ứng tiêu chí của BR8 (cảnh báo trong một đến hai chu kỳ trigger cộng thời gian debounce).
+  \item \textbf{Mỗi lô có chi phí cố định khoảng 6 giây.} Lô 76 sự kiện mất 6,3 giây, lô 417 sự kiện mất 11,8 giây: phần lớn thời gian là các lần đọc trạng thái từ Cassandra và tới bốn lệnh \code{MERGE} vào Iceberg (bronze và ba bảng \code{ops}), không phụ thuộc nhiều vào số sự kiện. Vì vậy chu kỳ 10 giây khiến tác vụ bận 63\,\% thời gian (p95 của một lô là 8,4 giây, sát chu kỳ) và dùng CPU gấp 2,4 lần chu kỳ 30 giây; chỉ cần tải tăng thêm một chút là các lô sẽ chạy nối nhau và độ trễ tăng dần. Chu kỳ ngắn cũng tạo nhiều commit hơn: 360 commit và 360 tệp mới mỗi giờ cho riêng bronze, gấp 3 lần ở 30 giây và gấp 6 lần ở 60 giây, tức là nhiều tệp nhỏ hơn cho compaction (Mục~\ref{sec:5-bench-compaction}).
+\end{enumerate}
+
+Chu kỳ 30 giây là điểm cân bằng: độ trễ p95 khoảng 36 giây và cảnh báo khoảng 48 giây vẫn đủ cho quyết định tưới tiêu và phản ứng với sự cố thiết bị (dữ liệu nông nghiệp thay đổi theo phút, không theo giây), trong khi tác vụ chỉ bận khoảng một phần tư thời gian và số commit bằng một phần ba so với 10 giây. Chu kỳ 60 giây tiết kiệm thêm rất ít CPU (12\,\% so với 13\,\%) nhưng làm cảnh báo chậm gấp đôi.
+
+\paragraph{Mối đe dọa với kết quả.} Số sự cố mất kết nối trong mỗi cửa sổ nhỏ (3 đến 6), nên p50 của độ trễ cảnh báo chỉ mang tính chỉ báo. Tải thấp (khoảng 7 sự kiện/giây), nên benchmark không đo được thông lượng tối đa; con số gần nhất là lô bắt kịp 1\,640 sự kiện trong 10,8 giây ở benchmark \#5. \code{writetime} và \code{ingested\_at} đều lấy từ đồng hồ của cùng một máy ảo Docker, nên không có lệch đồng hồ giữa hai đầu. Lần chạy đầu của benchmark có lỗi múi giờ trong truy vấn \code{ops.device\_gaps} (thiếu hậu tố \code{UTC}) nên không ghép được sự cố với cảnh báo; benchmark được sửa và chạy lại toàn bộ, bảng trên là lần chạy sau.
+
+
+\subsubsection{Benchmark \#5: phục hồi và phát lại}
+\label{sec:5-bench-replay}
+
+\paragraph{Câu hỏi.} Khi tác vụ streaming chết giữa chừng hoặc bị dừng trong lúc dữ liệu vẫn đến, sau khi khởi động lại có mất hay trùng sự kiện nào không, và hệ thống bắt kịp nhanh thế nào? Đây là bằng chứng cho BR3 (FR3.3) và cho yêu cầu phi chức năng ``không mất dữ liệu khi khởi động lại một dịch vụ'' và ``phát lại không tạo bản trùng''.
+
+\paragraph{Thiết kế.} Trigger 30 giây và cấu hình mô phỏng mặc định (kể cả lỗi \code{duplicate}). Sau 120 giây ổn định và 60 giây chạy bình thường, script làm gián đoạn tác vụ theo một trong ba kịch bản, giữ tác vụ dừng 180 giây trong khi bộ mô phỏng vẫn gửi (tạo một lượng tồn đọng trong Kafka), khởi động lại trên \emph{cùng checkpoint}, chạy tiếp 90 giây, dừng bộ mô phỏng và chờ hai lô bắt đầu sau sự kiện cuối cùng:
+
+\begin{itemize}
+  \item \code{sigkill}: \code{docker kill --signal KILL} 2 giây sau khi một lô bắt đầu. Lô đã được lập kế hoạch (offset đã ghi vào checkpoint) nhưng chưa ghi gì.
+  \item \code{sigkill-after-bronze}: \code{KILL} ngay khi lệnh \code{MERGE} của lô vào bronze vừa commit, tức là sau khi lakehouse đã có dữ liệu của lô nhưng trước khi ghi Cassandra và xử lý cảnh báo. Đây là trường hợp khó nhất: khởi động lại phải chạy lại một lô đã ghi một nửa.
+  \item \code{stop}: \code{docker compose stop}, dừng có trật tự.
+\end{itemize}
+
+\paragraph{Cách kiểm tra.} Kafka là nguồn sự thật. Script đọc lại \emph{mọi} thông điệp giữa offset lấy trước sự cố và offset sau khi bộ mô phỏng dừng, rồi đòi mỗi thông điệp được tính đúng một lần: hoặc cặp (phân vùng, offset) của nó có trong \code{bronze.sensor\_readings} hay \code{ops.quarantine}, hoặc nó là một bản gửi lại có khóa \code{(device\_id, metric, measured\_at)} đã có trong bronze (bản trùng được gộp, FR4.3). Thông điệp không thuộc trường hợp nào là \emph{mất}. Một khóa xuất hiện hai lần trong bronze, hay một offset hai lần trong quarantine, là \emph{trùng} (Truy vấn~\ref{lst:5-dup-check}). Cuối cùng, mọi số đo của bronze mà bảng điều khiển hiển thị (cờ \code{ok} hoặc \code{implausible\_jump}) phải có trong \code{readings\_by\_field\_24h} của Cassandra.
+
+\begin{table}[H]
+\centering
+\caption{Phục hồi và phát lại: ba kịch bản, mỗi kịch bản dừng 180 giây (\texttt{benchmarks/results/replay.csv})}
+\label{tab:5-bench-replay}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[1,c]X[1.2,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Chỉ số & \code{sigkill} & \code{sigkill-after-bronze} & \code{stop} \\
+Thông điệp Kafka được kiểm tra & 3\,120 & 3\,248 & 2\,856 \\
+Tồn đọng tạo ra khi tác vụ dừng & 1\,440 & 1\,440 & 1\,440 \\
+Lô hoàn tất cuối cùng trước sự cố & 447 & 461 & 476 \\
+Dòng của lô kế tiếp đã có trong bronze trước khi khởi động lại & 0 & 238 & 0 \\
+Lô đầu tiên sau khởi động lại & 448 & 462 & 477 \\
+Số sự kiện / thời gian xử lý của lô đó & 240 / 52,2 s & 240 / 51,2 s & 1\,640 / 10,8 s \\
+Từ lúc khởi động lại tới lúc lô đầu tiên xong & 56,1 s & 53,9 s & 14,0 s \\
+Vào bronze / vào quarantine / bản trùng được gộp & 3\,101 / 16 / 3 & 3\,231 / 14 / 3 & 2\,841 / 13 / 2 \\
+\textbf{Thông điệp bị mất} & \textbf{0} & \textbf{0} & \textbf{0} \\
+\textbf{Khóa trùng trong bronze / offset trùng trong quarantine} & \textbf{0 / 0} & \textbf{0 / 0} & \textbf{0 / 0} \\
+Số đo hiển thị được (bronze) / thiếu trong Cassandra & 3\,092 / 0 & 3\,210 / 0 & 2\,824 / 0 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Kết quả.} Cả ba kịch bản đều không mất và không trùng: mọi thông điệp Kafka được tính đúng một lần (ví dụ với \code{sigkill}: 3\,101 + 16 + 3 = 3\,120), không khóa nào xuất hiện hai lần trong \emph{toàn bộ} bảng bronze, và mọi số đo hiển thị được đều có trong Cassandra. Tác vụ luôn tiếp tục đúng ở lô kế tiếp lô đã hoàn tất.
+
+Kịch bản \code{sigkill-after-bronze} là bằng chứng mạnh nhất: lúc khởi động lại, 238 dòng của lô 462 đã nằm trong bronze, nhưng Cassandra và cảnh báo của lô đó chưa được ghi. Spark chạy lại đúng lô 462 với đúng dải offset đã lập kế hoạch (240 sự kiện, bằng một chu kỳ 30 giây dữ liệu, không phải toàn bộ tồn đọng); lệnh \code{MERGE} theo khóa \code{(device\_id, metric, measured\_at)} ghi đè 238 dòng cũ thay vì chèn thêm, và các lệnh \code{INSERT} vào Cassandra theo khóa chính cũng chỉ ghi đè. Đây chính là cơ chế ``checkpoint cộng ghi idempotent'' của Mục~\ref{sec:2-checkpoint} và~\ref{sec:2-idempotent} cho kết quả \emph{tương đương exactly-once} dù Spark chỉ bảo đảm at-least-once với sink \code{foreachBatch}. Sau \code{stop}, lô đầu tiên nhận cả tồn đọng (1\,640 sự kiện) trong 10,8 giây, nên 3 phút dữ liệu dồn lại được xử lý trong một lô, cách xa giới hạn \code{maxOffsetsPerTrigger} 20\,000.
+
+\paragraph{Điều cần ghi nhận thêm.} Sau khi bị giết, lô chạy lại mất khoảng 51--52 giây cho chỉ 240 sự kiện, so với 10,8 giây cho 1\,640 sự kiện sau khi dừng có trật tự. Đề tài chưa xác minh nguyên nhân; giả thuyết hợp lý nhất là HDFS phải thu hồi lease của các tệp checkpoint mà tiến trình bị giết còn mở (giới hạn mềm của lease là 60 giây). Hệ quả thực tế: sau một sự cố, dữ liệu gần thời gian thực trễ thêm khoảng một phút so với khi dừng có kế hoạch, nhưng không mất gì.
+
+\paragraph{Mối đe dọa với kết quả.} Mỗi kịch bản chạy một lần, với một nút Kafka và một DataNode; thời điểm giết trong kịch bản \code{sigkill} phụ thuộc lịch trigger nên không lặp lại chính xác. Benchmark không kiểm tra trường hợp mất checkpoint (khi đó Spark đọc lại từ offset sớm nhất, và chỉ \code{MERGE} bảo vệ khỏi trùng lặp).
+

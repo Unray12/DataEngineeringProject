@@ -1,0 +1,27 @@
+% Đầu vào cho Mục 5.5 (người phụ trách mục: Đạt): so sánh lớp xử lý luồng (phương án C).
+% Số liệu từ benchmark #1 (Nhân phụ trách), do Khang chạy.
+\subsection{Lớp xử lý luồng: chu kỳ trigger và xử lý từng sự kiện}
+\label{sec:5-comparison-trigger}
+
+Bảng~\ref{tab:5-compare-trigger} đối chiếu giải pháp chính (micro-batch 30 giây) với phương án C của Mục~\ref{sec:4-alt-trigger}. Ba cột đầu là số đo của benchmark \#1 (Bảng~\ref{tab:5-bench-trigger}); cột cuối là phân tích, vì xử lý từng sự kiện kiểu Flink không được xây dựng.
+
+\begin{table}[H]
+\centering
+\caption{Giải pháp chính và phương án C}
+\label{tab:5-compare-trigger}
+\small
+\begin{tblr}{
+  colspec = {X[2.2,l]X[1.2,l]X[1.4,l]X[1.2,l]X[1.8,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí & C: 10 s & Chính: 30 s & C: 60 s & C: từng sự kiện (phân tích) \\
+Độ trễ đầu-cuối p95 & 16 s & 36 s & 64 s & dưới 1 s tới Cassandra \\
+Độ trễ cảnh báo mất kết nối p50 & 17 s & 48 s & 95 s & cỡ thời gian im lặng cho phép (20 s), cần bộ hẹn giờ theo thiết bị \\
+Tỷ lệ bận / CPU trung bình & 63\,\% / 31\,\% & 26\,\% / 13\,\% & 20\,\% / 12\,\% & chạy liên tục \\
+Commit bronze mỗi giờ & 360 & 120 & 60 & vẫn phải gom lô trước khi ghi Iceberg \\
+Đạt mục tiêu 90 s & có & có, dư nhiều & có & có \\
+Công nghệ mới & không & không & không & Flink, nằm ngoài bảng quyết định \\
+\end{tblr}
+\end{table}
+
+Phương án 10 giây cho độ trễ thấp hơn khoảng 2 lần nhưng làm tác vụ bận gần hai phần ba thời gian và tạo gấp 3 lần số tệp nhỏ; với chi phí cố định khoảng 6 giây mỗi lô, đây là cấu hình dễ tụt lại nhất khi tải tăng. Phương án 60 giây gần như không tiết kiệm thêm CPU so với 30 giây nhưng làm cảnh báo chậm gấp đôi. Xử lý từng sự kiện chỉ có lợi khi cần phản ứng trong vài giây, điều mà các quyết định nông nghiệp của đề tài (tưới, xử lý thiết bị hỏng) không đòi hỏi, trong khi phải đưa thêm một engine luồng và chuyển trạng thái cảnh báo vào engine đó. Giải pháp chính (30 giây) vì vậy được giữ nguyên.

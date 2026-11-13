@@ -2,7 +2,7 @@
 \section{Giải pháp thay thế để so sánh}
 \label{sec:4-alternative}
 
-Đề tài so sánh giải pháp chính với hai phương án thay thế ở lớp lưu trữ và phục vụ phân tích. Phương án thay thế về xử lý (khoảng thời gian trigger, xử lý từng sự kiện kiểu Flink) do thành viên phụ trách xử lý luồng trình bày. Mỗi phương án dưới đây có một benchmark ở Chương~\ref{chap:5-evaluation}, nên so sánh dựa trên số đo chứ không chỉ dựa trên lập luận.
+Đề tài so sánh giải pháp chính với ba phương án thay thế: hai ở lớp lưu trữ và phục vụ phân tích (A, B) và một ở lớp xử lý luồng (C). Mỗi phương án dưới đây có một benchmark ở Chương~\ref{chap:5-evaluation}, nên so sánh dựa trên số đo chứ không chỉ dựa trên lập luận.
 
 \subsection{Phương án A: Hive/Parquet thuần thay cho Iceberg}
 \label{sec:4-alt-parquet}
@@ -46,7 +46,16 @@ Tệp nhỏ & Có; phải tự gộp bằng cách viết lại các phân vùng 
 
 \paragraph{Cách so sánh.} Benchmark \#2 (Mục~\ref{sec:5-bench-lookups}) chạy \emph{cùng một câu hỏi} của bảng điều khiển (lịch sử một thửa ruộng, so sánh nhiều thửa ruộng) trên Cassandra và trên Trino, đo độ trễ p50 và p95 theo số truy vấn đồng thời. Kết quả: Cassandra nhanh hơn Trino 15 đến 23 lần cho câu hỏi gần thời gian thực (Bảng~\ref{tab:5-bench-lookups}), nhưng phải thêm bảng cho mỗi câu hỏi phân tích; Mục~\ref{sec:5-comparison-storage} đối chiếu hai phương án.
 
+\subsection{Phương án C: khoảng trigger khác, hoặc xử lý từng sự kiện}
+\label{sec:4-alt-trigger}
+
+\paragraph{Mô tả.} Giải pháp chính chạy micro-batch với trigger 30 giây (Mục~\ref{sec:5-params}). Phương án C có hai dạng. Dạng thứ nhất giữ Spark nhưng đổi \code{TRIGGER\_INTERVAL} thành 10 giây hoặc 60 giây, chỉ là một biến môi trường. Dạng thứ hai là xử lý từng sự kiện ngay khi đến, theo kiểu Apache Flink (Mục~\ref{sec:2-three-models}); dạng này chỉ được phân tích, không xây dựng, vì Flink nằm ngoài bảng quyết định công nghệ của đề tài.
+
+\paragraph{Đánh đổi theo thiết kế.} Trigger ngắn hơn làm dữ liệu và cảnh báo đến bảng điều khiển sớm hơn, nhưng mỗi lô là một lần \code{MERGE} vào bronze và các bảng \code{ops}, tức là một commit Iceberg và thêm tệp nhỏ; chi phí cố định của mỗi lô (đọc trạng thái từ Cassandra, lập kế hoạch truy vấn Spark) cũng lặp lại nhiều hơn. Trigger dài hơn thì ngược lại, và vì cảnh báo cần 2 lô vi phạm liên tiếp (debounce), độ trễ cảnh báo tăng gần gấp đôi chu kỳ. Xử lý từng sự kiện cho độ trễ cỡ mili-giây, nhưng Iceberg không ghi được từng dòng một cách hiệu quả nên vẫn phải gom lô trước khi ghi lakehouse, và trạng thái debounce, cooldown phải chuyển vào bộ nhớ trạng thái của engine luồng.
+
+\paragraph{Cách so sánh.} Benchmark \#1 (Mục~\ref{sec:5-bench-trigger}) chạy cùng tải mô phỏng với trigger 10, 30 và 60 giây, đo độ trễ đầu-cuối, độ trễ cảnh báo mất kết nối, thời gian xử lý mỗi lô, CPU, bộ nhớ và số commit Iceberg; Mục~\ref{sec:5-comparison-trigger} đối chiếu các phương án.
+
 \subsection{Kết luận về lựa chọn}
 \label{sec:4-alt-conclusion}
 
-Hai phương án thay thế đơn giản hơn giải pháp chính, nhưng mỗi phương án bỏ mất một thứ mà tài liệu yêu cầu: Hive/Parquet bỏ mất giao dịch, ghi idempotent và time travel (BR3, BR4, BR6); Cassandra-only bỏ mất khả năng phân tích tùy ý trên toàn bộ lịch sử (BR5, BR6). Giải pháp chính trả giá bằng độ phức tạp, được đánh giá ở Mục~\ref{sec:5-comparison}.
+Hai phương án A và B đơn giản hơn giải pháp chính, nhưng mỗi phương án bỏ mất một thứ mà tài liệu yêu cầu: Hive/Parquet bỏ mất giao dịch, ghi idempotent và time travel (BR3, BR4, BR6); Cassandra-only bỏ mất khả năng phân tích tùy ý trên toàn bộ lịch sử (BR5, BR6). Phương án C cho thấy 30 giây là điểm cân bằng giữa độ trễ và chi phí ghi, không phải một giới hạn của công nghệ. Giải pháp chính trả giá bằng độ phức tạp, được đánh giá ở Mục~\ref{sec:5-comparison}.

@@ -15,7 +15,7 @@ Everything here is a proposal. Hours and dates are meant to be edited by the tea
 | Report chapter 2 | **Largely written** (micro-batch concept, mechanism, Kafka, Spark Structured Streaming, checkpoint, comparison of three processing models, about 200 lines). It covers the streaming half only. |
 | Report references | `refs.bib` has 4 entries. |
 | System | All 8 BRs have a page or an endpoint. Cassandra, Kafka, Spark, Trino, dbt, FastAPI and the web app run in Docker Compose. |
-| Benchmarks | **Not implemented.** The 5 `just bench-*` recipes only print "NOT IMPLEMENTED"; there is no `benchmarks/` folder. |
+| Benchmarks | **Implemented and run** (all six). `just bench-*` recipes call the scripts in `benchmarks/`; results with their configuration are in `benchmarks/results/*.csv`. At first only the 5 recipes existed and printed "NOT IMPLEMENTED". |
 
 ---
 
@@ -117,7 +117,7 @@ Total about 80 pages. Each member writes roughly 19–24 pages.
 
 ## 5. Benchmarks and evidence (do before chapter 5)
 
-The required benchmarks from `AGENTS.md` are not implemented. Without them chapter 5 has no numbers, and "evaluation of technology" (1/10) and the performance criterion are at risk. These are the first engineering tasks.
+Status: all six are implemented and their results are in `benchmarks/results/` (#2-#4 by Khang; #1, #5 and #6 were also run by Khang on the same machine so that every number in chapter 5 comes from one environment). The owners below still present and explain their benchmarks.
 
 ### 5.1 Benchmark tasks
 

@@ -24,7 +24,10 @@ from common.reference import ReferenceData
 
 from .config import FaultConfig, GeneratorConfig
 
-MALFORMED_VARIANTS = ("malformed_json", "missing_field", "invalid_timestamp", "malformed_value")
+# No "broken JSON" variant: the HTTP edge accepts only JSON objects and re-serialises them, so a
+# simulated broken body could never reach Kafka. An earlier variant added a stray key instead, which
+# the explicit schema ignores, so those readings were (correctly) stored as ok under a fault label.
+MALFORMED_VARIANTS = ("missing_field", "invalid_timestamp", "malformed_value")
 
 # Typical starting point and noise amplitude per metric. Kept here (not in the
 # reference data) because it describes how the *simulator* behaves, not the
@@ -198,14 +201,18 @@ class ReadingGenerator:
     ) -> dict[str, Any]:
         spec = self.reference.metrics[metric]
         base = self._walk(device, metric)
-        value: Any = round(base + random.gauss(0, METRIC_NOISE.get(metric, 0.5)), 3)
+        # Clamp after the noise too: a healthy sensor never reports negative rainfall or 101 % humidity,
+        # so only injected faults may leave the physical range.
+        value: Any = round(
+            min(spec.max, max(spec.min, base + random.gauss(0, METRIC_NOISE.get(metric, 0.5)))), 3
+        )
 
         if fault == "null_value":
             value = None
         elif fault == "out_of_range":
             value = round(spec.max + random.uniform(5, 50), 3)
         elif fault == "implausible_jump":
-            value = round(base + spec.max_jump * random.uniform(3, 10), 3)
+            value = round(_jump(base, spec.min, spec.max, spec.max_jump), 3)
 
         payload: dict[str, Any] = {
             "event_id": str(uuid.uuid4()),
@@ -236,9 +243,7 @@ class ReadingGenerator:
 
     @staticmethod
     def _malform(payload: dict[str, Any], variant: str) -> dict[str, Any]:
-        if variant == "malformed_json":
-            payload["_malformed_json"] = "not-json{{{"
-        elif variant == "missing_field":
+        if variant == "missing_field":
             payload.pop("reading_ts", None)
         elif variant == "invalid_timestamp":
             payload["reading_ts"] = "not-a-timestamp"
@@ -271,3 +276,16 @@ def stamp_fixture(records: list[dict[str, Any]], start_ts: float) -> list[dict[s
         record["reading_ts"] = _utc_iso(start_ts + index)
         stamped.append(record)
     return stamped
+
+
+def _jump(base: float, low: float, high: float, max_jump: float) -> float:
+    """A step of 2-3x ``max_jump``, kept inside the physical range.
+
+    An unclamped step leaves the range, and the range check (which runs first) then flags the reading
+    ``out_of_range`` instead of ``implausible_jump``. The step goes towards the bound with more room,
+    which is at least half the range, so even after clamping it stays well above ``max_jump`` (and above
+    the drift between the devices of one field, against which the jump is measured).
+    """
+    step = max_jump * random.uniform(2, 3)
+    target = base + step if high - base >= base - low else base - step
+    return min(high, max(low, target))
