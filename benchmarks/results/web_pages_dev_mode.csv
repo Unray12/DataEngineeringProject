@@ -1,0 +1,25 @@
+# date_utc: 2026-11-12 20:30:11
+# host_cpu: Apple M5
+# host_cores: 10
+# host_ram_gb: 24
+# docker_memory_gb: 11.73GiB
+# trino: 438 (single node, query.max-memory-per-node=1GB)
+# iceberg: 1.7.1, Parquet/Snappy
+# spark: 3.5.3 local[*]
+# benchmark: #6 API and web responsiveness
+# client: httpx from the host, one client, sequential requests, keep-alive
+# runs: 30
+# warmup: 3
+# date_range: 2026-11-04..2026-11-10 (7 days of gold data)
+# stream: running (30 s trigger) with the simulator, as in normal use
+# web_server: next dev (development server, the image before the fix)
+# page_load: HTML document, then the page's /api/* calls in parallel; browser rendering excluded
+page,api_calls,runs,html_ms_p50,html_ms_p95,data_ready_ms_p50,data_ready_ms_p95
+/,1,30,225.3,252.1,457.6,519.9
+/live,6,30,237.3,253.8,1583.8,1678.3
+/devices,6,30,234.4,248.6,1587.9,1644.9
+/alerts,2,30,230.6,262.0,682.9,742.3
+/quality,2,30,224.4,242.1,668.0,713.6
+/insights,4,30,225.3,237.4,1122.9,1193.5
+/analytics,2,30,225.1,239.5,671.8,710.1
+/fields/F001,11,30,227.0,245.0,2674.0,2770.3

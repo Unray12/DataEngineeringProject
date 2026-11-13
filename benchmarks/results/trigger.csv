@@ -1,0 +1,21 @@
+# date_utc: 2026-11-12 19:57:24
+# host_cpu: Apple M5
+# host_cores: 10
+# host_ram_gb: 24
+# docker_memory_gb: 11.73GiB
+# trino: 438 (single node, query.max-memory-per-node=1GB)
+# iceberg: 1.7.1, Parquet/Snappy
+# spark: 3.5.3 local[*]
+# benchmark: #1 micro-batch trigger interval
+# load: simulator, 24 devices every 5 s (about 8 events/s), default fault rate 0.05
+# outages: SIM_GAP_RATE=0.015, silent 180-240 s (longer than any debounce)
+# window_s: 360
+# settle_s: 180
+# max_offsets_per_trigger: 20000
+# alerting: ALERT_DEBOUNCE_BATCHES=2, offline after 20 s
+# latency: Cassandra writetime(value) - Kafka timestamp (ingested_at)
+# alert_latency: writetime(alert) - (last reading + 20 s)
+trigger_s,window_s,events,events_per_s,batches,events_per_batch_p50,batch_s_p50,batch_s_p95,busy_pct,readings_timed,latency_s_p50,latency_s_p95,latency_s_max,outage_alerts,alert_latency_s_p50,alert_latency_s_max,missed_outages,cpu_pct_avg,cpu_pct_p95,mem_mib_max,bronze_commits_per_h,bronze_files_per_h
+10,360,2732,7.59,35,76,6.3,8.4,63.1,2713,10.87,16.06,17.81,3,16.85,20.15,0,30.9,101.69,2284,360,360
+30,360,2688,7.47,12,222.0,7.5,10.69,26.2,2663,22.7,35.75,36.88,4,47.97,49.36,0,12.8,77.08,2574,120,120
+60,360,2499,6.94,6,416.5,11.8,15.45,19.9,2475,36.43,63.8,67.74,6,95.08,130.47,0,11.9,89.21,2034,60,60

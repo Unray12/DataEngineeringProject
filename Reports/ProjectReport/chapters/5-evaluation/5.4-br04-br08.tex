@@ -14,8 +14,8 @@ Bảng~\ref{tab:5-eff-br04} đối chiếu các tiêu chí chấp nhận của B
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
-Các lỗi do bộ mô phỏng tiêm vào (trùng, đột biến, payload hỏng, thiết bị lạ) đều được phát hiện và đếm trong báo cáo chất lượng & Bảng~\ref{tab:5-fault-result}; trang \emph{Data quality} hiển thị cùng số liệu & \dien{Đạt / Chưa đạt} \\
-Mọi con số trên bảng điều khiển truy ngược được về offset nguồn và lô & Cột lineage trên mọi dòng bronze và silver; bảng lineage theo thiết bị trên trang \emph{Data quality} (Hình~\ref{fig:4-br04-ui}) & \dien{Đạt / Chưa đạt} \\
+Các lỗi do bộ mô phỏng tiêm vào (trùng, đột biến, payload hỏng, thiết bị lạ) đều được phát hiện và đếm trong báo cáo chất lượng & Bảng~\ref{tab:5-fault-result}; trang \emph{Data quality} hiển thị cùng số liệu & Đạt: 601/601 lỗi được phát hiện và phân loại đúng (Mục~\ref{sec:5-fault-detection}) \\
+Mọi con số trên bảng điều khiển truy ngược được về offset nguồn và lô & Cột lineage trên mọi dòng bronze và silver; bảng lineage theo thiết bị trên trang \emph{Data quality} (Hình~\ref{fig:4-br04-ui}) & Đạt: 0 dòng thiếu cột lineage trong 108\,837 dòng bronze và 108\,797 dòng silver \\
 Test dbt thất bại chặn làm mới gold (FR4.7) & Log \code{just dbt-run} khi cố ý làm hỏng một test silver: các model gold bị bỏ qua & \dien{Đạt / Chưa đạt} \\
 Bảng điều khiển loại bỏ hoặc đánh dấu dữ liệu lỗi (FR4.6) & Giá trị gần thời gian thực kèm \code{quality\_flag}; điểm đáng ngờ được đánh dấu trên biểu đồ & \dien{Đạt / Chưa đạt} \\
 \end{tblr}
@@ -37,13 +37,13 @@ Bảng điều khiển loại bỏ hoặc đánh dấu dữ liệu lỗi (FR4.6)
 }
 Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
 Một lần vượt ngưỡng mô phỏng tạo đúng một cảnh báo, trong một đến hai chu kỳ trigger cộng thời gian debounce & Số cảnh báo trong \code{alerts\_by\_field} cho điều kiện đó; thời điểm cảnh báo trừ thời điểm của số đo vi phạm đầu tiên & \dien{Số cảnh báo, độ trễ (giây)} \\
-Một lần mất kết nối mô phỏng tạo đúng một cảnh báo và cảnh báo tự đóng khi có dữ liệu lại & Cảnh báo \code{device\_offline} với \code{resolution = condition\_cleared}; bản ghi khoảng trống trong \code{ops.device\_gaps} & \dien{Đạt / Chưa đạt} \\
+Một lần mất kết nối mô phỏng tạo đúng một cảnh báo và cảnh báo tự đóng khi có dữ liệu lại & Cảnh báo \code{device\_offline} với \code{resolution = condition\_cleared}; bản ghi khoảng trống trong \code{ops.device\_gaps} & Đạt: 16 sự cố đã kết thúc trong benchmark \#1 tạo đúng 16 cảnh báo, cả 16 tự đóng với \code{condition\_cleared} \\
 Vận hành viên acknowledge và resolve cảnh báo qua API, lịch sử được giữ & \code{PATCH /alerts/\{id\}}; các cột \code{acknowledged\_by}, \code{resolved\_by}, \code{note} trong \code{alerts\_by\_field} & \dien{Đạt / Chưa đạt} \\
-Chuyển trạng thái không hợp lệ bị từ chối & API trả 409 khi acknowledge một cảnh báo đã đóng & \dien{Đạt / Chưa đạt} \\
-Không có bão cảnh báo khi điều kiện kéo dài & Số cảnh báo cho một điều kiện vi phạm liên tục trong \dien{số} phút & \dien{Số cảnh báo (mong đợi 1)} \\
+Chuyển trạng thái không hợp lệ bị từ chối & API trả 409 khi acknowledge một cảnh báo đã đóng & Đạt: \code{PATCH} \code{acknowledge} lên một cảnh báo \code{resolved} trả 409 \\
+Không có bão cảnh báo khi điều kiện kéo dài & Số cảnh báo cho một điều kiện vi phạm liên tục trong tới 6,5 phút (thiết bị im lặng 391 giây, khoảng 13 lô) & Đạt: 1 cảnh báo cho mỗi sự cố \\
 \end{tblr}
 \end{table}
 
-\paragraph{Cách đo độ trễ cảnh báo.} Với trigger 30 giây và debounce 2 lô, độ trễ lý thuyết từ số đo vi phạm đầu tiên đến khi cảnh báo xuất hiện nằm trong khoảng 30--90 giây cộng thời gian xử lý một lô. Benchmark \#1 đo giá trị này với trigger 10, 30 và 60 giây. \dien{Kết quả đo.}
+\paragraph{Cách đo độ trễ cảnh báo.} Với trigger 30 giây và debounce 2 lô, độ trễ lý thuyết từ số đo vi phạm đầu tiên đến khi cảnh báo xuất hiện nằm trong khoảng 30--90 giây cộng thời gian xử lý một lô. Benchmark \#1 (Mục~\ref{sec:5-bench-trigger}) đo giá trị này cho cảnh báo mất kết nối với trigger 10, 30 và 60 giây: p50 lần lượt 16,9, 48,0 và 95,1 giây, lớn nhất 130,5 giây, và không sự cố nào bị bỏ sót (13 sự cố). Với trigger 30 giây, cảnh báo xuất hiện sau khoảng 48 giây, trong khoảng lý thuyết.
 
 \paragraph{Kịch bản minh họa.} Độ ẩm đất của một thửa lúa được đưa xuống dưới ngưỡng 32\% và một thiết bị được cho im lặng (\dien{cách tạo vi phạm trong demo, ví dụ tệp phát lại \texttt{SIM\_FIXTURE}}). Sau khoảng một phút, trang \emph{Alerts} hiện hai cảnh báo. Vận hành viên acknowledge cảnh báo độ ẩm kèm ghi chú, rồi resolve; cảnh báo mất kết nối tự đóng khi thiết bị gửi dữ liệu trở lại. \dien{Ảnh chụp timeline của cảnh báo.}

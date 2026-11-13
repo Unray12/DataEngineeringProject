@@ -88,6 +88,9 @@ or direct browser access to infrastructure services.
 - Bun 1.1+ for local web development
 - At least 8 GB of memory assigned to Docker; 12 GB is more comfortable for
   HDFS, Kafka, Cassandra, Spark, Trino, and the Hive Metastore together
+  (no container has a memory limit: with about 12 GB, running `just batch-run` while the streaming job
+  runs starts a second Spark driver and the kernel OOM-killed the NameNode during the evaluation; stop
+  the stream for the batch run, or give Docker 16 GB)
 
 Initialize the local environment:
 
@@ -285,17 +288,23 @@ clear `503` response instructing the operator to run the batch flow.
 
 ## Benchmarks
 
-Benchmarks #2, #3 and #4 of the evaluation run as recipes and write `benchmarks/results/*.csv`, whose first
-lines record the configuration (hardware, versions, data volume):
+The six benchmarks of the evaluation run as recipes and write `benchmarks/results/*.csv`, whose first
+lines record the configuration (hardware, versions, data volume, trigger):
 
 ```bash
-just bench-lookups     # Cassandra vs Trino for the same dashboard query (needs data in both stores)
-just bench-storage     # Iceberg vs plain Hive/Parquet (adds trino/catalog/hive.properties)
-just bench-compaction  # file count and query time before and after `just compact`
+just bench-trigger     # #1 trigger 10/30/60 s: end-to-end and alert latency, throughput, CPU/memory (~35 min)
+just bench-lookups     # #2 Cassandra vs Trino for the same dashboard query (needs data in both stores)
+just bench-storage     # #3 Iceberg vs plain Hive/Parquet (adds trino/catalog/hive.properties)
+just bench-compaction  # #4 file count and query time before and after `just compact`
+just bench-replay      # #5 SIGKILL/stop the stream mid-batch, restart: no loss, no duplicates (~35 min)
+just bench-web         # #6 API endpoint and page response times (needs `just up-app`)
 ```
 
-Run them on a quiet machine (stop the streaming job and the simulator first). `bench-trigger` and
-`bench-replay` are still to be implemented.
+#2-#4 run inside the `api` image; stop the streaming job and the simulator first. #1 and #5 run on the
+host with `uv` because they start, stop and kill `spark-stream` and the simulator themselves (they leave
+the stream running at 30 s). #6 times every FastAPI endpoint and every page (the HTML document plus the
+page's `/api/*` calls in parallel) through the published ports. `just check-correctness` runs the data
+checks of section 5.2 (injected faults vs detected, gold vs silver) after `just batch-run`.
 
 ## Verification and operations
 

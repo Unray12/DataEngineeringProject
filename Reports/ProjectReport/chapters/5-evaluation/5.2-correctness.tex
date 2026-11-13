@@ -15,7 +15,7 @@ Mọi lần đo dùng môi trường và quy trình ở Mục~\ref{sec:5-setup}.
 \subsection{Phát hiện lỗi được tiêm vào}
 \label{sec:5-fault-detection}
 
-\paragraph{Phương pháp.} Bộ mô phỏng gắn nhãn \code{simulated\_fault} cho mỗi sự kiện lỗi. Mỗi loại lỗi có một kết quả mong đợi: hoặc bị cách ly với một lý do cụ thể, hoặc được giữ lại với một cờ chất lượng cụ thể (Bảng~\ref{tab:5-fault-expect}). Số lỗi tiêm vào được đếm từ nhãn; số lỗi phát hiện được đếm từ \code{ops.quarantine} và \code{ops.quality\_counters}. Hai số phải bằng nhau.
+\paragraph{Phương pháp.} Bộ mô phỏng gắn nhãn \code{simulated\_fault} cho mỗi sự kiện lỗi. Mỗi loại lỗi có một kết quả mong đợi: hoặc bị cách ly với một lý do cụ thể, hoặc được giữ lại với một cờ chất lượng cụ thể (Bảng~\ref{tab:5-fault-expect}). Script \code{benchmarks/run\_correctness\_checks.py} (\code{just check-correctness}) lấy Kafka làm nguồn sự thật: nó đọc lại mọi thông điệp trong khoảng thời gian kiểm tra, đếm số sự kiện tiêm vào theo nhãn, rồi tìm nơi mỗi nhãn kết thúc trong bronze (với cờ nào) và trong \code{ops.quarantine} (với lý do nào), lọc theo đúng các offset đó. Một sự kiện được tính là \emph{phát hiện} khi nó không đi vào dữ liệu sạch (bị gắn cờ khác \code{ok} hoặc bị cách ly), và \emph{phân loại đúng} khi cờ hoặc lý do khớp Bảng~\ref{tab:5-fault-expect}.
 
 {\small
 \begin{longtblr}[
@@ -30,19 +30,19 @@ Mọi lần đo dùng môi trường và quy trình ở Mục~\ref{sec:5-setup}.
 Lỗi tiêm vào & Cách bộ mô phỏng tạo lỗi & Kết quả mong đợi \\
 \code{null\_value} & Giá trị đo là \code{null} & Cờ \code{null\_value} \\
 \code{out\_of\_range} & Giá trị lớn hơn ngưỡng tối đa từ 5 đến 50 đơn vị & Cờ \code{out\_of\_range} \\
-\code{implausible\_jump} & Giá trị lệch 3--10 lần bước nhảy tối đa & Cờ \code{implausible\_jump} \\
+\code{implausible\_jump} & Giá trị lệch 2--3 lần bước nhảy tối đa, vẫn trong khoảng vật lý & Cờ \code{implausible\_jump} \\
 \code{duplicate} & Gửi lại nguyên một payload đã gửi trước đó & Cờ \code{duplicate}, chỉ một bản vào bronze \\
 \code{unknown\_device} & Mã thiết bị không có trong danh mục & Cách ly, lý do \code{unknown\_device} \\
 \code{unexpected\_metric} & Tên chỉ số sai (\code{\ldots\_typo}) & Cách ly, lý do \code{unexpected\_metric} \\
-\code{malformed} & JSON hỏng, thiếu trường, thời gian sai, giá trị không phải số & Cách ly, lý do \code{invalid\_json}, \code{missing\_field}, \code{invalid\_timestamp} hoặc \code{malformed\_value} \\
-\end{longtblr}
-}
+\code{malformed} & Thiếu trường, thời gian sai, giá trị không phải số & Cách ly, lý do \code{missing\_field}, \code{invalid\_timestamp} hoặc \code{malformed\_value} \\
+\end{tblr}
+\end{table}
 
 Có ba điểm cần lưu ý khi đếm:
 
 \begin{itemize}
   \item \textbf{Đếm bản sao.} Với lỗi \code{duplicate}, bộ mô phỏng giữ payload ở lần đầu thiết bị bị chọn và chỉ gửi lại ở lần thứ hai. Số bản sao thật vì vậy phải đếm bằng số \code{event\_id} lặp lại, không đếm bằng số nhãn.
-  \item \textbf{Bản sao đến ở lô khác.} Cờ \code{duplicate} được gán bằng \code{row\_number()} \emph{trong một lô}. Nếu bản sao đến ở một lô sau, nó mang cờ \code{ok} và lệnh \code{MERGE} gộp nó vào dòng đã có. Bronze vẫn không bị trùng, nhưng bảng đếm sẽ ghi thiếu số bản sao. Vì bản sao của bộ mô phỏng thường cách bản gốc nhiều lô, đây là nguồn lệch được dự đoán của dòng \code{duplicate} trong Bảng~\ref{tab:5-fault-result}.
+  \item \textbf{Bản sao đến ở lô khác.} Cờ \code{duplicate} được gán bằng \code{row\_number()} \emph{trong một lô}. Nếu bản sao đến ở một lô sau, nó mang cờ \code{ok} và lệnh \code{MERGE} gộp nó vào dòng đã có. Bronze vẫn không bị trùng, nhưng bảng đếm sẽ ghi thiếu số bản sao. Đây là nguồn lệch có thể có của dòng \code{duplicate} trong Bảng~\ref{tab:5-fault-result}.
   \item \textbf{Bước nhảy.} Bước nhảy được so với giá trị mới nhất của cả thửa ruộng, nên một giá trị bước nhảy đến ngay sau một giá trị ngoài khoảng có thể không bị coi là bước nhảy.
 \end{itemize}
 
@@ -65,67 +65,85 @@ GROUP BY 1, 2 ORDER BY 1, 2;
 SELECT sum(duplicate) FROM lakehouse.ops.quality_counters;
 \end{lstlisting}
 
-\paragraph{Kết quả.} Bảng~\ref{tab:5-fault-result} là kết quả của một lần chạy \dien{thời lượng} giây với cấu hình mặc định.
+\paragraph{Kết quả.} Bảng~\ref{tab:5-fault-result} là kết quả trên mọi thông điệp gửi từ 17:23 UTC ngày 12/11/2026 tới khi kết thúc các benchmark (51\,755 thông điệp, khoảng 2,5 giờ chạy với tỷ lệ lỗi mặc định, \texttt{benchmarks/results/correctness.csv}). Cột cuối là lần kiểm tra đầu tiên, chạy trên toàn bộ dữ liệu Kafka còn giữ \emph{trước khi} sửa bộ mô phỏng (xem phần nhận xét).
 
-{\small
-\begin{longtblr}[
-  caption = {Số lỗi tiêm vào so với số lỗi phát hiện được},
-  label = {tab:5-fault-result},
-]{
-  width = \linewidth,
-  rowhead = 1,
-  colspec = {X[1.8,l]X[1,c]X[1,c]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+\begin{table}[H]
+\centering
+\caption{Lỗi tiêm vào, lỗi phát hiện và lỗi được phân loại đúng}
+\label{tab:5-fault-result}
+\small
+\begin{tblr}{
+  colspec = {X[1.9,l]X[0.9,c]X[0.9,c]X[1.1,c]X[1.6,c]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
-Loại lỗi & Tiêm vào & Phát hiện & Tỷ lệ \\
-\code{null\_value} & \dien{} & \dien{} & \dien{} \\
-\code{out\_of\_range} & \dien{} & \dien{} & \dien{} \\
-\code{implausible\_jump} & \dien{} & \dien{} & \dien{} \\
-\code{duplicate} & \dien{} & \dien{} & \dien{} \\
-\code{unknown\_device} & \dien{} & \dien{} & \dien{} \\
-\code{unexpected\_metric} & \dien{} & \dien{} & \dien{} \\
-\code{malformed} & \dien{} & \dien{} & \dien{} \\
-Tổng & \dien{} & \dien{} & \dien{} \\
-\end{longtblr}
-}
+Loại lỗi & Tiêm vào & Phát hiện & Phân loại đúng & Trước khi sửa (đúng / tiêm) \\
+\code{null\_value} & 80 & 80 & 80 & 52 / 52 \\
+\code{out\_of\_range} & 105 & 105 & 105 & 57 / 57 \\
+\code{implausible\_jump} & 72 & 72 & 72 & 2 / 92 \\
+\code{unknown\_device} & 103 & 103 & 103 & 67 / 67 \\
+\code{unexpected\_metric} & 72 & 72 & 72 & 83 / 83 \\
+\code{malformed} & 121 & 121 & 121 & 61 / 78 \\
+\code{duplicate} (bản gửi lại) & 48 & 48 & 48 & 18 / 18 \\
+\textbf{Tổng} & \textbf{601} & \textbf{601} & \textbf{601 (100\,\%)} & 340 / 447 \\
+\end{tblr}
+\end{table}
 
-\dien{Nhận xét kết quả: loại nào đạt 100\%, loại nào lệch và vì sao.}
+Sau khi sửa, mọi lỗi được tiêm vào đều bị phát hiện và phân loại đúng. Với lỗi \code{duplicate}, 48 bản gửi lại không tạo thêm dòng nào trong bronze (số dòng trừ số \code{event\_id} khác nhau bằng 0), và \code{ops.quality\_counters} đếm đúng 48 bản trùng: trong lần chạy này các bản gửi lại đều đến đủ sớm để được phát hiện, nên nguồn lệch dự đoán ở trên không xảy ra.
+
+\paragraph{Ba lỗi của bộ mô phỏng do kiểm tra này phát hiện.} Lần kiểm tra đầu cho kết quả khác, và cả ba chỗ lệch đều nằm ở bộ mô phỏng chứ không ở đường xử lý:
+
+\begin{enumerate}
+  \item \textbf{Bước nhảy vượt khoảng vật lý.} Bộ mô phỏng tạo bước nhảy bằng 3--10 lần bước nhảy tối đa, nên giá trị gần như luôn vượt khoảng của chỉ số; vì kiểm tra khoảng chạy trước, 90/92 lỗi bị gắn cờ \code{out\_of\_range} thay vì \code{implausible\_jump}. Dữ liệu vẫn bị loại khỏi dữ liệu sạch, nhưng kiểm tra bước nhảy gần như không được thử. Bộ mô phỏng được sửa để tạo bước nhảy 2--3 lần, giữ trong khoảng vật lý.
+  \item \textbf{Biến thể ``JSON hỏng'' không hỏng.} Biến thể này chỉ thêm một khóa lạ vào payload; cổng HTTP chỉ nhận đối tượng JSON và tuần tự hóa lại, nên thông điệp tới Kafka luôn là JSON hợp lệ và được giữ với cờ \code{ok} (17 sự kiện), đúng theo schema tường minh. Biến thể bị bỏ; JSON hỏng thật sự bị cổng HTTP từ chối với mã 422 và không bao giờ tới Kafka.
+  \item \textbf{Giá trị bình thường ra ngoài khoảng.} Nhiễu đo được cộng \emph{sau} bước giới hạn khoảng, nên 643 số đo không mang nhãn lỗi nằm ngoài khoảng (lượng mưa âm tới $-0{,}32$~mm/h, độ ẩm không khí tới 102\,\%). Đường xử lý đã gắn cờ đúng cả 643, nhưng chúng làm sai số liệu ``lỗi tiêm vào''. Bộ mô phỏng được sửa để giới hạn cả giá trị cuối cùng; sau khi sửa, 0 số đo không mang nhãn bị gắn cờ \code{out\_of\_range}.
+\end{enumerate}
+
+Mỗi lỗi có một kiểm thử đơn vị trong \code{tests/unit/test\_simulator.py}; kiểm thử về khoảng giá trị thất bại trên mã cũ và đạt trên mã mới.
+
+\paragraph{Cảnh báo giả của kiểm tra bước nhảy.} 86 trong 51\,080 số đo lành mạnh (0,17\,\%) bị gắn cờ \code{implausible\_jump}. 80 trong số đó đứng ngay sau một số đo khác của cùng thửa ruộng và chỉ số đã bị gắn cờ \code{implausible\_jump}: giá trị mới nhất trong \code{latest\_by\_field}, dùng làm mốc so bước nhảy, nhận cả các số đo có cờ \code{implausible\_jump} (để bảng điều khiển hiển thị chúng kèm cờ), nên sau một giá trị bất thường, số đo bình thường kế tiếp bị so với giá trị bất thường đó. Đây là một hạn chế của đường xử lý được ghi nhận lại; cách sửa là chỉ lấy số đo \code{ok} cuối cùng làm mốc so bước nhảy.
 
 \subsection{Đối soát tầng gold với tầng silver}
 \label{sec:5-reconciliation}
 
-\paragraph{Phương pháp.} Chọn ngẫu nhiên \dien{số} cặp (thửa ruộng, ngày), tính lại min, max, trung bình và số bản ghi trực tiếp từ silver, rồi so với \code{gold.field\_daily}. Truy vấn~\ref{lst:5-reconcile} trả về các dòng lệch; kết quả mong đợi là rỗng.
+\paragraph{Phương pháp.} Không lấy mẫu: \emph{mọi} dòng của \code{gold.field\_daily} được tính lại trực tiếp từ silver theo đúng định nghĩa của model (min, max, trung bình chỉ trên dòng \code{quality\_flag = 'ok'}; \code{reading\_count} trên mọi giá trị khác rỗng; \code{valid\_count} trên dòng \code{ok}) rồi so sánh. Truy vấn~\ref{lst:5-reconcile} đếm các dòng lệch; truy vấn thứ hai đếm các bộ (thửa ruộng, chỉ số, ngày) có trong silver mà thiếu trong gold. Kết quả mong đợi của cả hai là 0.
 
-\begin{lstlisting}[language=SQL, caption={Đối soát gold với silver trên Trino}, label={lst:5-reconcile}]
+\begin{lstlisting}[language=SQL, caption={Đối soát gold với silver trên Trino (rút gọn từ \texttt{run\_correctness\_checks.py})}, label={lst:5-reconcile}]
 WITH recomputed AS (
     SELECT field_id, metric, CAST(date_trunc('day', measured_at) AS date) AS day,
-           min(value) AS min_value, max(value) AS max_value,
-           avg(value) AS avg_value, count(*) AS reading_count
+           min(CASE WHEN quality_flag = 'ok' THEN value END) AS min_value,
+           max(CASE WHEN quality_flag = 'ok' THEN value END) AS max_value,
+           avg(CASE WHEN quality_flag = 'ok' THEN value END) AS avg_value,
+           count(*) AS reading_count,
+           count_if(quality_flag = 'ok') AS valid_count
     FROM lakehouse.silver.sensor_readings
     WHERE value IS NOT NULL
     GROUP BY 1, 2, 3
 )
-SELECT g.field_id, g.metric, g.day
+SELECT count(*) AS compared,
+       count_if(r.day IS NULL
+                OR g.reading_count <> r.reading_count
+                OR g.valid_count <> r.valid_count
+                OR g.min_value IS DISTINCT FROM r.min_value
+                OR g.max_value IS DISTINCT FROM r.max_value
+                OR abs(g.avg_value - r.avg_value) > 1e-9) AS mismatched
 FROM lakehouse.gold.field_daily g
-JOIN recomputed r USING (field_id, metric, day)
-WHERE g.reading_count <> r.reading_count
-   OR abs(g.avg_value - r.avg_value) > 1e-9
-   OR g.min_value <> r.min_value OR g.max_value <> r.max_value;
+LEFT JOIN recomputed r
+  ON g.field_id = r.field_id AND g.metric = r.metric AND g.day = r.day;
 \end{lstlisting}
 
-\paragraph{Kết quả.} \dien{Số cặp kiểm tra, số dòng lệch (mong đợi 0).}
+\paragraph{Kết quả.} Sau \code{just batch-run}, 520/520 dòng của \code{gold.field\_daily} khớp với giá trị tính lại từ silver (0 dòng lệch về số đếm, min, max hay trung bình), và 0 bộ (thửa ruộng, chỉ số, ngày) của silver bị thiếu trong gold. Mục~\ref{sec:4-br06} dùng cùng cách tính lại để kiểm tra trung bình có trọng số của trang so sánh giai đoạn.
 
 \subsection{Giá trị phi lý trong tầng gold}
 \label{sec:5-implausible}
 
-\paragraph{Phương pháp.} Đếm số dòng của \code{gold.field\_daily} có \code{min\_value} hoặc \code{max\_value} nằm ngoài khoảng vật lý của chỉ số (Bảng~\ref{tab:4-metric-ranges}).
+\paragraph{Phương pháp.} Đếm số dòng của \code{gold.field\_daily} có \code{min\_value} hoặc \code{max\_value} nằm ngoài khoảng vật lý \emph{riêng của từng chỉ số} (Bảng~\ref{tab:4-metric-ranges}), chặt hơn test \code{accepted\_range} chung $[-30, 200]$ của dbt.
 
-\paragraph{Kết quả.} Như đã nêu ở Mục~\ref{sec:4-br04}, phiên bản hiện tại của \code{field\_daily} tổng hợp mọi giá trị khác rỗng, kể cả giá trị có cờ \code{out\_of\_range}, nên lần đo này \emph{được dự đoán} sẽ tìm thấy giá trị phi lý. \dien{Số dòng phi lý trước khi sửa.} Sau khi giới hạn model ở \code{quality\_flag = 'ok'} và thêm test khoảng giá trị, \dien{số dòng phi lý sau khi sửa (mong đợi 0) và log \texttt{just dbt-test}.}
+\paragraph{Kết quả.} 0/520 dòng của \code{gold.field\_daily} có min hoặc max nằm ngoài khoảng của chỉ số, dù silver vẫn giữ 1\,071 số đo \code{out\_of\_range} (silver giữ mọi số đo kèm cờ, theo FR4.6). Model đã được giới hạn ở \code{quality\_flag = 'ok'} (Mục~\ref{sec:4-br04}), và \code{just dbt-test} đạt 28/28 test, gồm các test \code{accepted\_range} của gold.
 
 \subsection{Không mất, không trùng khi khởi động lại}
 \label{sec:5-no-loss}
 
-Kiểm tra này dùng kết quả của benchmark \#5 (Mục~\ref{sec:5-performance}): dừng tác vụ streaming vài phút trong khi bộ mô phỏng vẫn gửi dữ liệu, khởi động lại, rồi so số dòng và số khóa \code{(device\_id, metric, measured\_at)} trùng lặp trong bronze và Cassandra trước và sau. Cơ chế bảo đảm là checkpoint của Spark (Mục~\ref{sec:2-checkpoint}) cùng các lệnh \code{MERGE} theo khóa (Mục~\ref{sec:2-idempotent}).
+Kiểm tra này dùng kết quả của benchmark \#5 (Mục~\ref{sec:5-bench-replay}): giết hoặc dừng tác vụ streaming 3 phút trong khi bộ mô phỏng vẫn gửi dữ liệu, khởi động lại trên cùng checkpoint, rồi đối chiếu từng thông điệp Kafka với bronze, quarantine và Cassandra, và đếm khóa \code{(device\_id, metric, measured\_at)} trùng lặp. Cơ chế bảo đảm là checkpoint của Spark (Mục~\ref{sec:2-checkpoint}) cùng các lệnh \code{MERGE} theo khóa (Mục~\ref{sec:2-idempotent}).
 
 \begin{lstlisting}[language=SQL, caption={Kiểm tra khóa trùng trong bronze}, label={lst:5-dup-check}]
 SELECT device_id, metric, measured_at, count(*) AS n
@@ -133,9 +151,9 @@ FROM lakehouse.bronze.sensor_readings
 GROUP BY 1, 2, 3 HAVING count(*) > 1;
 \end{lstlisting}
 
-\paragraph{Kết quả.} \dien{Số dòng trước và sau, số khóa trùng (mong đợi 0), lấy từ \texttt{benchmarks/results/replay.csv}.}
+\paragraph{Kết quả.} Ở cả ba kịch bản (giết tác vụ đầu lô, giết ngay sau khi lô đã commit vào bronze, dừng có trật tự), 0 thông điệp bị mất, 0 khóa trùng trong bronze, 0 offset trùng trong quarantine và 0 số đo hiển thị được bị thiếu trong Cassandra, trên tổng cộng 9\,224 thông điệp Kafka (Bảng~\ref{tab:5-bench-replay}). Truy vấn~\ref{lst:5-dup-check} chạy trên toàn bộ bronze sau cả ba kịch bản cũng trả về rỗng.
 
 \subsection{Kiểm thử đơn vị}
 \label{sec:5-unit-tests}
 
-Ngoài các kiểm tra trên dữ liệu thật, logic quyết định được kiểm thử độc lập với Spark và Cassandra bằng \code{just test-unit}: 7 kiểm thử cho máy trạng thái cảnh báo và 11 kiểm thử cho logic mất kết nối và khoảng trống dữ liệu. \dien{Kết quả lần chạy: số kiểm thử đạt / tổng.}
+Ngoài các kiểm tra trên dữ liệu thật, logic quyết định được kiểm thử độc lập với Spark và Cassandra bằng \code{just test-unit}: 7 kiểm thử cho máy trạng thái cảnh báo, 11 cho logic mất kết nối và khoảng trống dữ liệu, 13 cho cấu hình, 8 cho dữ liệu danh mục, 11 cho lớp gần thời gian thực của API và 7 cho giá trị của bộ mô phỏng (thêm sau khi kiểm tra ở Mục~\ref{sec:5-fault-detection} phát hiện lỗi của bộ mô phỏng). Lần chạy cuối: 57/57 kiểm thử đạt.
