@@ -1,6 +1,6 @@
 /**
  * Plain-language summaries. Every sentence is built from data by these pure
- * functions, so they can be tested without a browser (BR7).
+ * functions, so they can be tested without a browser.
  */
 
 import { METRICS, METRIC_INFO, type CompareRow, type Metric, type SummaryRow } from "./types";

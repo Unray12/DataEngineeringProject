@@ -74,7 +74,13 @@ models:
           - accepted_range: {min_value: 0, max_value: 24}
 
   - name: quality_daily
-    description: Daily data quality counts from streaming quality counters and quarantine.
+    description: >
+      Daily data quality counts: valid, duplicate and out-of-range readings from the streaming quality
+      counters, and the number of records sent to quarantine (0 on a day without any).
     columns:
       - name: day
-        tests: [not_null]
+        tests: [not_null, unique]
+      - name: quarantined
+        tests:
+          - not_null
+          - accepted_range: {min_value: 0}

@@ -18,7 +18,7 @@
 Endpoint & Kho & p50 (ms) & p95 (ms) \\
 \code{/farms}, \code{/farms/\{id\}/fields} & danh mục & 0,5 & 0,6 \\
 \code{/fields/\{id\}/latest} & Cassandra & 3,7 & 7,1 \\
-\code{/fields/\{id\}/series} (24 giờ, 1\,482 điểm) & Cassandra & 10,1 & 13,0 \\
+\code{/fields/\{id\}/series} (24 giờ, phản hồi 136~KB) & Cassandra & 10,1 & 13,0 \\
 \code{/fields/\{id\}/alerts}, \code{/alerts} & Cassandra & 3,0--3,1 & 4,9--5,8 \\
 \code{/devices/\{id\}/status} & Cassandra & 8,2 & 12,3 \\
 \code{/devices} (24 thiết bị; 32 truy vấn tuần tự) & Cassandra & 106,6 & 121,9 \\
@@ -50,7 +50,7 @@ Thửa ruộng F001 & 11 & 20 / 26 & 2\,674 \\
 \end{tblr}
 \end{table}
 
-\paragraph{Kết quả.} Các endpoint đọc Cassandra trả lời trong 3--10 ms ở p50 (tối đa 13 ms ở p95), đúng mục tiêu ``cỡ mười mili-giây''; các endpoint phân tích trên Trino trả lời trong khoảng 25--80 ms, phù hợp với kết quả của benchmark \#2. Mọi trang có dữ liệu trong vòng khoảng 130 ms ở p95. Từ trang tổng quan, người quản lý tới tóm tắt của một thửa ruộng bằng \textbf{1 lần nhấp} (mỗi dòng thửa ruộng là một liên kết tới \code{/fields/\{id\}}), đạt tiêu chí ``trong vài lần nhấp'' của BR7; điều này được kiểm tra trực tiếp trên giao diện.
+\paragraph{Kết quả.} Các endpoint đọc một phân vùng Cassandra trả lời trong 3--10 ms ở p50 (tối đa 13 ms ở p95), đúng mục tiêu ``cỡ mười mili-giây''; riêng \code{/devices} mất khoảng 107 ms vì gửi tuần tự 32 truy vấn (một cho mỗi thiết bị và mỗi thửa ruộng). Các endpoint phân tích trên gold trả lời trong khoảng 25--80 ms, phù hợp với kết quả của benchmark \#2. Mọi trang có dữ liệu trong vòng khoảng 130 ms ở p95. Từ trang tổng quan, người quản lý tới tóm tắt của một thửa ruộng bằng \textbf{1 lần nhấp} (mỗi dòng thửa ruộng là một liên kết tới \code{/fields/\{id\}}), đạt tiêu chí ``trong vài lần nhấp'' của BR7; điều này được kiểm tra trực tiếp trên giao diện.
 
 \paragraph{Hai vấn đề được phát hiện và sửa.} Lần chạy đầu cho kết quả kém hơn nhiều, và cả hai nguyên nhân đều nằm ở cách triển khai chứ không ở thiết kế:
 

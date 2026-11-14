@@ -1,15 +1,7 @@
-"""Iceberg table DDL for the streaming sinks (bronze + ops).
+"""Iceberg tables written by the streaming job: bronze and the ``ops`` tables.
 
-Bronze keeps every schema-valid reading, raw and flagged, forever (FR6.1); the
-``ops`` namespace holds the operational tables the medallion ETL consumes:
-quarantine (FR4.1), per-batch quality counters (FR4.5) and device gap records
-(FR3.5). Silver and gold are deliberately absent: dbt builds those.
-
-Every table is created idempotently at job start with an explicit schema
-(AGENTS.md: no schema inference), and every write is a MERGE keyed on
-``(device_id, metric, measured_at)`` (or on the Kafka offsets for quarantine),
-so a replayed micro-batch updates rows in place instead of duplicating them
-(FR3.3).
+Silver and gold are built by dbt, not here. Tables are created at job start if missing, and every
+write is a MERGE on a natural key, so a re-run batch updates rows instead of adding them.
 """
 
 from __future__ import annotations
@@ -23,7 +15,7 @@ OPS_QUARANTINE = f"{CATALOG}.ops.quarantine"
 OPS_QUALITY_COUNTERS = f"{CATALOG}.ops.quality_counters"
 OPS_DEVICE_GAPS = f"{CATALOG}.ops.device_gaps"
 
-# Column order is the contract for "INSERT *" in the MERGE statements below.
+# The MERGE source must have exactly the table's columns: `UPDATE SET *` and `INSERT *` match them by name.
 BRONZE_COLUMNS = [
     "event_id",
     "device_id",
@@ -44,22 +36,6 @@ BRONZE_COLUMNS = [
     "simulated_fault",
 ]
 
-QUARANTINE_COLUMNS = [
-    "reason",
-    "raw_payload",
-    "event_id",
-    "device_id",
-    "metric",
-    "reading_ts",
-    "value_raw",
-    "source_topic",
-    "source_partition",
-    "source_offset",
-    "ingested_at",
-    "detected_at",
-    "batch_id",
-]
-
 QUALITY_COUNTER_COLUMNS = [
     "batch_id",
     "window_start",
@@ -74,16 +50,6 @@ QUALITY_COUNTER_COLUMNS = [
     "out_of_range",
     "implausible_jump",
     "late",
-]
-
-DEVICE_GAP_COLUMNS = [
-    "field_id",
-    "device_id",
-    "gap_start",
-    "gap_end",
-    "duration_s",
-    "detected_batch_id",
-    "resolved_batch_id",
 ]
 
 _DDL = [
@@ -184,7 +150,7 @@ def merge(
     source_view: str,
     condition: str,
 ) -> None:
-    """Idempotent merge/upsert (AGENTS.md rule for every Spark job, FR3.3).
+    """Upsert ``source_view`` into ``target`` on ``condition``.
 
     The source must be unique per match condition; callers de-duplicate first.
     """

@@ -1,4 +1,4 @@
-/** Pure helpers for the overview and field pages (BR1). */
+/** Pure helpers for the overview and field pages. */
 
 import type { Alert, Device, Farm, Field } from "@/lib/types";
 

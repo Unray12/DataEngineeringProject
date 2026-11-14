@@ -1,4 +1,4 @@
-"""Benchmark #2: Cassandra against Trino-on-Iceberg for the same dashboard question (BR2, BR7).
+"""Benchmark #2: Cassandra against Trino-on-Iceberg for the same dashboard question.
 
 Q0 latest values of one field, Q1 last 24 hours of one metric of one field. Q2 and Q3 are analytical
 questions (30-day history, comparing all fields) that only the Trino path can answer without extra

@@ -113,9 +113,7 @@ const CROP_NAMES: Record<string, string> = {
   COFFEE: "Coffee",
 };
 
-// ---------------------------------------------------------------------------
 // Deterministic pseudo-random helpers
-// ---------------------------------------------------------------------------
 
 /** mulberry32: 32-bit PRNG, good enough for demo data and stable across runs. */
 export function mulberry32(seed: number): () => number {
@@ -157,9 +155,7 @@ function round(value: number, digits = 1): number {
   return Math.round(value * factor) / factor;
 }
 
-// ---------------------------------------------------------------------------
 // Farms, fields and devices
-// ---------------------------------------------------------------------------
 
 function fieldStatus(field: FieldSeed): Status {
   const { moisture, temperature } = field;
@@ -240,9 +236,7 @@ export function getDevices(fieldId?: string): Device[] {
   return devices.filter((device) => !fieldId || device.fieldId === fieldId).map((device) => ({ ...device }));
 }
 
-// ---------------------------------------------------------------------------
 // Latest values and 24-hour series
-// ---------------------------------------------------------------------------
 
 const METRIC_CYCLE: Metric[] = ["soil_moisture", "soil_temperature", "air_temperature", "air_humidity", "rainfall"];
 
@@ -362,9 +356,7 @@ export function getIndicators(fieldId: string, metric: Metric, days = 7): Indica
   return rows;
 }
 
-// ---------------------------------------------------------------------------
 // Alerts (all three lifecycle states plus every severity/type)
-// ---------------------------------------------------------------------------
 
 function alert(row: Omit<Alert, "openedAt"> & { minutesAgo: number }): Alert {
   const { minutesAgo, ...rest } = row;
@@ -514,9 +506,7 @@ export const alerts: Alert[] = [
   }),
 ];
 
-// ---------------------------------------------------------------------------
 // Quality: 90 daily counters + per-device lineage
-// ---------------------------------------------------------------------------
 
 export const QUALITY_DAYS = 90;
 

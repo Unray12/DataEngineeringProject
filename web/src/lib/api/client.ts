@@ -49,9 +49,7 @@ const envelope = <T>(data: T, source: "cassandra" | "trino" = "cassandra"): Enve
   meta: { asOf: new Date().toISOString(), source },
 });
 
-// ---------------------------------------------------------------------------
 // Server-side FastAPI adapter
-// ---------------------------------------------------------------------------
 
 type ApiFetchOptions = {
   method?: "GET" | "PATCH" | "POST";
@@ -145,15 +143,32 @@ function pickEnum<T extends string>(value: unknown, allowed: readonly T[], fallb
   return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
 }
 
+// FastAPI rows carry the streaming job's condition code (`device_offline:F001-S01`, `low_soil_moisture`,
+// `heat_stress`, ...); `alert_type` there is display text such as "device offline".
+const ALERT_TYPE_BY_CODE_PREFIX: Array<[string, AlertType]> = [
+  ["device_offline:", "device_outage"],
+  ["battery_low:", "low_battery"],
+  ["signal_poor:", "poor_signal"],
+  ["rapid_change:", "rate_of_change"],
+];
+
+function alertType(row: Record<string, unknown>): AlertType {
+  if (typeof row.type === "string") return pickEnum(row.type, ALERT_TYPES, "threshold");
+  const code = asString(row.condition_code) ?? "";
+  return ALERT_TYPE_BY_CODE_PREFIX.find(([prefix]) => code.startsWith(prefix))?.[1] ?? "threshold";
+}
+
 function parseAlertRow(value: unknown): Alert {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ApiError(502, "FastAPI returned an invalid alert row", "invalid_payload");
   }
   const row = value as Record<string, unknown>;
-  const metric = asString(row.metric);
+  const rawMetric = asString(row.metric);
+  // The platform stores humidity as relative_humidity; the UI calls it air_humidity.
+  const metric = rawMetric === "relative_humidity" ? "air_humidity" : rawMetric;
   const parsed: AlertPayload = {
     id: asString(row.alert_id ?? row.id) ?? "unknown-alert",
-    type: pickEnum(row.alert_type ?? row.type, ALERT_TYPES, "threshold"),
+    type: alertType(row),
     severity: pickEnum(row.severity, ALERT_SEVERITIES, "info"),
     fieldId: asString(row.field_id ?? row.fieldId) ?? "unknown-field",
     deviceId: asString(row.device_id ?? row.deviceId),
@@ -283,10 +298,8 @@ async function fetchApiReference(): Promise<{ farms: Farm[]; fields: Field[]; de
   return { farms: apiFarms, fields: apiFields, devices: apiDevices };
 }
 
-// ---------------------------------------------------------------------------
-// Reference data shared by the alert filters and detail drawer (M3).
-// Kept separate from the dashboard payload so /alerts only pulls what it needs.
-// ---------------------------------------------------------------------------
+// Reference data for the alert filters and detail drawer, kept separate from the dashboard payload so
+// /alerts only pulls what it needs.
 
 export type ReferenceData = {
   farms: Envelope<Farm[]>;
@@ -313,9 +326,7 @@ export async function getReferenceData(): Promise<ReferenceData> {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Dashboard and live series (kept compatible with the existing scaffold)
-// ---------------------------------------------------------------------------
+// Dashboard and live series
 
 export async function getDashboardData() {
   if (env.DATA_MODE === "mock") {
@@ -365,9 +376,7 @@ export async function getSeries(metric: Series["metric"], fieldId = "field-n01")
   });
 }
 
-// ---------------------------------------------------------------------------
-// Alerts (BR8) - Cassandra-backed
-// ---------------------------------------------------------------------------
+// Alerts - Cassandra-backed
 
 export type AlertFilters = {
   status?: AlertStatus;
@@ -453,9 +462,7 @@ export async function transitionAlert(
   return parseAlertRow(raw);
 }
 
-// ---------------------------------------------------------------------------
-// Quality (BR4) - Trino-backed
-// ---------------------------------------------------------------------------
+// Quality - Trino-backed
 
 export async function getQualitySummary(from?: string, to?: string): Promise<Envelope<QualityDay[]>> {
   if (env.DATA_MODE === "mock") {
@@ -542,9 +549,7 @@ export async function getQualityData(): Promise<
   };
 }
 
-// ---------------------------------------------------------------------------
-// Analytical history (M4) - unchanged contract
-// ---------------------------------------------------------------------------
+// Analytical history
 
 export async function getAnalyticsData(
   fieldId: string,

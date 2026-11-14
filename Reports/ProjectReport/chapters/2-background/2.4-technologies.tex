@@ -32,12 +32,12 @@ Thư mục checkpoint lưu bốn thành phần:
   \item \code{metadata}: mã định danh duy nhất của truy vấn. Khi đổi lớn logic truy vấn, cần dùng vị trí checkpoint mới.
 \end{itemize}
 
-Quy trình phục hồi như sau: ghi offset vào \code{offsets/}, xử lý và ghi vào sink, rồi ghi \code{commits/}. Nếu hệ thống sập khi lô $N$ đã có trong \code{offsets/} nhưng chưa có trong \code{commits/}, lô $N$ được phát lại với \emph{cùng} khoảng offset. Để kết quả đúng một lần, sink phải idempotent hoặc transactional, ví dụ Delta Lake hoặc upsert theo mã lô.
+Quy trình phục hồi như sau: ghi offset vào \code{offsets/}, xử lý và ghi vào sink, rồi ghi \code{commits/}. Nếu hệ thống sập khi lô $N$ đã có trong \code{offsets/} nhưng chưa có trong \code{commits/}, lô $N$ được phát lại với \emph{cùng} khoảng offset. Để kết quả đúng một lần, sink phải idempotent hoặc transactional, ví dụ một bảng Iceberg hay Delta Lake ghi theo giao dịch, hoặc lệnh upsert theo khóa.
 
 \subsection{Ví dụ mã nguồn}
 \label{sec:2-code}
 
-Đoạn mã dưới đây đọc luồng đơn hàng từ Kafka, tính doanh thu theo sản phẩm trong cửa sổ 1 phút và cập nhật kết quả mỗi 10 giây. Cùng mẫu này sẽ được áp dụng cho số đo cảm biến trong Chương~\ref{chap:4-design}.
+Đoạn mã dưới đây đọc luồng đơn hàng từ Kafka, tính doanh thu theo sản phẩm trong cửa sổ 1 phút và cập nhật kết quả mỗi 10 giây. Tác vụ của đề tài (Chương~\ref{chap:4-design}) dùng cùng nguồn Kafka, \code{maxOffsetsPerTrigger} và trigger \code{processingTime}, nhưng không tổng hợp theo cửa sổ: mỗi lô được xử lý trong \code{foreachBatch} và ghi bằng lệnh \code{MERGE}.
 
 \begin{lstlisting}[language=Python, caption={Kafka $\rightarrow$ Spark $\rightarrow$ sink với trigger 10 giây}, label={lst:2-example}]
 orders = (spark.readStream.format("kafka")

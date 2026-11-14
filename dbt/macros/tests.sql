@@ -1,5 +1,5 @@
 {% test accepted_range(model, column_name, min_value=none, max_value=none) %}
--- Returns the rows outside [min_value, max_value]; the test passes when there are none (FR4.7).
+-- Returns the rows outside [min_value, max_value]; the test passes when there are none.
 select *
 from {{ model }}
 where {{ column_name }} is not null

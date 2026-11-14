@@ -21,9 +21,9 @@ BR4 Dữ liệu đáng tin cậy & & \checkmark & \checkmark & \checkmark & \che
 BR5 Quản lý dựa trên dữ liệu & & & & \checkmark & \checkmark & \checkmark & \checkmark \\
 BR6 Đánh giá lịch sử & & & & \checkmark & \checkmark & \checkmark & \checkmark \\
 BR7 Thông tin dễ tiếp cận & & & \checkmark & \checkmark & & \checkmark & \checkmark \\
-BR8 Ứng phó sớm với rủi ro & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
-\end{longtblr}
-}
+BR8 Ứng phó sớm với rủi ro & \checkmark & \checkmark & \checkmark & \checkmark & & & \checkmark \\
+\end{tblr}
+\end{table}
 
 \subsection{Cách đọc ma trận}
 \label{sec:3-mapping-read}
@@ -33,7 +33,7 @@ Ma trận cho thấy ba nhóm yêu cầu, tương ứng với ba đường dữ 
 \begin{itemize}
   \item \textbf{Đường gần thời gian thực} (Kafka, Spark streaming, Cassandra): BR2 và BR3 dựa chủ yếu vào đường này, vì chúng cần dữ liệu mới trong khoảng một phút và cần chịu được gián đoạn.
   \item \textbf{Đường phân tích} (Iceberg, dbt, Trino): BR5 và BR6 chỉ dùng đường này, vì chúng làm việc trên dữ liệu tổng hợp nhiều ngày đến nhiều tháng.
-  \item \textbf{Yêu cầu xuyên suốt}: BR1, BR4 và BR8 đi qua cả hai đường. BR8 chạm vào mọi thành phần: luật cảnh báo chạy trong Spark, trạng thái cảnh báo nằm trong Cassandra, còn lịch sử cảnh báo và dữ liệu thô đi vào Iceberg để phân tích sau.
+  \item \textbf{Yêu cầu xuyên suốt}: BR1, BR4 và BR8 đi qua cả hai đường. Với BR8, luật cảnh báo chạy trong Spark, cảnh báo và trạng thái của chúng nằm trong Cassandra, còn Iceberg nhận dữ liệu thô và các khoảng mất kết nối (\code{ops.device\_gaps}). Lịch sử cảnh báo chưa được đưa vào tầng gold (FR8.6, Bảng~\ref{tab:3-mapping-br4-br8}).
 \end{itemize}
 
 \subsection{Yêu cầu xử lý cho BR4 và BR8}
@@ -64,6 +64,6 @@ FR8.2 & Phát hiện mất kết nối, pin yếu, sóng yếu & Spark streaming
 FR8.3 & Lưu cảnh báo với loại, mức độ, thửa ruộng, trạng thái & Cassandra & Bảng \code{alerts\_by\_field}, \code{alerts\_by\_status}, \code{alert\_by\_id} \\
 FR8.4 & Vòng đời open, acknowledged, resolved & Spark, FastAPI & Máy trạng thái thuần trong \code{alerts.py}; \code{PATCH /alerts/\{id\}} \\
 FR8.5 & Chống bão cảnh báo (debounce, cooldown) & Spark, Cassandra & Bảng \code{alert\_state\_by\_field} \\
-FR8.6 & Danh sách cảnh báo đang mở và lịch sử & FastAPI, web & \code{GET /alerts?status=} \\
-\end{longtblr}
-}
+FR8.6 & Danh sách cảnh báo đang mở và lịch sử & Cassandra, FastAPI, web & \code{GET /alerts?status=} và \code{GET /fields/\{id\}/alerts} (lịch sử giữ 90 ngày trong Cassandra); bảng lịch sử cảnh báo ở tầng gold chưa được hiện thực \\
+\end{tblr}
+\end{table}

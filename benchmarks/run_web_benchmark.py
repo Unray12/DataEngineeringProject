@@ -1,4 +1,4 @@
-"""Benchmark #6: responsiveness of the API and the web app (BR1, BR7; WORK_DIVISION.md #6).
+"""Benchmark #6: responsiveness of the API and the web app.
 
 * Every FastAPI endpoint the web app uses, called directly (``--runs`` times after a warm-up):
   p50/p95/max latency and response size, grouped by the store behind it (Cassandra or Trino).

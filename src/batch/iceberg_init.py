@@ -1,11 +1,7 @@
-"""Create the medallion namespaces in the Iceberg/Hive catalog.
+"""Create the lakehouse namespaces and load the crop targets (``just lakehouse-init``).
 
-``just lakehouse-init`` runs this before the streaming job starts so that
-``bronze`` and ``ops`` exist (the streaming job also creates them, idempotently)
-and so the dbt-built ``silver``/``gold`` namespaces are ready.
-
-    python -m batch.iceberg_init            # create namespaces and load crop targets
-    python -m batch.iceberg_init --drop-all # drop every lakehouse table first
+python -m batch.iceberg_init            # create namespaces and load crop targets
+python -m batch.iceberg_init --drop-all # drop every lakehouse table first
 """
 
 from __future__ import annotations
@@ -38,7 +34,7 @@ TBLPROPERTIES ('format-version' = '2')
 def crop_target_rows(
     reference: ReferenceData,
 ) -> list[tuple[str, str, float | None, float | None, float | None, float | None]]:
-    """One row per (crop, metric) target range, the contract of ``ops.crop_targets`` (FR5.2)."""
+    """One row per (crop, metric) target range, the contract of ``ops.crop_targets``."""
     return [
         (crop.crop_code, metric, target.min, target.max, target.alert_below, target.alert_above)
         for crop in reference.crops.values()
@@ -50,7 +46,7 @@ def load_crop_targets(spark, reference: ReferenceData) -> int:
     """Replace ``ops.crop_targets`` with the reference data so dbt gold models can join the targets.
 
     The JSON file stays the single source of truth: edit it, rerun ``just lakehouse-init`` and the
-    next ``just dbt-run`` recomputes the indicators with the new ranges (BR5 acceptance criterion).
+    next ``just dbt-run`` recomputes the indicators with the new ranges.
     """
     spark.sql(CROP_TARGETS_DDL)
     rows = crop_target_rows(reference)

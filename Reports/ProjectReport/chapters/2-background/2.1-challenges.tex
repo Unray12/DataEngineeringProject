@@ -4,10 +4,10 @@
 Trong xử lý luồng thuần túy (pure stream processing), mỗi sự kiện được xử lý ngay khi đến. Cách làm này cho độ trễ thấp, nhưng khi áp dụng cho dữ liệu cảm biến nông nghiệp thì nảy sinh ba khó khăn chính.
 
 \subsection{Khôi phục trạng thái đang xử lý}
-Khi một nút xử lý gặp sự cố giữa chừng, hệ thống phải dựng lại trạng thái phức tạp của hàng nghìn sự kiện chưa được đệm. Ví dụ, một nút bị lỗi khi đang nhận đợt dữ liệu dồn kéo dài 4 giờ từ cổng LoRaWAN sẽ rơi vào vòng lặp khởi động lại liên tục vì phải khôi phục dữ liệu đất chưa được đệm.
+Engine luồng giữ trạng thái của từng khóa (bộ đếm, cửa sổ, giá trị gần nhất) trong bộ nhớ của các nút xử lý. Để khôi phục sau sự cố, engine phải chụp trạng thái này định kỳ, và khi khởi động lại phải nạp lại toàn bộ trạng thái rồi phát lại các sự kiện đến sau lần chụp cuối. Trạng thái càng lớn thì việc chụp và nạp lại càng tốn thời gian. Ví dụ, khi một cổng LoRaWAN gửi dồn dữ liệu của nhiều giờ mất kết nối, trạng thái của mọi thiết bị liên quan phải được giữ và chụp lại trong lúc engine xử lý đợt dữ liệu đó.
 
 \subsection{Ghi trùng khi ghi dở dang}
-Xử lý từng sự kiện không có ranh giới thực thi rõ ràng. Khi mạng đứt giữa chừng, việc tránh ghi trùng đòi hỏi cơ chế khóa phân tán tốn kém. Ví dụ, kết nối LoRaWAN đứt giữa lúc đồng bộ dữ liệu tưới khiến gói tin gửi lại bị cộng hai lần vào nhật ký lượng nước.
+Khi xử lý từng sự kiện, không có ranh giới tự nhiên cho biết phần nào đã được ghi ra đích. Nếu tác vụ sập sau khi ghi một sự kiện nhưng trước khi lưu tiến độ, sự kiện đó sẽ được xử lý và ghi lại sau khi khởi động lại. Muốn tránh, đích phải tham gia giao thức cam kết hai pha cùng checkpoint của engine, hoặc mọi lệnh ghi phải idempotent. Ví dụ, nếu nhật ký lượng nước tưới được cập nhật bằng phép cộng dồn, một sự kiện được ghi lại sẽ bị cộng hai lần.
 
-\subsection{Độ phức tạp trạng thái ở mức dưới một giây}
-Xử lý luồng liên tục cần cơ chế watermark cho dữ liệu đến sai thứ tự và tiêu tốn nhiều bộ nhớ, làm tăng chi phí cho những tác vụ không cần độ trễ dưới một giây. Ví dụ, chạy vòng đánh giá dưới một giây trên nhiệt độ đất vốn biến thiên chậm là lãng phí, vì chu kỳ cập nhật 30 giây đã đáp ứng nhu cầu canh tác.
+\subsection{Chi phí của độ trễ dưới một giây}
+Để đạt độ trễ dưới một giây, engine phải chạy liên tục, giữ trạng thái trong bộ nhớ và xử lý dữ liệu đến sai thứ tự bằng watermark cho từng sự kiện. Chi phí này không đáng với những tác vụ không cần độ trễ đó. Ví dụ, nhiệt độ đất biến thiên chậm, nên chu kỳ cập nhật 30 giây đã đáp ứng nhu cầu canh tác.

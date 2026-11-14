@@ -19,7 +19,7 @@ Kiến trúc medallion chia kho dữ liệu thành ba tầng, mỗi tầng có m
 \subsection{dbt: biến đổi dữ liệu dưới dạng mã}
 \label{sec:2-dbt}
 
-dbt (data build tool) cho phép viết mỗi bước biến đổi thành một \emph{model}, tức một câu lệnh \code{SELECT} lưu trong tệp \code{.sql} \cite{dbt_docs}. dbt tự sinh câu lệnh tạo bảng, tự xác định thứ tự chạy nhờ hàm \code{ref()} và \code{source()}, và chạy câu lệnh trên một engine có sẵn. Đề tài dùng bộ chuyển đổi dbt-spark kết nối tới Spark Thrift Server, nên Spark vẫn là engine thực thi và các bảng đích là bảng Iceberg.
+dbt (data build tool) cho phép viết mỗi bước biến đổi thành một \emph{model}, tức một câu lệnh \code{SELECT} lưu trong tệp \code{.sql} \cite{dbt_docs}. dbt tự sinh câu lệnh tạo bảng, tự xác định thứ tự chạy nhờ hàm \code{ref()} và \code{source()}, và chạy câu lệnh trên một engine có sẵn. Đề tài dùng bộ chuyển đổi dbt-spark ở chế độ \code{session}: dbt mở một phiên Spark ngay trong container của nó (không qua Spark Thrift Server), nên Spark vẫn là engine thực thi và các bảng đích là bảng Iceberg.
 
 Đoạn mã~\ref{lst:2-silver} là model silver của đề tài. Hàm cửa sổ \code{row\_number()} giữ lại đúng một bản ghi cho mỗi khóa \code{(device\_id, metric, measured\_at)}, ưu tiên bản ghi được nhận sau cùng.
 
@@ -61,7 +61,7 @@ models:
           - not_null
           - accepted_values:
               values: [soil_moisture, soil_temperature, air_temperature,
-                       air_humidity, relative_humidity, rainfall]
+                       relative_humidity, rainfall]
 \end{lstlisting}
 
 Lệnh \code{dbt build} chạy model và test theo đúng thứ tự phụ thuộc. Khi một test của model silver thất bại, các model gold phía sau bị bỏ qua (\emph{skip}) thay vì được dựng từ dữ liệu sai. Đây là cơ chế đề tài dùng để đáp ứng FR4.7: một test thất bại sẽ chặn lần làm mới tầng gold tương ứng.
@@ -72,8 +72,8 @@ Lệnh \code{dbt build} chạy model và test theo đúng thứ tự phụ thu�
 Không phải lỗi nào cũng nên xử lý giống nhau. Đề tài phân biệt hai mức:
 
 \begin{itemize}
-  \item \textbf{Lỗi cấu trúc} (payload không phải JSON, thiếu trường bắt buộc, thời gian không đọc được, giá trị không phải số, thiết bị không có trong danh mục): bản ghi không thể gán cho thửa ruộng nào, nên được \emph{cách ly} (quarantine) sang một bảng riêng kèm lý do và payload gốc. Tác vụ không dừng lại vì một bản ghi hỏng.
-  \item \textbf{Lỗi nội dung} (giá trị rỗng, ngoài khoảng vật lý, bước nhảy bất thường, bản ghi trùng): bản ghi vẫn được lưu nhưng mang \emph{cờ chất lượng} (\code{quality\_flag}), để bảng điều khiển có thể loại bỏ hoặc đánh dấu.
+  \item \textbf{Lỗi cấu trúc} (payload không phải JSON, thiếu trường bắt buộc, thời gian không đọc được, giá trị không phải số, thiết bị không có trong danh mục, chỉ số không khai báo cho thiết bị): bản ghi không thể gán cho thửa ruộng và chỉ số nào, nên được \emph{cách ly} (quarantine) sang một bảng riêng kèm lý do và payload gốc. Tác vụ không dừng lại vì một bản ghi hỏng.
+  \item \textbf{Lỗi nội dung} (giá trị rỗng, ngoài khoảng vật lý, bước nhảy bất thường): bản ghi vẫn được lưu nhưng mang \emph{cờ chất lượng} (\code{quality\_flag}), để bảng điều khiển có thể loại bỏ hoặc đánh dấu. Bản ghi trùng trong cùng một lô được gắn cờ \code{duplicate}, chỉ một bản được ghi vào bronze, và số bản trùng được đếm trong \code{ops.quality\_counters}.
 \end{itemize}
 
 Cách làm này giữ được toàn bộ bằng chứng: không có bản ghi nào bị xóa âm thầm, và số lượng của từng loại lỗi có thể đếm lại. Đoạn mã~\ref{lst:2-quarantine-ddl} là cấu trúc bảng cách ly.

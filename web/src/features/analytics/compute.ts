@@ -1,5 +1,5 @@
 /**
- * Pure functions behind the analytics page (BR5, BR6). They hold every number the page
+ * Pure functions behind the analytics page. They hold every number the page
  * shows, so the figures can be unit-tested against values worked out by hand.
  */
 
@@ -72,7 +72,7 @@ export type AlignedPoint = {
   previousBucket: string | null;
 };
 
-/** Put two periods on one axis by position ("day 1", "day 2", …) so they can be overlaid (FR6.3). */
+/** Put two periods on one axis by position ("day 1", "day 2", …) so they can be overlaid. */
 export function alignPeriods(current: HistoryRow[], previous: HistoryRow[]): AlignedPoint[] {
   const length = Math.max(current.length, previous.length);
   return Array.from({ length }, (_, index) => ({
@@ -94,7 +94,7 @@ export function weekStart(bucket: string): string {
 
 export type WeeklyPoint = { week: string; avg: number; readings: number };
 
-/** Seasonal view: reading-weighted average per week (FR6.3). */
+/** Seasonal view: reading-weighted average per week. */
 export function weeklyAverages(rows: HistoryRow[]): WeeklyPoint[] {
   const weeks = new Map<string, { sum: number; readings: number }>();
   for (const row of rows) {
@@ -110,7 +110,7 @@ export function weeklyAverages(rows: HistoryRow[]): WeeklyPoint[] {
     .map(([week, entry]) => ({ week, avg: round1(entry.sum / entry.readings), readings: entry.readings }));
 }
 
-/** Plain-language irrigation line for one field (BR5, FR5.3). */
+/** Plain-language irrigation line for one field. */
 export function irrigationMessage(fieldName: string, hoursBelow: number | null, days: number): string {
   const span = days === 1 ? "today" : `over the last ${days} days`;
   if (hoursBelow === null) return `${fieldName}: no soil-moisture target is available.`;

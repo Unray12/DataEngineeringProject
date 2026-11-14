@@ -36,12 +36,11 @@ RUN apt-get update \
         procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Project metadata lives in pyproject.toml (hatchling backend). `uv sync`
-# installs the runtime + dev dependency groups into the system environment so
-# spark-submit and the Trino/Cassandra clients are all on PATH.
+# The locked runtime and dev dependencies go into the system environment, so
+# spark-submit, dbt, the Trino/Cassandra clients and pytest (`just test`) are on PATH.
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv export --locked --no-dev --no-emit-project --format requirements-txt \
+RUN uv export --locked --no-emit-project --format requirements-txt \
       --output-file /tmp/requirements.txt \
     && uv pip install --system --no-cache -r /tmp/requirements.txt \
     && uv pip install --system --no-cache "pyspark==${SPARK_VERSION}" \

@@ -1,9 +1,7 @@
-"""HTTP access layer for the agriculture platform (BR1, BR2, BR3, BR7, BR8).
+"""FastAPI service, the only data source of the web app.
 
-The API is the **only** access layer the web app talks to (AGENTS.md). For now
-it serves the near real-time path: master data from the shared reference file
-and current state from Cassandra (``cassandra/schema.cql``). Intraday/daily
-endpoints backed by Trino/gold are deferred until dbt builds those tables.
+Near real-time endpoints read Cassandra, analytical ones read the gold tables through Trino
+(``analytics.py``). Master data comes from the reference file.
 """
 
 from __future__ import annotations
@@ -16,10 +14,11 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from api.analytics import AnalyticsReader
+from api.analytics import AnalyticsReader, AnalyticsUnavailable
 from api.live import find_gaps, gap_multiplier, outage_counts, target_state
 from common.reference import ReferenceData, load_reference
 from streaming.alerts import ALLOWED_TRANSITIONS, STATUS_ACKNOWLEDGED, STATUS_OPEN, STATUS_RESOLVED
@@ -66,24 +65,30 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Agriculture Data Platform", version="0.1.0", lifespan=lifespan)
 
+ANALYTICS_NOT_READY = "analytical tables are not ready; run the batch flow first"
+
+
+@app.exception_handler(AnalyticsUnavailable)
+def analytics_unavailable(_request: Request, exc: AnalyticsUnavailable) -> JSONResponse:
+    log.warning("analytical query failed: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": ANALYTICS_NOT_READY})
+
 
 def _ref() -> ReferenceData:
-    if reference is None:  # pragma: no cover - lifespan always runs
+    if reference is None:
         raise HTTPException(status_code=503, detail="reference data not loaded")
     return reference
 
 
 def _session():
-    if writer is None:  # pragma: no cover - lifespan always runs
+    if writer is None:
         raise HTTPException(status_code=503, detail="cassandra not connected")
     return writer.session
 
 
 def _analytics() -> AnalyticsReader:
     if analytics is None:
-        raise HTTPException(
-            status_code=503, detail="analytical tables are not ready; run the batch flow first"
-        )
+        raise HTTPException(status_code=503, detail=ANALYTICS_NOT_READY)
     return analytics
 
 
@@ -99,11 +104,6 @@ def _rows(rows) -> list[dict[str, Any]]:
     return [{key: _json_value(value) for key, value in row._asdict().items()} for row in rows]
 
 
-# --------------------------------------------------------------------------------------
-# health
-# --------------------------------------------------------------------------------------
-
-
 @app.get("/health/live")
 def live() -> dict[str, str]:
     return {"status": "ok"}
@@ -113,14 +113,9 @@ def live() -> dict[str, str]:
 def ready() -> dict[str, str]:
     try:
         _session().execute("SELECT release_version FROM system.local").one()
-    except Exception as exc:  # noqa: BLE001 - surfaced as 503
+    except Exception as exc:  # reported as 503
         raise HTTPException(status_code=503, detail=f"cassandra unavailable: {exc}") from exc
     return {"status": "ready", "reference": _ref().path}
-
-
-# --------------------------------------------------------------------------------------
-# master data (BR1, FR1.1)
-# --------------------------------------------------------------------------------------
 
 
 @app.get("/farms")
@@ -196,11 +191,6 @@ def list_devices() -> list[dict[str, Any]]:
     return rows
 
 
-# --------------------------------------------------------------------------------------
-# near real-time readings (BR2, FR2.2, FR2.3)
-# --------------------------------------------------------------------------------------
-
-
 @app.get("/fields/{field_id}/latest")
 def field_latest(field_id: str) -> dict[str, Any]:
     _require_field(field_id)
@@ -265,11 +255,6 @@ def device_status(device_id: str) -> dict[str, Any]:
     return result
 
 
-# --------------------------------------------------------------------------------------
-# alerts (BR8, FR8.3, FR8.4)
-# --------------------------------------------------------------------------------------
-
-
 @app.get("/fields/{field_id}/alerts")
 def field_alerts(field_id: str, limit: int = Query(50, ge=1, le=200)) -> list[dict[str, Any]]:
     _require_field(field_id)
@@ -286,11 +271,6 @@ def list_alerts(
         raise HTTPException(status_code=400, detail=f"invalid status {status}")
     rows = _session().execute("SELECT * FROM alerts_by_status WHERE status = %s LIMIT %s", (status, limit))
     return _rows(rows)
-
-
-# --------------------------------------------------------------------------------------
-# analytical serving path (BR5, BR6, BR7)
-# --------------------------------------------------------------------------------------
 
 
 def _date(value: str | None, fallback_days: int = 7) -> str:
@@ -316,7 +296,7 @@ def field_indicators(
 
 
 def _target(field_id: str, metric: str | None) -> dict[str, float] | None:
-    """Target range of the field's crop for ``metric`` (FR5.2), or ``None`` when it has none."""
+    """Target range of the field's crop for ``metric``, or ``None`` when it has none."""
     crop = _ref().crop(_ref().fields[field_id].crop_code)
     target = crop.target(metric) if crop and metric else None
     if target is None or target.min is None or target.max is None:
@@ -376,7 +356,7 @@ def quality_devices() -> dict[str, Any]:
 
 
 class AlertTransition(BaseModel):
-    """Body of ``PATCH /alerts/{alert_id}`` (BR8 acceptance criterion)."""
+    """Body of ``PATCH /alerts/{alert_id}``."""
 
     action: Literal["acknowledge", "resolve"]
     actor: str = Field(default="operator", min_length=1, max_length=64)
@@ -426,11 +406,6 @@ def transition_alert(alert_id: str, body: AlertTransition = Body(...)) -> dict[s
 
     updated = _session().execute("SELECT * FROM alert_by_id WHERE alert_id = %s", (parsed_id,)).one()
     return _rows([updated])[0]
-
-
-# --------------------------------------------------------------------------------------
-# helpers
-# --------------------------------------------------------------------------------------
 
 
 def _require_field(field_id: str) -> None:

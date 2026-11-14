@@ -110,7 +110,7 @@ Thêm cột & thành công & thành công \\
 
 \paragraph{Câu hỏi.} Sau nhiều commit nhỏ của streaming, \code{rewrite\_data\_files} giảm bao nhiêu số tệp và rút ngắn truy vấn bao nhiêu (Mục~\ref{sec:4-compaction})?
 
-\paragraph{Thiết kế.} Một bảng Iceberg mới nhận 240 commit, mỗi commit 5\,000 dòng trải trên 3 ngày liên tiếp, tổng 1\,200\,000 dòng, nên mỗi ngày có khoảng 24 tệp nhỏ. Sau khi đo số tệp và thời gian hai truy vấn, recipe chạy chính \code{just compact} (macro dbt gọi \code{rewrite\_data\_files}, chiến lược binpack, Mục~\ref{sec:4-compaction}), rồi đo lại. Kiểm tra số dòng không đổi sau khi gộp.
+\paragraph{Thiết kế.} Một bảng Iceberg mới nhận 240 commit, mỗi commit 5\,000 dòng trải trên 3 ngày liên tiếp (cả bảng phủ 30 ngày), tổng 1\,200\,000 dòng, nên mỗi ngày có khoảng 24 tệp nhỏ. Sau khi đo số tệp và thời gian hai truy vấn, recipe chạy chính \code{just compact} (macro dbt gọi \code{rewrite\_data\_files}, chiến lược binpack, Mục~\ref{sec:4-compaction}), rồi đo lại. Kiểm tra số dòng không đổi sau khi gộp.
 
 {\small
 \begin{longtblr}[

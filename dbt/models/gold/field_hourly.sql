@@ -7,9 +7,9 @@
     partition_by=['day']
 ) }}
 
--- Hourly aggregates per field and metric over the readings that passed validation (FR5.1).
+-- Hourly aggregates per field and metric over the readings that passed validation.
 -- Each hour carries the crop's target range so daily indicators (time in range, hours below
--- target) can be derived without joining the reference data again (FR5.2, FR5.3).
+-- target) can be derived without joining the reference data again.
 select
     s.field_id,
     s.farm_id,

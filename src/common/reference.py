@@ -1,19 +1,8 @@
-"""Loader for the platform's master data (BR1, FR1.1, FR1.2, FR5.2).
+"""Loader for ``reference/reference_data.json``: farms, fields, devices, crops and metrics.
 
-The reference data lives in a single JSON file (``reference/reference_data.json``)
-and is the authority for:
-
-* which farms, fields and devices exist and how they relate (FR1.1). The
-  streaming job resolves ``farm_id``/``field_id`` from ``device_id`` here
-  instead of trusting the event payload (FR1.2), and quarantines readings from
-  devices that are not listed (BR1 acceptance criterion).
-* the physically plausible range and the maximum plausible step change of
-  every metric (FR4.2).
-* the per-crop target ranges and alert thresholds (FR5.2, FR8.1).
-* each device's nominal reporting interval, used to detect outages (FR8.2).
-
-Everything is loaded once at startup and treated as immutable; changing the
-file and restarting a service is how master data is updated.
+The simulator, the streaming job and the API all read this one file. The streaming job takes a
+reading's field and farm from here rather than from the payload, and quarantines unknown devices.
+The file is read once at startup; edit it and restart to change master data.
 """
 
 from __future__ import annotations
@@ -68,7 +57,7 @@ class MetricSpec:
 
 @dataclass(frozen=True)
 class CropTarget:
-    """Target range and alert thresholds for one metric of one crop (FR5.2)."""
+    """Target range and alert thresholds for one metric of one crop."""
 
     metric: str
     min: float | None = None
@@ -96,8 +85,6 @@ class ReferenceData:
     crops: dict[str, Crop]
     path: str
 
-    # -- lookups used by the streaming job and the API ---------------------
-
     def device(self, device_id: str) -> Device | None:
         return self.devices.get(device_id)
 
@@ -117,17 +104,12 @@ class ReferenceData:
         return [field for field in self.fields.values() if field.farm_id == farm_id]
 
     def offline_after_s(self, device: Device, multiplier: float) -> float:
-        """Silence length (in seconds) after which the device counts as offline (FR8.2)."""
+        """Silence length (in seconds) after which the device counts as offline."""
         return max(device.reporting_interval_s * multiplier, 1.0)
 
 
 def load_reference(path: str | None = None) -> ReferenceData:
-    """Load and validate the reference data.
-
-    ``path`` defaults to the ``REFERENCE_DATA_PATH`` environment variable, which
-    every service sets to the mounted ``reference/`` directory. No credentials
-    and no hard-coded hosts: configuration comes from the environment (AGENTS.md).
-    """
+    """Load and validate the reference data (``path`` defaults to ``$REFERENCE_DATA_PATH``)."""
     resolved = path or os.environ.get("REFERENCE_DATA_PATH") or DEFAULT_REFERENCE_PATH
     raw: dict[str, Any] = json.loads(Path(resolved).read_text(encoding="utf-8"))
 

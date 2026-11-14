@@ -1,10 +1,4 @@
-"""Publishing helpers for the simulator.
-
-The simulator sends readings to the ingest service over HTTP
-(``http://ingest:8081/v1/readings``), matching the LoRaWAN gateway push model
-documented in AGENTS.md. A direct-to-Kafka transport is kept for debugging the
-broker in isolation; it is not part of the normal architecture.
-"""
+"""Sending simulated readings: over HTTP to the ingest service (normal), or straight to Kafka (debugging)."""
 
 from __future__ import annotations
 
@@ -23,11 +17,6 @@ READINGS_PATH = "/v1/readings"
 
 def _encode(value: dict[str, Any]) -> bytes:
     return json.dumps(value, separators=(",", ":")).encode("utf-8")
-
-
-# --------------------------------------------------------------------------------------
-# Kafka transport (debug only)
-# --------------------------------------------------------------------------------------
 
 
 def build_producer(config: ProducerConfig) -> Producer:
@@ -57,14 +46,9 @@ def wait_for_broker(config: ProducerConfig, timeout_s: float, interval_s: float 
             producer = build_producer(config)
             producer.list_topics(timeout=5)
             return True
-        except Exception:  # noqa: BLE001 - any broker error means "not ready yet"
+        except Exception:  # any broker error means "not ready yet"
             time.sleep(interval_s)
     return False
-
-
-# --------------------------------------------------------------------------------------
-# HTTP transport (through the ingest service, the normal path)
-# --------------------------------------------------------------------------------------
 
 
 def build_http_client(timeout_s: float) -> httpx.Client:
@@ -93,9 +77,7 @@ def publish_http(
 ) -> tuple[int, int]:
     """Publish readings to the ingest service; return ``(accepted, failed)``.
 
-    Documents are sent one by one so a single malformed record cannot poison the
-    batch. A 4xx means the ingest service refused the envelope - count it and
-    move on (FR3.2: the pipeline must keep running).
+    Readings are sent one by one, so one rejected reading (4xx) is counted and skipped.
     """
     url = base_url.rstrip("/") + READINGS_PATH
     accepted = 0

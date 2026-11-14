@@ -1,4 +1,4 @@
-"""Benchmark #5: recovery and replay, no loss and no duplicates (AGENTS.md, FR3.3).
+"""Benchmark #5: recovery and replay, no loss and no duplicates.
 
 While the simulator keeps sending, the script stops the streaming job, waits ``--outage``
 seconds so a backlog builds up in Kafka, then starts the job again on the same checkpoint.

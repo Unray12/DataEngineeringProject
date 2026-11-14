@@ -1,9 +1,4 @@
-"""Shared Spark session builder for the lakehouse (Iceberg on HDFS, HMS catalog).
-
-Both the streaming job (``python -m streaming``) and the batch helpers
-(``python -m batch.iceberg_init``) run against the same warehouse, so the
-catalog configuration lives here once instead of being duplicated.
-"""
+"""Spark session with the Iceberg catalog on HDFS (Hive Metastore), shared by the stream and batch jobs."""
 
 from __future__ import annotations
 
@@ -23,7 +18,6 @@ def build_spark(master: str | None = None) -> SparkSession:
         # UTC everywhere: timestamps must not depend on the container locale.
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.shuffle.partitions", os.getenv("SPARK_SHUFFLE_PARTITIONS", "4"))
-        # Iceberg catalog on HDFS via the Hive Metastore (AGENTS.md).
         .config("spark.sql.catalog.lakehouse", "org.apache.iceberg.spark.SparkCatalog")
         .config("spark.sql.catalog.lakehouse.catalog-impl", "org.apache.iceberg.hive.HiveCatalog")
         .config(

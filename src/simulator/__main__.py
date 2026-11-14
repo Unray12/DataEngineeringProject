@@ -1,9 +1,4 @@
-"""Entry point: ``python -m simulator``.
-
-Builds one simulated sensor per device in the reference data and pushes readings
-through the HTTP ingest service (the normal path) or straight to Kafka
-(``SIM_TRANSPORT=kafka``, for debugging the broker in isolation).
-"""
+"""``python -m simulator``: one simulated sensor per device, sending through the ingest service."""
 
 from __future__ import annotations
 
@@ -43,7 +38,7 @@ def _configure_logging() -> None:
     )
 
 
-def _handle_signal(signum, frame) -> None:  # noqa: ARG001
+def _handle_signal(signum, frame) -> None:
     global _running
     _running = False
     log.info("shutdown signal received, finishing current tick")

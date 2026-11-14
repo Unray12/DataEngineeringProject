@@ -1,4 +1,4 @@
-"""Data-correctness checks of the evaluation (section 5.2; BR4, FR4.1-FR4.7).
+"""Data-correctness checks of the evaluation.
 
 1. Fault detection. Kafka is the ground truth: every message carries the simulator's
    ``simulated_fault`` label. For each label the script counts the messages sent, then where they

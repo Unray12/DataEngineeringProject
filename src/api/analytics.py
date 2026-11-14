@@ -1,8 +1,4 @@
-"""Trino read adapter for the analytical serving path.
-
-The API owns this connection so browsers never access Trino or Iceberg
-directly. Queries are deliberately limited to the dbt gold tables.
-"""
+"""Trino queries behind the analytical endpoints. They only read the gold (and ops) tables."""
 
 from __future__ import annotations
 
@@ -10,9 +6,18 @@ import os
 from typing import Any
 
 from trino.dbapi import Connection, connect
+from trino.exceptions import OperationalError, TrinoUserError
 
 # ISO-8601 UTC, so the browser can parse an hourly bucket without guessing the format.
 HOUR_BUCKET = "format_datetime(hour_start, 'yyyy-MM-dd''T''HH:mm:ss''Z''')"
+
+
+# Errors that mean "the batch flow has not built the tables yet", not a broken query.
+_MISSING_OBJECT_ERRORS = {"CATALOG_NOT_FOUND", "SCHEMA_NOT_FOUND", "TABLE_NOT_FOUND"}
+
+
+class AnalyticsUnavailable(RuntimeError):
+    """Trino is unreachable or the gold tables do not exist yet."""
 
 
 class AnalyticsReader:
@@ -30,12 +35,20 @@ class AnalyticsReader:
 
     def query(self, sql: str, parameters: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         cursor = self.connection.cursor()
-        cursor.execute(sql, parameters)
+        try:
+            cursor.execute(sql, parameters)
+            rows = cursor.fetchall()
+        except TrinoUserError as exc:
+            if exc.error_name in _MISSING_OBJECT_ERRORS:
+                raise AnalyticsUnavailable(exc.message) from exc
+            raise
+        except OperationalError as exc:  # includes TrinoConnectionError
+            raise AnalyticsUnavailable(str(exc)) from exc
         columns = [description[0] for description in cursor.description]
-        return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
+        return [dict(zip(columns, row, strict=True)) for row in rows]
 
     def indicators(self, field_id: str, start: str, end: str, granularity: str) -> list[dict[str, Any]]:
-        """Indicators per day (``field_indicators``) or per hour (``field_hourly``) (FR5.1, FR5.3)."""
+        """Indicators per day (``field_indicators``) or per hour (``field_hourly``)."""
         if granularity == "hourly":
             return self.query(
                 f"""
@@ -67,7 +80,7 @@ class AnalyticsReader:
     def history(
         self, field_id: str, start: str, end: str, metric: str, granularity: str
     ) -> list[dict[str, Any]]:
-        """Per-field history of one metric, daily or hourly (FR6.3).
+        """Per-field history of one metric, daily or hourly.
 
         ``count`` is the number of validated readings behind ``avg``, the weight a client needs to
         average several buckets (``field_hourly`` holds validated readings only).

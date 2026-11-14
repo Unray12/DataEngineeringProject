@@ -1,21 +1,12 @@
-"""Spark Structured Streaming micro-batch job (BR2, BR3, BR4, BR8).
+"""Configuration and the Kafka source of the streaming job.
 
-Pipeline (30 s micro-batch, see AGENTS.md):
-
-    Kafka ``sensor.readings.v1``
-      -> explicit-schema parse + lineage capture (topic/partition/offset/ingested_at)
-      -> device -> field -> farm resolution against master data (FR1.2)
-      -> validation: schema, ranges, implausible jumps, de-duplication (FR4.1-4.3)
-      -> Iceberg: bronze (raw, flagged), ops.quarantine, ops.quality_counters,
-         ops.device_gaps                       (HDFS, full history, FR6)
-      -> Cassandra: latest_by_field, readings_by_field_24h, device_status,
-         alerts + alert lifecycle              (near real-time serving, FR2.2)
-
-Silver and gold are **not** written here: they are built by dbt (AGENTS.md).
+Kafka -> parse with an explicit schema and keep lineage (topic, partition, offset, Kafka timestamp)
+-> ``pipeline.BatchProcessor`` every ``TRIGGER_INTERVAL`` (30 s by default).
 """
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -48,22 +39,16 @@ def spark_interval(value: str) -> str:
 
 
 def env(key: str, default: str) -> str:
-    import os
-
     value = os.environ.get(key)
     return default if value in (None, "") else value
 
 
 def env_float(key: str, default: float) -> float:
-    import os
-
     value = os.environ.get(key)
     return default if value in (None, "") else float(value)
 
 
 def env_int(key: str, default: int) -> int:
-    import os
-
     value = os.environ.get(key)
     return default if value in (None, "") else int(value)
 
@@ -85,9 +70,9 @@ class StreamConfig:
     cassandra_wait_s: int
     # Master data
     reference_path: str
-    # Quality rules (FR4.2)
+    # Quality rules
     late_after_s: int
-    # Alert rules (FR8.1, FR8.2, FR8.5)
+    # Alert rules
     debounce_batches: int
     cooldown_s: int
     offline_multiplier: float
@@ -104,7 +89,6 @@ class StreamConfig:
             topic=env("KAFKA_SENSOR_TOPIC", "sensor.readings.v1"),
             starting_offsets=env("STARTING_OFFSETS", "earliest"),
             max_offsets_per_trigger=env_int("MAX_OFFSETS_PER_TRIGGER", 20000),
-            # Fixed decision (AGENTS.md): 30 s micro-batch. Benchmarks override it.
             trigger_interval=spark_interval(env("TRIGGER_INTERVAL", "30s")),
             checkpoint_location=f"{checkpoint_uri.rstrip('/')}/{checkpoint_root}",
             master=env("SPARK_MASTER", "local[*]"),
@@ -121,11 +105,10 @@ class StreamConfig:
         )
 
 
-# Explicit payload schema (AGENTS.md: no schema inference on streaming reads).
-#
+# Payload schema, given explicitly (no inference on streaming reads).
 # Numeric fields arrive as strings so that a wrong JSON type ("value": "high")
 # can be told apart from a genuine JSON null: the former is a malformed record
-# (quarantined, FR4.1), the latter is a null measurement (flagged, FR4.2).
+# (quarantined), the latter is a null measurement (flagged).
 PAYLOAD_COLUMNS: dict[str, Any] = {
     "event_id": "string",
     "device_id": "string",
@@ -139,15 +122,11 @@ PAYLOAD_COLUMNS: dict[str, Any] = {
 
 
 def read_stream(spark: SparkSession, cfg: StreamConfig) -> DataFrame:
-    """Kafka source with explicit schema and full lineage columns (FR4.4).
+    """Kafka source with an explicit schema and lineage columns.
 
-    The Kafka stream is unioned with a Spark built-in ``rate`` source that
-    emits one tick row per second. Spark does not run a micro-batch at all when
-    no source has new offsets (and the query is stateless), so without the tick
-    a silent topic would stop the 30 s trigger from ever evaluating outages
-    (FR3.5) or alerts (FR8) - exactly what a fleet-wide silence looks like.
-    Ticks carry no payload and are filtered out here, before validation, so no
-    downstream stage ever sees them; they exist only to keep offsets advancing.
+    Kafka is unioned with Spark's ``rate`` source (one tick row per second). Spark skips a batch when
+    no source has new offsets, so without the ticks a completely silent fleet would never be checked
+    for outages. The tick rows are filtered out again before anything else sees them.
     """
     from pyspark.sql.functions import col, from_json, lit, try_to_timestamp
     from pyspark.sql.types import StringType, StructField, StructType
@@ -229,7 +208,7 @@ def read_stream(spark: SparkSession, cfg: StreamConfig) -> DataFrame:
         .filter(~col("is_tick"))
         .drop("is_tick")
         # Late and out-of-order readings are accepted; the watermark documents
-        # the configured lateness window (FR3.4) and bounds any future state.
+        # the configured lateness window and bounds any future state.
         # Applied after the union: tick rows carry a null measured_at, which the
         # watermark ignores.
         .withWatermark("measured_at", f"{env_int('WATERMARK_S', 3600)} seconds")

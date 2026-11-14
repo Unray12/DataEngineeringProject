@@ -1,4 +1,4 @@
-"""Benchmark #3: Iceberg against plain Hive/Parquet on the same data (BR6, FR6.2).
+"""Benchmark #3: Iceberg against plain Hive/Parquet on the same data.
 
 Both tables get the same synthetic readings through the same number of small commits (the way
 the streaming job writes), then the same three queries are timed. Afterwards four behaviours

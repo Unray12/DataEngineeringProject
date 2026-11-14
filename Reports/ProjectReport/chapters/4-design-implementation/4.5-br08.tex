@@ -31,6 +31,8 @@ Sóng yếu (\code{signal\_poor}) & Chất lượng tín hiệu $<$ 0,3 & info &
 
 Ví dụ với lúa (\code{RICE}): khoảng độ ẩm đất mục tiêu là 30--60\% và ngưỡng cảnh báo \code{alert\_below} là 32\%. Nếu trung bình độ ẩm các bản ghi hợp lệ trong một lô của thửa F001 là 29,5\%, điều kiện \code{low\_soil\_moisture} của F001 ở trạng thái vi phạm.
 
+Với mỗi thửa ruộng và chỉ số có khoảng mục tiêu, điều kiện dưới ngưỡng và điều kiện trên ngưỡng đều được đánh giá ở mọi lô có dữ liệu hợp lệ, kể cả khi không vi phạm (hàm \code{threshold\_conditions} trong \code{src/streaming/alerts.py}). Nhờ vậy bộ đếm debounce của từng điều kiện được đặt lại và cảnh báo đang mở được đóng khi điều kiện hết.
+
 Điều kiện mất kết nối được đánh giá cho \emph{mọi} thiết bị trong danh mục ở mỗi lô, kể cả khi lô không có dữ liệu. Để Spark vẫn chạy lô khi Kafka im lặng hoàn toàn, nguồn Kafka được hợp (\code{unionByName}) với nguồn \code{rate} của Spark phát một dòng nhịp mỗi giây; các dòng nhịp bị lọc bỏ ngay sau đó. Nếu thiếu cơ chế này, sự cố mất kết nối toàn bộ sẽ không bao giờ được phát hiện vì không có lô nào chạy.
 
 \subsubsection{Máy trạng thái: debounce, cooldown và tự đóng}
@@ -61,7 +63,7 @@ Ba quy tắc chống bão cảnh báo (FR8.5) và vòng đời (FR8.4) như sau:
   \item \textbf{Debounce}: điều kiện phải vi phạm liên tiếp \code{ALERT\_DEBOUNCE\_BATCHES} lô (mặc định 2) mới sinh cảnh báo, nên một lô nhiễu không gây cảnh báo. Với trigger 30 giây, cảnh báo xuất hiện sau khoảng 60 giây kể từ lô vi phạm đầu tiên.
   \item \textbf{Một cảnh báo cho một sự cố}: khi đã có cảnh báo mở cho điều kiện đó, các lô vi phạm tiếp theo không sinh thêm cảnh báo.
   \item \textbf{Cooldown}: sau khi một cảnh báo được phát, cùng điều kiện không được phát lại trong \code{ALERT\_COOLDOWN\_S} giây (mặc định 300).
-  \item \textbf{Tự đóng}: khi điều kiện hết vi phạm, cảnh báo đang ở trạng thái \code{open} được đóng tự động với lý do \code{condition\_cleared}. Cảnh báo mất kết nối vì thế tự đóng khi thiết bị gửi dữ liệu trở lại. Cảnh báo đã được \emph{acknowledge} thì không tự đóng, vì đã có người nhận xử lý và phải do họ đóng.
+  \item \textbf{Tự đóng}: khi điều kiện hết vi phạm, cảnh báo đang ở trạng thái \code{open} được đóng tự động với lý do \code{condition\_cleared}. Cảnh báo mất kết nối vì thế tự đóng khi thiết bị gửi dữ liệu trở lại. Cảnh báo đã được \emph{acknowledge} thì không tự đóng, vì đã có người nhận xử lý và phải do họ đóng. Ngoại lệ là \code{rapid\_change}: điều kiện này chỉ được ghi nhận ở lô có bước nhảy, nên bộ đếm debounce của nó không được đặt lại giữa hai lần nhảy cách xa nhau và cảnh báo của nó chỉ được đóng bằng tay.
 \end{itemize}
 
 Trạng thái của từng cặp (thửa ruộng, điều kiện), gồm bộ đếm debounce, thời điểm phát gần nhất và cảnh báo đang mở, được lưu trong bảng Cassandra \code{alert\_state\_by\_field}. Vì vậy tác vụ không cần toán tử có trạng thái của Spark, và bộ đếm vẫn còn sau khi tác vụ khởi động lại.
@@ -112,4 +114,4 @@ curl -X PATCH http://localhost:8000/alerts/<alert_id> \
 \label{fig:4-br08-ui}
 \end{figure}
 
-\paragraph{Kiểm thử.} Logic cảnh báo có 7 kiểm thử đơn vị trong \code{tests/unit/test\_alerts.py}: debounce hoãn các lô đầu, một lô nhiễu không mở cảnh báo, cảnh báo đang mở không bị phát lại, điều kiện hết thì cảnh báo tự đóng, cảnh báo đã acknowledge không tự đóng, cooldown chặn cảnh báo thứ hai quá sớm, và bảng chuyển trạng thái. Logic mất kết nối và khoảng trống dữ liệu có 11 kiểm thử trong \code{tests/unit/test\_status.py}. Cả hai chạy bằng \code{just test-unit}, không cần khởi động cụm.
+\paragraph{Kiểm thử.} Logic cảnh báo có 9 kiểm thử đơn vị trong \code{tests/unit/test\_alerts.py}: debounce hoãn các lô đầu, một lô nhiễu không mở cảnh báo, cảnh báo đang mở không bị phát lại, điều kiện hết thì cảnh báo tự đóng, cảnh báo đã acknowledge không tự đóng, cooldown chặn cảnh báo thứ hai quá sớm, bảng chuyển trạng thái, cả hai chiều của ngưỡng được ghi nhận ở mỗi lô, và cảnh báo \code{heat\_stress} tự đóng khi nhiệt độ giảm. Logic mất kết nối và khoảng trống dữ liệu có 11 kiểm thử trong \code{tests/unit/test\_status.py}. Cả hai chạy bằng \code{just test-unit}, không cần khởi động cụm.

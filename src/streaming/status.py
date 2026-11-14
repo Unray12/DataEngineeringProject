@@ -1,11 +1,7 @@
-"""Device online/offline transition logic (FR3.5, FR8.2).
+"""Device online/offline transitions, as plain functions so they can be unit-tested.
 
-Pure functions: no Spark and no Cassandra, so the outage lifecycle - open a
-gap on silence, close it when the device reports again - is unit-testable.
-``pipeline.BatchProcessor._update_device_status`` calls :func:`transition`
-once per device per micro-batch and only handles I/O around it.
-
-All timestamps are timezone-aware UTC.
+``pipeline.BatchProcessor._update_device_status`` calls ``transition`` once per device per batch and
+does the I/O. All timestamps are timezone-aware UTC.
 """
 
 from __future__ import annotations
@@ -91,7 +87,7 @@ def transition(
 
     resume_gap: tuple[datetime, datetime] | None = None
     if was_offline and batch_last_seen is not None:
-        # Transition offline -> online: close the gap (FR3.5).
+        # Transition offline -> online: close the gap.
         if gap_start is not None and batch_first_seen is not None and batch_first_seen >= gap_start:
             resume_gap = (gap_start, batch_first_seen)
             gap_end = batch_first_seen
@@ -108,8 +104,6 @@ def transition(
         gap_start = last_seen
         gap_end = None
         went_offline = True
-    elif is_offline:
-        pass  # already offline and still silent: the gap stays open
 
     return StatusDecision(
         status=status,

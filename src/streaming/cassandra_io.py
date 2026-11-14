@@ -1,12 +1,7 @@
-"""Cassandra access for the streaming job (near real-time serving path).
+"""Cassandra reads and writes of the streaming job.
 
-The micro-batch driver writes through the Python driver: volumes are small
-(demo scale), the writes are keyed exactly like the tables (query-first, see
-``cassandra/schema.cql``), and every write is an idempotent upsert, so a
-replayed batch updates rows in place (FR3.3). Reads are point lookups on the
-same primary keys: previous latest value per (field, metric) for the jump
-check, alert state for debounce/cooldown, and device status for outage
-detection.
+Volumes are small, so the driver writes from the Spark driver process. Every write is an upsert on the
+table's primary key, which makes a re-run batch harmless.
 """
 
 from __future__ import annotations
@@ -155,8 +150,6 @@ class CassandraWriter:
     def close(self) -> None:
         self.cluster.shutdown()
 
-    # -- reads -------------------------------------------------------------
-
     def read_latest(self, field_id: str, metric: str) -> LatestRow | None:
         row = self.session.execute(
             "SELECT value, measured_at, quality_flag FROM latest_by_field "
@@ -197,10 +190,8 @@ class CassandraWriter:
             )
         return out
 
-    # -- writes ------------------------------------------------------------
-
     def write_series(self, rows: list[tuple]) -> None:
-        """Insert last-24-hours rows; PK idempotency makes replays no-ops (FR3.3)."""
+        """Insert last-24-hours rows; PK idempotency makes replays no-ops."""
         if not rows:
             return
         execute_concurrent_with_args(self.session, self.p_series, rows, concurrency=32)
@@ -231,8 +222,6 @@ class CassandraWriter:
             ),
         )
 
-    # -- alert lifecycle ---------------------------------------------------
-
     def open_alert(
         self,
         *,
@@ -250,7 +239,7 @@ class CassandraWriter:
         threshold_value: float | None,
         batch_id: int,
     ) -> None:
-        """Insert a new open alert in every serving table (FR8.3)."""
+        """Insert a new open alert in every serving table."""
         created = utc_naive(created_at)
         args = (
             condition_code,
@@ -283,7 +272,7 @@ class CassandraWriter:
         note: str | None = None,
         resolved_at: datetime | None = None,
     ) -> None:
-        """Move an alert to 'resolved' across every serving table (FR8.4)."""
+        """Move an alert to 'resolved' across every serving table."""
         when = utc_naive(resolved_at or datetime.now(UTC))
         created = utc_naive(created_at)
         row = self._alert_row(field_id, created, alert_id)
@@ -357,7 +346,7 @@ class CassandraWriter:
         batch_id: int,
         now: datetime,
     ) -> None:
-        """Full-row upsert of the per-condition alert state (FR8.5)."""
+        """Full-row upsert of the per-condition alert state."""
         self.session.execute(
             self.p_alert_state,
             (
