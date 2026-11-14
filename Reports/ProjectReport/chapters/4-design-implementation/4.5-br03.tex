@@ -1,0 +1,50 @@
+\subsection{BR03 -- Duy trì tính liên tục của giám sát}
+\label{sec:4-br03}
+
+\paragraph{Yêu cầu.}
+BR03 yêu cầu dữ liệu không bị mất khi tác vụ xử lý tạm thời dừng, việc phát lại không sinh bản ghi trùng, dữ liệu đến muộn vẫn được tiếp nhận và các khoảng thiết bị ngừng báo cáo phải được ghi nhận rõ ràng (FR3.1--FR3.5). Vì vậy tính liên tục được xử lý ở cả nguồn, engine và nơi ghi, thay vì phụ thuộc vào một cơ chế riêng lẻ.
+
+\paragraph{Kafka làm bộ đệm phát lại (FR3.1).}
+Kafka tách quá trình thu thập khỏi Spark. Producer chỉ cần broker xác nhận sự kiện đã được ghi; không cần Spark đang chạy tại cùng thời điểm. Topic có retention cấu hình được, mặc định hướng tới bảy ngày theo yêu cầu, nên một lần dừng xử lý vài phút hoặc vài giờ không làm mất sự kiện đầu vào.
+
+\paragraph{Checkpoint bền vững (FR3.2).}
+Checkpoint của Spark được lưu trên HDFS. Mỗi lô có phạm vi Kafka offset đã lập kế hoạch và một commit tương ứng khi xử lý hoàn tất. Nếu tiến trình chết sau khi offset đã được ghi nhưng trước commit, Spark sử dụng cùng checkpoint để chạy lại lô đó sau khi khởi động.
+
+\paragraph{Ghi idempotent (FR3.3).}
+Tác vụ sử dụng \code{foreachBatch}, do đó một lô có thể được chạy lại. Bảng bronze của Iceberg sử dụng \code{MERGE} theo khóa
+\code{(device\_id, metric, measured\_at)}. Các bảng Cassandra dùng khóa chính xác định theo truy vấn; ghi lại cùng số đo sẽ cập nhật cùng một row thay vì chèn một row logic mới. Vì vậy việc replay một lô không tạo ra bản sao mới ở tầng phục vụ.
+
+\begin{lstlisting}[language=Python, caption={Các giai đoạn liên quan tới phục hồi của một micro-batch (\texttt{src/streaming/pipeline.py}, rút gọn)}, label={lst:4-br03-batch}]
+# Persist durable history using keyed Iceberg MERGE.
+write_bronze_and_counters(flagged, batch_id)
+
+# Serving rows use stable Cassandra primary keys.
+writer.write_series(series_rows)
+writer.write_latest(latest_rows)
+
+# Device state and gaps are derived again on replay.
+update_device_status(...)
+\end{lstlisting}
+
+\paragraph{Dữ liệu đến muộn (FR3.4).}
+Pipeline sử dụng event time từ \code{reading\_ts}, được ánh xạ thành \code{measured\_at}, thay vì giả định thứ tự Kafka chính là thứ tự xảy ra ngoài đồng. Watermark mặc định một giờ thể hiện chính sách event-time và giới hạn state cho các phép xử lý stateful nếu có. Hiện tại chưa có phép xử lý stateful sử dụng watermark để loại bản ghi đến muộn; bản ghi hợp lệ về cấu trúc vẫn được xử lý và lưu ngay cả khi đến muộn hơn một giờ. Nếu chậm hơn 600 giây, số đo được gắn cờ \code{is\_late} và vẫn được lưu vào bronze. Cơ chế này cho phép phân biệt dữ liệu đến muộn với dữ liệu thực sự bị mất.
+
+\paragraph{Phát hiện khoảng trống (FR3.5).}
+Trạng thái mới nhất của mỗi thiết bị được lưu trong \code{device\_status}. Nếu thời gian kể từ \code{last\_seen} vượt quá một bội số cấu hình của chu kỳ báo cáo, thiết bị chuyển sang trạng thái offline và một khoảng trống được mở. Với fixture hiện tại, thiết bị báo cáo mỗi 5 giây và hệ số mặc định là 4, tương đương ngưỡng im lặng 20 giây.
+
+Khi thiết bị gửi trở lại, khoảng trống được đóng bằng \code{gap\_end} và thời lượng được tính. Bản ghi này còn được lưu bền vững ở \code{ops.device\_gaps}. Nguồn heartbeat của Spark bảo đảm việc kiểm tra này vẫn chạy ngay cả khi toàn bộ Kafka topic không có sự kiện mới.
+
+\paragraph{Hiển thị.}
+Endpoint chuỗi số đo trả về cả các điểm và danh sách khoảng trống. Giao diện Live tô hoặc ngắt riêng khoảng thiếu thay vì nội suy giữa hai số đo ở hai phía. Trang Devices cung cấp trạng thái thiết bị, \code{last\_seen}, pin, chất lượng tín hiệu và số lần mất dữ liệu trong 24 giờ.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{ui-devices.png}
+\caption{Trang Devices hiển thị trạng thái thiết bị và số khoảng gián đoạn}
+\label{fig:4-br03-devices}
+\end{figure}
+
+\paragraph{Kết quả.}
+Benchmark phục hồi ở Mục~\ref{sec:5-bench-replay} thử ba trường hợp: giết tác vụ trong lúc lô đang chạy, giết ngay sau khi bronze đã commit nhưng trước khi các sink còn lại hoàn tất, và dừng có trật tự. Tổng cộng 9\,224 thông điệp Kafka được đối chiếu. Cả ba trường hợp đều có 0 thông điệp bị mất, 0 khóa trùng trong bronze, 0 offset trùng trong quarantine và 0 số đo đáng hiển thị bị thiếu trong Cassandra.
+
+Trường hợp khó nhất là giết tác vụ ngay sau khi bronze đã ghi 238 dòng của lô. Khi khởi động lại, Spark chạy lại đúng lô đó; \code{MERGE} cập nhật các dòng đã tồn tại và Cassandra ghi vào cùng khóa chính. Kết quả cho thấy checkpoint kết hợp với sink idempotent đạt được kết quả tương đương exactly-once ở mức dữ liệu, dù \code{foreachBatch} có ngữ nghĩa thực thi at-least-once.

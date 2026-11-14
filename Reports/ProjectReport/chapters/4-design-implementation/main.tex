@@ -9,7 +9,51 @@ Chương này trình bày giải pháp kỹ thuật dữ liệu của đề tài
 
 \section{Công nghệ xử lý dữ liệu}
 \label{sec:4-processing}
-% TODO
+
+Giải pháp sử dụng hai kiểu xử lý với hai nhịp khác nhau. Đường gần thời gian thực dùng Spark Structured Streaming đọc Kafka theo micro-batch; đường phân tích dùng dbt trên Spark để biến đổi dữ liệu bronze thành silver và gold theo lần làm mới. Mục này tập trung vào đường streaming vì đây là đường phục vụ trực tiếp BR2 và BR3.
+
+\subsection{Kafka làm ranh giới giữa thu thập và xử lý}
+
+Service tiếp nhận và Spark không gọi trực tiếp lẫn nhau. Mọi số đo được ghi trước vào topic Kafka \code{sensor.readings.v1}. Kafka giữ lại sự kiện sau khi producer đã gửi thành công, vì vậy tốc độ gửi của thiết bị không cần đồng bộ với thời gian xử lý của Spark. Khi tác vụ Spark tạm thời dừng, số đo mới vẫn tiếp tục được Kafka lưu và được đọc lại sau khi tác vụ khởi động lại.
+
+Đối với mỗi sự kiện, Spark giữ lại \code{topic}, \code{partition}, \code{offset} và timestamp Kafka dưới dạng thông tin lineage. Offset cũng là cơ sở để Spark xác định chính xác khoảng sự kiện thuộc về từng micro-batch.
+
+\subsection{Spark Structured Streaming theo micro-batch 30 giây}
+
+Tác vụ chính sử dụng trigger 30 giây. Mỗi lượt chạy lấy những offset mới từ Kafka, phân tích payload theo schema tường minh, ánh xạ thiết bị vào thửa ruộng và trang trại, gắn các cờ chất lượng, sau đó ghi kết quả tới Cassandra và Iceberg. Giới hạn \code{MAX\_OFFSETS\_PER\_TRIGGER=20000} ngăn một lần backlog lớn tạo ra một lô không kiểm soát được.
+
+Các tham số chính được cấu hình qua biến môi trường, như Đoạn mã~\ref{lst:4-stream-config}.
+
+\begin{lstlisting}[language=Python, caption={Các tham số chính của đường streaming (\texttt{src/streaming/config.py})}, label={lst:4-stream-config}]
+trigger_interval = spark_interval(
+    env("TRIGGER_INTERVAL", "30s")
+)
+max_offsets_per_trigger = env_int(
+    "MAX_OFFSETS_PER_TRIGGER", 20000
+)
+late_after_s = env_int("LATE_AFTER_S", 600)
+checkpoint_location = (
+    f"{checkpoint_uri.rstrip('/')}/{checkpoint_root}"
+)
+\end{lstlisting}
+
+Chu kỳ 30 giây không được chọn chỉ theo cảm tính. Benchmark ở Mục~\ref{sec:5-bench-trigger} so sánh 10, 30 và 60 giây trong cùng môi trường. Với 30 giây, độ trễ đầu-cuối p50 là 22,7 giây, p95 là 35,8 giây và lớn nhất 36,9 giây, thấp hơn nhiều so với mục tiêu 90 giây. Tác vụ bận 26\% thời gian, so với 63\% ở trigger 10 giây. Vì vậy 30 giây giữ được độ mới cần thiết mà không phải trả chi phí xử lý và số commit cao như chu kỳ ngắn hơn.
+
+\subsection{Checkpoint và khôi phục}
+
+Checkpoint được đặt trên HDFS thay vì filesystem tạm của container. Spark ghi phạm vi offset dự kiến xử lý trước khi chạy một lô và chỉ ghi commit sau khi lô hoàn thành. Nếu tiến trình dừng giữa hai bước, khi khởi động lại Spark chạy lại cùng phạm vi offset.
+
+Điều này tự nó chưa tạo ra kết quả exactly-once khi sử dụng \code{foreachBatch}, vì một sink có thể đã được ghi trước khi tiến trình dừng. Do đó các thao tác ghi được thiết kế idempotent: bảng Iceberg dùng \code{MERGE} theo khóa tự nhiên, còn bảng Cassandra dùng khóa chính ổn định. Cơ chế ``nguồn có thể phát lại + checkpoint + sink idempotent'' cho kết quả tương đương exactly-once ở mức logic, được kiểm chứng bằng benchmark phục hồi ở Mục~\ref{sec:5-bench-replay}.
+
+\subsection{Xử lý dữ liệu đến muộn và khoảng im lặng}
+
+Tác vụ phân biệt event time với processing time và cấu hình watermark một giờ trên \code{measured\_at}. Watermark thể hiện chính sách event-time và có thể giới hạn state cho các phép xử lý stateful nếu được bổ sung. Trong hiện thực hiện tại, chưa có phép xử lý stateful sử dụng watermark để loại bản ghi đến muộn, nên bản ghi không bị loại chỉ vì vượt một giờ. Ngưỡng \code{LATE\_AFTER\_S=600} đánh dấu các số đo trễ hơn 600 giây bằng \code{is\_late}; các bản ghi này vẫn được lưu vào bronze để giữ lịch sử đầy đủ.
+
+Một vấn đề khác là khi toàn bộ topic không có sự kiện mới, Spark có thể không tạo micro-batch, trong khi hệ thống vẫn cần kiểm tra xem thiết bị có bị mất kết nối hay không. Vì vậy luồng Kafka được ghép với một nguồn \code{rate} đóng vai trò heartbeat. Tick của heartbeat bị lọc trước bước xử lý nghiệp vụ nhưng làm source offset tiếp tục tiến lên, nhờ đó các lượt kiểm tra mất kết nối vẫn được thực hiện khi cảm biến im lặng hoàn toàn.
+
+\subsection{Vì sao dùng micro-batch}
+
+Xử lý từng sự kiện bằng một engine như Flink có thể giảm độ trễ xuống mức dưới giây, nhưng yêu cầu của đề tài chỉ cần dữ liệu xuất hiện trong khoảng một phút và các quyết định nông nghiệp không thay đổi theo mili-giây. Benchmark cho thấy trigger 30 giây đã có p95 35,8 giây. Chuyển sang một engine xử lý từng sự kiện sẽ bổ sung thêm công nghệ, trạng thái và vận hành trong khi lợi ích độ trễ không cần thiết cho bài toán. Vì vậy Spark Structured Streaming theo micro-batch được giữ làm giải pháp chính.
 
 \input{chapters/4-design-implementation/4.4-data-model}
 
@@ -17,8 +61,8 @@ Chương này trình bày giải pháp kỹ thuật dữ liệu của đề tài
 \label{sec:4-pipeline}
 
 \input{chapters/4-design-implementation/4.5-br01}
-\subsection{BR02 -- Nâng cao nhận biết điều kiện đồng ruộng}
-\subsection{BR03 -- Duy trì tính liên tục của giám sát}
+\input{chapters/4-design-implementation/4.5-br02}
+\input{chapters/4-design-implementation/4.5-br03}
 \input{chapters/4-design-implementation/4.5-br04}
 \input{chapters/4-design-implementation/4.5-br05}
 \input{chapters/4-design-implementation/4.5-br06}
@@ -31,5 +75,45 @@ Chương này trình bày giải pháp kỹ thuật dữ liệu của đề tài
 \label{sec:4-application}
 
 \subsection{Mô phỏng và thu thập dữ liệu}
+\label{sec:4-simulation-ingest}
+
+Vì phần cứng cảm biến và network server LoRaWAN nằm ngoài phạm vi đề tài, nhóm xây dựng một bộ mô phỏng để cung cấp luồng dữ liệu có cùng đặc trưng cần thiết cho pipeline. Bộ mô phỏng không chứa một danh sách thiết bị riêng mà đọc trực tiếp \code{reference/reference\_data.json}; vì vậy khi thêm thiết bị vào dữ liệu danh mục, lần chạy tiếp theo có thể tự tạo số đo cho thiết bị đó mà không sửa mã sinh dữ liệu.
+
+\paragraph{Sinh số đo.}
+Mỗi thiết bị giữ trạng thái riêng gồm chu kỳ báo cáo, pin, chất lượng tín hiệu và các chỉ số được đăng ký. Với mỗi chỉ số, bộ sinh duy trì một baseline và thực hiện random walk có biên. Giá trị sau nhiễu tiếp tục được giới hạn trong khoảng vật lý của chỉ số, nên một sự kiện bình thường không tự nhiên tạo ra độ ẩm 101\% hoặc lượng mưa âm. Chỉ các lỗi được tiêm có chủ đích mới có thể vượt các giới hạn này.
+
+\begin{lstlisting}[language=Python, caption={Sinh giá trị bằng random walk có giới hạn (\texttt{src/simulator/generator.py}, rút gọn)}, label={lst:4-simulator-walk}]
+step = random.gauss(
+    0, METRIC_NOISE.get(metric, 1.0) * 0.5
+)
+value = min(
+    spec.max,
+    max(spec.min, baseline + step),
+)
+\end{lstlisting}
+
+Bộ mô phỏng còn thay đổi dần mức pin và chất lượng tín hiệu. Cách này cho phép các trường sức khỏe thiết bị thay đổi theo thời gian thay vì luôn giữ một hằng số.
+
+\paragraph{Tiêm lỗi.}
+Tại mỗi nhịp, bộ mô phỏng có thể chọn một thiết bị để lên lịch lỗi. Bảy loại lỗi gồm giá trị rỗng, ngoài khoảng, bước nhảy bất thường, bản gửi trùng, thiết bị lạ, chỉ số không hợp lệ và payload sai hình thức. Mỗi sự kiện lỗi có trường \code{simulated\_fault}; trường này đi theo bản ghi tới bronze hoặc raw payload của quarantine và được sử dụng để đánh giá khả năng phát hiện lỗi ở Chương~\ref{chap:5-evaluation}.
+
+Thiết bị cũng có thể được đưa vào trạng thái ngủ trong khoảng 45--90 giây theo cấu hình mặc định. Trong thời gian này bộ sinh không phát bất kỳ chỉ số nào của thiết bị. Đây là cách mô phỏng tình huống mất pin, lỗi gateway hoặc gián đoạn kết nối cho BR03 và BR08.
+
+\paragraph{Service tiếp nhận.}
+Bộ mô phỏng gửi payload qua HTTP tới service tiếp nhận. Service này được giữ đơn giản có chủ ý: nó bảo đảm request có thể được chuyển thành sự kiện và gửi vào Kafka, nhưng không thực hiện đầy đủ các quy tắc nghiệp vụ như thiết bị có tồn tại hay giá trị có hợp lý hay không. Những kiểm tra đó thuộc tác vụ Spark để mọi sự kiện, kể cả sự kiện lỗi, vẫn có Kafka offset và có thể được lưu vết.
+
+Kafka producer bật idempotence và chờ xác nhận từ broker trước khi phản hồi thành công. Nếu broker không xác nhận được thông điệp, service trả lỗi để client có thể retry. Mô hình này ưu tiên at-least-once ở biên; việc khử trùng lặp được xử lý ở downstream bằng khóa logic của số đo.
+
+Luồng tổng thể của bước thu thập do đó là:
+
+\[
+\text{Simulator / Gateway}
+\rightarrow \text{HTTP ingest}
+\rightarrow \text{Kafka}
+\rightarrow \text{Spark Structured Streaming}.
+\]
+
+Việc giữ service tiếp nhận mỏng còn tạo điều kiện thay bộ mô phỏng bằng gateway thực trong tương lai: miễn gateway gửi được cùng hợp đồng sự kiện, các tầng Kafka, Spark, Cassandra và Iceberg phía sau không cần thay đổi.
+
 \input{chapters/4-design-implementation/4.7-ui}
 \input{chapters/4-design-implementation/4.7-deployment}

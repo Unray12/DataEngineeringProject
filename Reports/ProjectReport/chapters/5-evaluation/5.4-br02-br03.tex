@@ -1,0 +1,66 @@
+% Phần BR2 và BR3 của Mục 5.4 (người phụ trách: Nhân).
+
+\subsection{BR02 -- Nâng cao nhận biết điều kiện đồng ruộng}
+\label{sec:5-eff-br02}
+
+Bảng~\ref{tab:5-eff-br02} đối chiếu hai tiêu chí chấp nhận của BR02 với kết quả đo trên hệ thống.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR02 và bằng chứng}
+\label{tab:5-eff-br02}
+\small
+\begin{tblr}{
+  colspec = {X[2.5,l]X[3.7,l]X[0.8,c]},
+  rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines,
+  row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Trong tải bình thường, số đo xuất hiện trên API trong vòng 90 giây kể từ khi Kafka nhận &
+Benchmark \#1 với trigger 30 giây: độ trễ đầu-cuối p50 22,7 s, p95 35,8 s và lớn nhất 36,9 s (Mục~\ref{sec:5-bench-trigger}) &
+Đạt \\
+Mỗi panel trên bảng điều khiển cho biết thời điểm dữ liệu được cập nhật &
+Trang Live hiển thị \emph{Data as of}; dữ liệu gần thời gian thực cũ hơn 90 giây được đánh dấu stale (Mục~\ref{sec:4-ui}) &
+Đạt \\
+\end{tblr}
+\end{table}
+
+Kết quả benchmark cho thấy giới hạn 90 giây còn dư đáng kể. Ở trigger 30 giây, ngay cả giá trị lớn nhất 36,9 giây chỉ bằng khoảng 41\% mục tiêu. Endpoint \code{/fields/\{id\}/latest} có p50 3,7 ms và endpoint chuỗi 24 giờ có p50 10,1 ms, vì vậy thời gian chờ chủ yếu đến từ chu kỳ micro-batch chứ không phải từ lớp API hay Cassandra.
+
+Về mặt sử dụng, trang Live cung cấp đủ bốn thành phần của FR2.4: giá trị hiện tại, đơn vị và trạng thái so với khoảng mục tiêu, xu hướng gần đây và thời điểm cập nhật. Người vận hành không cần truy cập Kafka hay cơ sở dữ liệu để biết số liệu vừa được cập nhật khi nào.
+
+\subsection{BR03 -- Duy trì tính liên tục của giám sát}
+\label{sec:5-eff-br03}
+
+BR03 có ba tiêu chí chấp nhận liên quan tới khôi phục và khoảng trống dữ liệu. Hai tiêu chí đầu được kiểm tra trực tiếp bằng benchmark \#5, trong đó tác vụ streaming bị dừng 180 giây trong khi bộ mô phỏng vẫn tiếp tục gửi sự kiện.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR03 và bằng chứng}
+\label{tab:5-eff-br03}
+\small
+\begin{tblr}{
+  colspec = {X[2.5,l]X[3.7,l]X[0.8,c]},
+  rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines,
+  row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Dừng Spark trong vài phút rồi khởi động lại không làm mất hoặc nhân đôi số đo downstream &
+Ba kịch bản benchmark \#5 kiểm tra tổng cộng 9\,224 thông điệp Kafka: 0 mất, 0 khóa trùng bronze, 0 offset trùng quarantine, 0 số đo hiển thị được thiếu trong Cassandra &
+Đạt \\
+Phát lại một khoảng Kafka cho kết quả logic giống nhau ở Cassandra và Iceberg &
+Kịch bản \code{sigkill-after-bronze}: 238 dòng đã commit vào bronze trước khi chết; lô được chạy lại và \code{MERGE} cùng khóa chính Cassandra không tạo bản ghi logic mới &
+Đạt \\
+Một lần thiết bị ngừng báo cáo tạo khoảng trống có thời điểm bắt đầu và kết thúc &
+Logic gap có 11 kiểm thử đơn vị đạt; trạng thái offline mở gap và số đo mới tiếp theo đóng gap; \code{ops.device\_gaps} lưu \code{gap\_start}, \code{gap\_end} và thời lượng &
+Đạt \\
+\end{tblr}
+\end{table}
+
+Kịch bản \code{sigkill-after-bronze} là phép thử quan trọng nhất cho idempotency. Trước khi tiến trình bị giết, 238 dòng của micro-batch đã được ghi vào bronze nhưng Cassandra chưa được cập nhật. Sau khi khởi động lại bằng cùng checkpoint, Spark chạy lại đúng phạm vi offset của lô đó. Các dòng bronze đã có được cập nhật bằng \code{MERGE} thay vì chèn thêm, còn các thao tác Cassandra ghi vào cùng primary key. Truy vấn đếm khóa trùng trên toàn bộ bronze sau ba kịch bản trả về rỗng.
+
+Khả năng bắt kịp sau gián đoạn cũng được kiểm chứng. Trong trường hợp dừng có trật tự, 1\,440 sự kiện tích lũy trong ba phút dừng được đưa cùng với các sự kiện kế tiếp vào lô 1\,640 sự kiện và xử lý trong 10,8 giây. Với hai trường hợp bị \code{SIGKILL}, lô đầu tiên hoàn tất sau khoảng 54--56 giây; chậm hơn trường hợp dừng có trật tự nhưng vẫn không mất dữ liệu.
+
+Kết quả này cần được hiểu trong giới hạn của môi trường thử nghiệm: mỗi kịch bản chỉ chạy một lần, Kafka và HDFS đều dùng cấu hình một nút, và benchmark không kiểm tra trường hợp toàn bộ checkpoint bị mất. Trong phạm vi các sự cố một dịch vụ mà yêu cầu đề tài đặt ra, BR03 đạt các tiêu chí chấp nhận.

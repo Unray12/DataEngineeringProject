@@ -1,0 +1,54 @@
+\subsection{BR02 -- Nâng cao nhận biết điều kiện đồng ruộng}
+\label{sec:4-br02}
+
+\paragraph{Yêu cầu.}
+BR02 yêu cầu người vận hành nhận được điều kiện hiện tại của từng thửa ruộng mà không phải chờ bước tổng hợp theo giờ hoặc theo ngày. Theo FR2.1--FR2.4, hệ thống phải thu nhận năm loại số đo, xử lý theo micro-batch, cung cấp giá trị mới nhất và chuỗi 24 giờ, đồng thời cho biết thời điểm dữ liệu được cập nhật.
+
+\paragraph{Luồng dữ liệu.}
+Số đo từ bộ mô phỏng hoặc gateway được service tiếp nhận đưa vào Kafka. Mỗi 30 giây, Spark đọc các offset mới, xác định \code{field\_id} và \code{farm\_id} từ \code{device\_id}, thực hiện các bước kiểm định rồi ghi các số đo có thể phục vụ lên Cassandra. FastAPI chỉ đọc Cassandra cho các endpoint gần thời gian thực, và giao diện Live gọi các endpoint này theo chu kỳ 30 giây.
+
+Hai bảng Cassandra chính của BR02 được thiết kế theo truy vấn thay vì theo mô hình chuẩn hóa. Bảng \code{latest\_by\_field} trả lời câu hỏi ``giá trị hiện tại của mọi chỉ số trong một thửa ruộng'', còn \code{readings\_by\_field\_24h} trả lời ``chuỗi của một chỉ số trong 24 giờ gần nhất''.
+
+\begin{lstlisting}[language=SQL, caption={Hai khóa truy vấn chính của BR02 (\texttt{cassandra/schema.cql})}, label={lst:4-br02-cassandra}]
+CREATE TABLE latest_by_field (
+    field_id text,
+    metric text,
+    value double,
+    measured_at timestamp,
+    ingested_at timestamp,
+    quality_flag text,
+    batch_id bigint,
+    PRIMARY KEY ((field_id), metric)
+);
+
+CREATE TABLE readings_by_field_24h (
+    field_id text,
+    metric text,
+    bucket bigint,
+    measured_at timestamp,
+    value double,
+    quality_flag text,
+    batch_id bigint,
+    PRIMARY KEY ((field_id, metric), bucket, measured_at)
+) WITH default_time_to_live = 172800;
+\end{lstlisting}
+
+Bảng chuỗi sử dụng TTL 48 giờ, dài hơn cửa sổ 24 giờ mà giao diện cần. Nhờ đó Cassandra chỉ giữ phần dữ liệu gần đây, còn lịch sử đầy đủ nằm ở Iceberg. Cách chia vai trò này tránh việc một bảng phục vụ phải tích lũy vô hạn trong khi vẫn giữ được dữ liệu thô cho phân tích dài hạn.
+
+\paragraph{API.}
+Endpoint \code{/fields/\{field\_id\}/latest} trả về giá trị mới nhất của từng chỉ số trong thửa ruộng, kèm đơn vị, thời điểm đo, thời điểm nhận, chất lượng và trạng thái so với khoảng mục tiêu của cây trồng. Endpoint \code{/fields/\{field\_id\}/series} trả về chuỗi của một chỉ số trong tối đa 48 giờ và tính các khoảng bị mất dữ liệu.
+
+Chuỗi số đo được sắp xếp theo \code{bucket} giờ và \code{measured\_at} trong partition của từng cặp \code{(field\_id, metric)}. TTL 48 giờ giới hạn lượng dữ liệu được giữ trong partition, còn \code{bucket} là cột clustering giúp API giới hạn khoảng thời gian cần đọc. API xác định các bucket tương ứng với khoảng thời gian yêu cầu, đọc chúng rồi sắp xếp lại theo \code{measured\_at}.
+
+\paragraph{Hiển thị.}
+Trang \emph{Live monitor} dùng hai endpoint trên để hiển thị năm chỉ số của thửa ruộng. Mỗi panel có giá trị hiện tại, đơn vị, trạng thái so với khoảng mục tiêu, thời điểm \emph{Data as of} và biểu đồ 24 giờ. Dữ liệu gần thời gian thực cũ hơn 90 giây được cảnh báo là stale thay vì tiếp tục được trình bày như dữ liệu mới.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{br01-live.png}
+\caption{Trang Live monitor phục vụ BR02}
+\label{fig:4-br02-live}
+\end{figure}
+
+\paragraph{Kết quả.}
+Benchmark trigger ở Mục~\ref{sec:5-bench-trigger} cho thấy với cấu hình chính 30 giây, độ trễ từ lúc Kafka nhận sự kiện đến lúc Cassandra ghi số đo có p50 22,7 giây, p95 35,8 giây và lớn nhất 36,9 giây. Toàn bộ đều thấp hơn mục tiêu 90 giây của BR02. Benchmark API ở Mục~\ref{sec:5-bench-web} cho thấy endpoint giá trị mới nhất có p50 3,7 ms và endpoint chuỗi 24 giờ với 1\,482 điểm có p50 10,1 ms. Như vậy phần lớn độ trễ mà người dùng quan sát đến từ chu kỳ micro-batch, không phải từ truy vấn phục vụ.

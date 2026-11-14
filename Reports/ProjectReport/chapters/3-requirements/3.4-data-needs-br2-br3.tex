@@ -1,0 +1,30 @@
+% Phần BR2 và BR3 của Mục 3.4 (người phụ trách: Nhân).
+\subsection{Nhu cầu dữ liệu của BR2 và BR3}
+\label{sec:3-needs-br2-br3}
+
+BR2 và BR3 cùng liên quan đến đường dữ liệu gần thời gian thực nhưng trả lời hai câu hỏi khác nhau. BR2 quan tâm tới \emph{nội dung của số đo}: điều kiện tại thửa ruộng hiện tại như thế nào và vừa thay đổi ra sao. BR3 quan tâm tới \emph{tính liên tục của việc quan sát}: dữ liệu có đang được thu thập đầy đủ hay không, và hệ thống có bảo toàn được số đo khi thiết bị hoặc dịch vụ tạm thời gián đoạn hay không. Bảng~\ref{tab:3-needs-br2-br3} tóm tắt hai nhu cầu này.
+
+\begin{table}[H]
+\centering
+\caption{Nhu cầu sử dụng dữ liệu của BR2 và BR3}
+\label{tab:3-needs-br2-br3}
+\small
+\begin{tblr}{
+  colspec = {X[0.8,l]X[1.4,l]X[2.4,l]X[1.6,l]X[1.4,l]},
+  rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines,
+  row{1} = {font=\bfseries, bg=gray!20},
+}
+BR & Người dùng & Câu hỏi cần trả lời & Loại xử lý & Độ trễ chấp nhận \\
+BR2 & U2 người vận hành trang trại, U1 quản lý trang trại &
+Điều kiện hiện tại của từng thửa ruộng là gì? Số đo gần nhất được cập nhật lúc nào? Trong 24 giờ gần đây chỉ số thay đổi ra sao? &
+Xử lý luồng theo micro-batch; cập nhật giá trị mới nhất và chuỗi số đo gần đây theo thửa ruộng và chỉ số &
+Số đo phải xuất hiện trên API trong vòng 90 giây kể từ khi Kafka nhận sự kiện; giao diện phải cho biết thời điểm cập nhật \\
+BR3 & U4 nhóm quản lý dữ liệu, U2 người vận hành trang trại &
+Thiết bị nào đang ngừng báo cáo? Khoảng mất dữ liệu bắt đầu và kết thúc khi nào? Khi tác vụ xử lý dừng rồi chạy lại, dữ liệu có bị mất hoặc ghi trùng không? &
+Kafka lưu đệm có thể phát lại; checkpoint bền vững; ghi idempotent; phát hiện im lặng của thiết bị và lưu khoảng trống rõ ràng &
+Việc gián đoạn tạm thời không được làm mất dữ liệu; trạng thái thiết bị và khoảng trống phải xuất hiện ở lần xử lý gần nhất sau khi đủ điều kiện phát hiện \\
+\end{tblr}
+\end{table}
+
+Hai nhu cầu trên dẫn tới ba quyết định thiết kế chính. Thứ nhất, số đo hiện tại không thể chờ chu kỳ làm mới của tầng phân tích mà phải có một đường phục vụ riêng với độ trễ cỡ vài chục giây. Thứ hai, nguồn dữ liệu và tác vụ xử lý phải được tách rời để việc dừng Spark không ngăn thiết bị tiếp tục gửi dữ liệu. Thứ ba, hệ thống phải phân biệt rõ ``không có dữ liệu'' với một giá trị đo bằng không: khoảng thời gian thiết bị im lặng được ghi thành một khoảng trống có thời điểm bắt đầu và kết thúc, thay vì được nội suy hoặc che giấu trên biểu đồ.

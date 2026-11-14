@@ -68,6 +68,7 @@ BR08 & Hỗ trợ ứng phó sớm với rủi ro & Phát hiện sớm điều k
 \label{sec:3-data-needs}
 Mỗi yêu cầu nghiệp vụ dẫn đến một nhu cầu cụ thể về dữ liệu: người dùng nào đặt câu hỏi gì, cần loại xử lý nào và chấp nhận độ trễ bao nhiêu. Mục này trình bày các nhu cầu đó theo từng cặp yêu cầu, làm cơ sở để lựa chọn cách xử lý và lưu trữ dữ liệu ở Chương~\ref{chap:4-design}.
 \input{chapters/3-requirements/3.4-data-needs-br1-br7}
+\input{chapters/3-requirements/3.4-data-needs-br2-br3}
 \input{chapters/3-requirements/3.4-data-needs-br4-br8}
 \input{chapters/3-requirements/3.4-data-needs-br5-br6}
 
@@ -75,9 +76,66 @@ Mỗi yêu cầu nghiệp vụ dẫn đến một nhu cầu cụ thể về dữ
 \label{sec:3-data-sources}
 
 \subsection{Nguồn dữ liệu}
-% TODO: cảm biến độ ẩm đất, nhiệt độ, thời tiết, thiết bị tưới, danh mục trang trại/thửa ruộng
+\label{sec:3-data-sources-detail}
+
+Đề tài sử dụng ba nhóm dữ liệu đầu vào: số đo cảm biến, dữ liệu danh mục và dữ liệu mô phỏng phục vụ thử nghiệm. Trong một hệ thống thực tế, nhóm số đo đầu tiên sẽ được tạo bởi các cảm biến ngoài đồng và truyền qua gateway hoặc hạ tầng LoRaWAN. Vì đề tài không triển khai phần cứng và network server LoRaWAN, quá trình này được thay thế bằng bộ mô phỏng gửi cùng cấu trúc sự kiện qua HTTP tới service tiếp nhận. Do đó phần còn lại của pipeline không phụ thuộc vào việc số đo được tạo bởi thiết bị thật hay bộ mô phỏng.
+
+\paragraph{Số đo cảm biến.}
+Mỗi sự kiện biểu diễn một số đo của một thiết bị tại một thời điểm. Năm chỉ số được sử dụng gồm độ ẩm đất (\code{soil\_moisture}), nhiệt độ đất (\code{soil\_temperature}), nhiệt độ không khí (\code{air\_temperature}), độ ẩm tương đối (\code{relative\_humidity}) và lượng mưa (\code{rainfall}). Ngoài giá trị đo, sự kiện còn mang mã thiết bị, thời điểm đo, mức pin và chất lượng tín hiệu. Ví dụ:
+
+\begin{lstlisting}[language=json, caption={Ví dụ payload số đo cảm biến}, label={lst:3-sensor-payload}]
+{
+  "event_id": "2fd1...",
+  "device_id": "F001-S01",
+  "metric": "soil_moisture",
+  "value": 47.8,
+  "reading_ts": "2026-11-10T08:00:03Z",
+  "battery_pct": 92.0,
+  "signal_quality": 0.91
+}
+\end{lstlisting}
+
+Mã trang trại và thửa ruộng không được xem là thông tin định tuyến đáng tin cậy từ thiết bị. Tác vụ streaming tra \code{device\_id} trong dữ liệu danh mục rồi tự xác định \code{field\_id} và \code{farm\_id}. Cách này tránh trường hợp một thiết bị gửi nhầm hoặc giả mạo thông tin vị trí.
+
+\paragraph{Dữ liệu danh mục.}
+Tệp \code{reference/reference\_data.json} là nguồn sự thật dùng chung cho cấu trúc trang trại, thửa ruộng, thiết bị, loại cây trồng và định nghĩa chỉ số. Cấu hình hiện tại gồm 4 trang trại, 8 thửa ruộng, 24 thiết bị, 4 loại cây trồng và 5 chỉ số. Mỗi thiết bị khai báo thửa ruộng mà nó thuộc về, các chỉ số mà nó được phép đo, chu kỳ báo cáo, pin và chất lượng tín hiệu ban đầu. Dữ liệu danh mục còn lưu giới hạn vật lý của từng chỉ số và khoảng mục tiêu theo loại cây trồng. Bộ mô phỏng, tác vụ streaming và API đều đọc cùng tệp này, nhờ đó không phải duy trì ba bản ánh xạ riêng biệt.
+
+\paragraph{Bộ mô phỏng.}
+Bộ mô phỏng tạo dữ liệu theo chu kỳ của từng thiết bị. Giá trị không được chọn độc lập ngẫu nhiên ở mỗi lần gửi mà di chuyển theo random walk quanh một giá trị cơ sở, sau đó bị giới hạn trong khoảng vật lý của chỉ số. Cách sinh này tạo ra chuỗi có biến đổi từ từ giống telemetry hơn so với nhiễu trắng hoàn toàn ngẫu nhiên.
+
+Để kiểm tra khả năng xử lý dữ liệu không hoàn hảo, bộ mô phỏng còn chủ động tạo bảy loại lỗi được liệt kê ở Bảng~\ref{tab:3-sim-faults}. Ngoài ra, một thiết bị có thể được đặt vào trạng thái im lặng trong một khoảng thời gian để mô phỏng mất nguồn, mất kết nối hoặc lỗi gateway.
+
+\begin{table}[H]
+\centering
+\caption{Các lỗi được bộ mô phỏng chủ động tạo}
+\label{tab:3-sim-faults}
+\small
+\begin{tblr}{
+  colspec = {X[2,l]X[4,l]},
+  rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines,
+  row{1} = {font=\bfseries, bg=gray!20},
+}
+Loại lỗi & Ý nghĩa \\
+\code{null\_value} & Sự kiện có cấu trúc hợp lệ nhưng giá trị đo bị rỗng \\
+\code{out\_of\_range} & Giá trị vượt giới hạn vật lý của loại chỉ số \\
+\code{implausible\_jump} & Giá trị thay đổi đột ngột quá mức cho phép so với số đo trước \\
+\code{duplicate} & Cùng một số đo được gửi lại \\
+\code{unknown\_device} & Mã thiết bị không tồn tại trong dữ liệu danh mục \\
+\code{unexpected\_metric} & Thiết bị gửi một loại chỉ số không được đăng ký cho nó \\
+\code{malformed} & Thiếu trường bắt buộc, timestamp sai hoặc giá trị không chuyển được thành số \\
+\end{tblr}
+\end{table}
 
 \subsection{Đặc trưng dữ liệu}
-% TODO: tốc độ, khối lượng, dữ liệu đến muộn/trùng/thiếu, chất lượng
+\label{sec:3-data-characteristics}
+
+Dữ liệu cảm biến của đề tài có khối lượng không lớn so với một hệ thống IoT sản xuất, nhưng có đủ các đặc trưng của dữ liệu luồng để kiểm chứng kiến trúc. Với 8 thửa ruộng, mỗi thửa có ba thiết bị, cùng tạo năm chuỗi chỉ số theo thửa ruộng, hệ thống có 40 chuỗi đo. Chu kỳ báo cáo hiện tại là 5 giây, tương đương tối đa khoảng 8 số đo mỗi giây hay khoảng 691\,200 số đo mỗi ngày nếu tất cả thiết bị hoạt động liên tục. Trong các benchmark, tốc độ thực tế xấp xỉ 7--8 sự kiện mỗi giây do lịch phát và các khoảng im lặng của thiết bị.
+
+Đặc trưng quan trọng hơn khối lượng là dữ liệu có thứ tự thời gian không hoàn hảo. Một số đo có \code{measured\_at} là thời điểm cảm biến quan sát hiện tượng, trong khi \code{ingested\_at} là thời điểm Kafka nhận sự kiện. Hai thời điểm này có thể khác nhau nếu kết nối bị gián đoạn, do đó sự kiện có thể đến muộn hoặc không theo đúng thứ tự đo. Pipeline cấu hình watermark một giờ trên \code{measured\_at} để xác định chính sách event-time và giới hạn state cho các phép xử lý stateful nếu có. Trong hiện thực hiện tại, chưa có phép xử lý stateful sử dụng watermark để loại bản ghi đến muộn; bản ghi không bị loại chỉ vì vượt watermark. Các số đo trễ hơn 600 giây được đánh dấu bằng \code{is\_late} và vẫn được lưu vào bronze.
+
+Dữ liệu còn có thể bị trùng do retry, bị sai cấu trúc, chứa giá trị ngoài giới hạn hoặc bị thiếu hoàn toàn trong một khoảng thời gian. Đặc biệt, trường hợp thiết bị im lặng không được biểu diễn bằng một giá trị 0. Một giá trị 0 có thể là số đo hợp lệ đối với một số chỉ số, trong khi im lặng nghĩa là không có quan sát. Vì vậy pipeline tạo các bản ghi khoảng trống riêng, còn giao diện ngắt đường biểu diễn tại những khoảng này.
+
+Các đặc trưng trên quyết định lựa chọn giải pháp ở Chương~\ref{chap:4-design}: Kafka được dùng làm bộ đệm bền vững và có thể phát lại; Spark Structured Streaming xử lý theo thời gian sự kiện và micro-batch; Cassandra phục vụ dữ liệu mới nhất với độ trễ thấp; còn Iceberg lưu lại lịch sử đầy đủ để xử lý lại và phân tích.
 
 \input{chapters/3-requirements/3.6-mapping}
