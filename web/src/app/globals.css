@@ -173,6 +173,9 @@ h1 { background: linear-gradient(120deg, var(--ink) 40%, var(--accent)); -webkit
 html { scrollbar-color: rgba(100, 116, 129, .35) transparent; scrollbar-width: thin; }
 .surface-card { transition: box-shadow .25s ease, border-color .25s ease; backdrop-filter: blur(8px); }
 .surface-card:hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--line)); }
+/* backdrop-filter makes each card its own stacking context, so an open dropdown's list
+   would sit under later cards. Lift the card that holds the open dropdown above its siblings. */
+.surface-card:has([aria-haspopup="listbox"][aria-expanded="true"]) { position: relative; z-index: 40; }
 .stat-card { position: relative; overflow: hidden; }
 .stat-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, #34d399, #059669 60%, transparent); opacity: .85; }
 .stat-card p:nth-child(2) { font-variant-numeric: tabular-nums; }
