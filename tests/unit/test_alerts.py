@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from common.reference import CropTarget
 from streaming.alerts import (
     ALLOWED_TRANSITIONS,
     STATUS_ACKNOWLEDGED,
@@ -16,6 +17,7 @@ from streaming.alerts import (
     evaluate,
     open_alert,
     resolve_open_alert,
+    threshold_conditions,
 )
 
 CFG = AlertConfig(debounce_batches=2, cooldown_s=300)
@@ -126,3 +128,48 @@ def test_allowed_transitions_lifecycle() -> None:
     assert ALLOWED_TRANSITIONS[STATUS_OPEN] == {STATUS_ACKNOWLEDGED, STATUS_RESOLVED}
     assert ALLOWED_TRANSITIONS[STATUS_ACKNOWLEDGED] == {STATUS_RESOLVED}
     assert ALLOWED_TRANSITIONS[STATUS_RESOLVED] == set()
+
+
+TEMPERATURE = CropTarget(metric="air_temperature", min=10.0, max=38.0, alert_below=5.0, alert_above=38.0)
+
+
+def temperature(avg_value: float) -> dict[str, Condition]:
+    conditions = threshold_conditions(
+        field_id="F001",
+        metric="air_temperature",
+        unit="degC",
+        avg_value=avg_value,
+        target=TEMPERATURE,
+        crop_code="RICE",
+        device_id="F001-S02",
+    )
+    return {condition.condition_code: condition for condition in conditions}
+
+
+def test_threshold_conditions_observe_both_bounds() -> None:
+    hot = temperature(40.0)
+    assert set(hot) == {"low_air_temperature", "heat_stress"}
+    assert hot["heat_stress"].breaching and hot["heat_stress"].severity == "critical"
+    assert not hot["low_air_temperature"].breaching
+
+    soil = threshold_conditions(
+        field_id="F001",
+        metric="soil_moisture",
+        unit="%",
+        avg_value=29.5,
+        target=CropTarget(metric="soil_moisture", min=30.0, max=60.0, alert_below=32.0),
+        crop_code="RICE",
+        device_id="F001-S01",
+    )
+    assert [(c.condition_code, c.breaching) for c in soil] == [("low_soil_moisture", True)]
+
+
+def test_heat_stress_alert_resolves_when_the_temperature_drops() -> None:
+    state = AlertState(field_id="F001", condition_code="heat_stress")
+    evaluate(temperature(40.0)["heat_stress"], state, NOW, CFG)
+    assert evaluate(temperature(41.0)["heat_stress"], state, NOW + timedelta(seconds=30), CFG).emit_alert
+    open_alert(state, uuid.uuid4(), NOW + timedelta(seconds=30))
+
+    decision = evaluate(temperature(30.0)["heat_stress"], state, NOW + timedelta(seconds=60), CFG)
+    assert decision.resolve_alert is True
+    assert state.debounce_count == 0

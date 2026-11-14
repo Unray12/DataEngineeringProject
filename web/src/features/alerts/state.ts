@@ -1,5 +1,5 @@
 /**
- * Pure alert state machine (BR8, FR8.4).
+ * Pure alert state machine.
  *
  * The matrix mirrors `ALLOWED_TRANSITIONS` in `src/streaming/alerts.py`:
  *   open -> acknowledged | resolved

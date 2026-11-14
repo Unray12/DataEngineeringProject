@@ -20,7 +20,7 @@ Hệ thống có hai nhu cầu lưu trữ trái ngược nhau. Bảng điều kh
 Tiêu chí & Cassandra & Iceberg trên HDFS \\
 Dữ liệu giữ & 24--48 giờ (TTL); trạng thái cảnh báo 90 ngày & Toàn bộ lịch sử (bronze), tổng hợp (gold) \\
 Mẫu truy cập & Tra cứu theo khóa, đọc theo phân vùng & Quét theo khoảng ngày, gộp, so sánh \\
-Độ trễ truy vấn & Cỡ mười mili-giây & Cỡ trăm mili-giây tới giây (qua Trino) \\
+Độ trễ truy vấn & Vài mili-giây & Vài chục tới vài trăm mili-giây (qua Trino) \\
 Độ tươi dữ liệu & Vài giây tới một phút & Theo lần làm mới gold \\
 Ghi & Ghi nhanh theo lô nhỏ & Ghi theo commit, cần gộp tệp \\
 Phục vụ & Bảng điều khiển gần thời gian thực & Bảng điều khiển trong ngày, theo ngày \\
@@ -38,7 +38,7 @@ Quy tắc đi kèm: bảng điều khiển gần thời gian thực chỉ đọc
 
 \paragraph{Vì sao HDFS.} HDFS có sẵn trong bộ công cụ của môn học và là nơi Iceberg, Spark và Trino đều đọc được qua cùng một cấu hình Hadoop. Hệ thống tệp phân tán cũng giữ nguyên được mô hình triển khai ``dữ liệu nằm cạnh tính toán'' khi mở rộng thêm nút. Hạn chế là tệp nhỏ (Mục~\ref{sec:2-hdfs}), được xử lý bằng compaction ở Mục~\ref{sec:4-compaction}.
 
-\paragraph{Vì sao Hive Metastore.} Catalog phải được Spark và Trino dùng chung (Mục~\ref{sec:2-hms}). Hive Metastore là catalog được cả hai connector hỗ trợ sẵn. Trong đề tài, metastore dùng cơ sở dữ liệu Derby nhúng lưu trong một volume Docker. Cách này đủ cho một nút, nhưng chỉ cho phép \emph{một} kết nối tại một thời điểm. Tài liệu thiết kế dự kiến backend Postgres cho môi trường thật; đây là một khác biệt có chủ ý của bản demo, được nêu lại ở phần hạn chế (Chương~\ref{chap:6-conclusion}).
+\paragraph{Vì sao Hive Metastore.} Catalog phải được Spark và Trino dùng chung (Mục~\ref{sec:2-hms}). Hive Metastore là catalog được cả hai connector hỗ trợ sẵn. Trong đề tài, metastore dùng cơ sở dữ liệu Derby nhúng lưu trong một volume Docker. Cách này đủ cho một nút, nhưng Derby nhúng chỉ cho \emph{một} tiến trình mở cơ sở dữ liệu, nên không thể chạy thêm bản metastore thứ hai để chịu lỗi. Tài liệu thiết kế dự kiến backend Postgres cho môi trường thật; đây là một khác biệt có chủ ý của bản demo, được nêu lại ở phần hạn chế (Chương~\ref{chap:6-conclusion}).
 
 \subsection{Bảng quyết định công nghệ lưu trữ}
 \label{sec:4-storage-decisions}
@@ -69,7 +69,7 @@ Phiên bản cụ thể của từng thành phần nằm ở Bảng~\ref{tab:4-v
 \subsection{Cấu hình Spark ghi Iceberg}
 \label{sec:4-spark-iceberg}
 
-Spark được nối với catalog Iceberg ở một nơi duy nhất, \code{src/streaming/spark.py}; tác vụ streaming, tác vụ khởi tạo và dbt dùng cùng cấu hình, nên không có ba bản cấu hình lệch nhau. Đoạn mã~\ref{lst:4-spark-catalog} là cấu hình catalog trong hồ sơ dbt.
+Tác vụ streaming và tác vụ khởi tạo dựng phiên Spark ở cùng một nơi, \code{src/streaming/spark.py}. dbt không dùng mã Python này mà khai báo lại các thuộc tính catalog trong hồ sơ \code{dbt/profiles.yml} (Đoạn mã~\ref{lst:4-spark-catalog}), nên hai nơi phải được giữ khớp nhau.
 
 \begin{lstlisting}[caption={Catalog Iceberg trong Spark (\texttt{dbt/profiles.yml}, rút gọn)}, label={lst:4-spark-catalog}]
 server_side_parameters:
@@ -105,4 +105,4 @@ just compact bronze.sensor_readings
 # = dbt run-operation rewrite_data_files --args '{table: bronze.sensor_readings}'
 \end{lstlisting}
 
-\code{just batch-run} gọi compaction cho bảng bronze và ba bảng \code{ops} (\code{quality\_counters}, \code{quarantine}, \code{device\_gaps}), vì tác vụ streaming commit vào cả bốn bảng ở mỗi lô. Các bảng \code{ops} được thêm vào sau benchmark \#6: trước khi gộp, \code{ops.quality\_counters} có 1\,300 tệp cho 12\,688 dòng và endpoint \code{/quality/devices} mất 846 ms ở p50, sau khi gộp còn 154 ms (Mục~\ref{sec:5-bench-web}). Người vận hành vẫn phải chạy \code{just batch-run} bằng tay; lập lịch định kỳ (ví dụ bằng cron trong một container) và mở rộng sang các bảng gold là việc còn lại. Trong benchmark \#4 (Mục~\ref{sec:5-bench-compaction}), macro này gộp 720 tệp nhỏ thành 30 tệp trong 15 giây và làm truy vấn gộp 7 ngày nhanh gấp 2,1 lần.
+\code{just batch-run} gọi compaction cho bảng bronze và ba bảng \code{ops} (\code{quality\_counters}, \code{quarantine}, \code{device\_gaps}), vì tác vụ streaming commit vào cả bốn bảng ở mỗi lô. Các bảng \code{ops} được thêm vào sau benchmark \#6: trước khi gộp, \code{ops.quality\_counters} có 1\,300 tệp cho 12\,688 dòng và endpoint \code{/quality/devices} mất 846 ms ở p50, sau khi gộp còn khoảng 150--200 ms (Mục~\ref{sec:5-bench-web}). Người vận hành vẫn phải chạy \code{just batch-run} bằng tay; lập lịch định kỳ (ví dụ bằng cron trong một container) và mở rộng sang các bảng gold là việc còn lại. Trong benchmark \#4 (Mục~\ref{sec:5-bench-compaction}), macro này gộp 720 tệp nhỏ thành 30 tệp trong 15 giây và làm truy vấn gộp 7 ngày nhanh gấp 2,1 lần.

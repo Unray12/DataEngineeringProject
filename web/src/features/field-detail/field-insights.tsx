@@ -38,7 +38,7 @@ const suffix = (unit: string) => (unit === "%" ? "%" : ` ${unit}`);
 
 type Props = { fieldId: string; fieldIds: string[]; targets?: Field["targets"] };
 
-/** Per-measurement cards: average, change vs the previous period, target status and rank (BR7). */
+/** Per-measurement cards: average, change vs the previous period, target status and rank. */
 export function FieldInsights({ fieldId, fieldIds, targets }: Props) {
   const [days, setDays] = useState(7);
   const range = useMemo(() => lastDays(days), [days]);

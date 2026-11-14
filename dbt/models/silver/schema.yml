@@ -15,6 +15,6 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [soil_moisture, soil_temperature, air_temperature, air_humidity, relative_humidity, rainfall]
+              values: [soil_moisture, soil_temperature, air_temperature, relative_humidity, rainfall]
       - name: measured_at
         tests: [not_null]

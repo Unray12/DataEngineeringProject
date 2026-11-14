@@ -6,8 +6,7 @@ with counters as (
         sum(total) as total,
         sum(valid) as valid,
         sum(duplicate) as duplicate,
-        sum(out_of_range) as out_of_range,
-        sum(null_value) as quarantined
+        sum(out_of_range) as out_of_range
     from {{ source('ops', 'quality_counters') }}
     group by 1
 ),
@@ -21,7 +20,7 @@ select
     c.valid,
     c.duplicate,
     c.out_of_range,
-    coalesce(q.quarantined, c.quarantined, 0) as quarantined,
+    coalesce(q.quarantined, 0) as quarantined,
     c.total
 from counters c
 left join quarantine q on q.day = c.day

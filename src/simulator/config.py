@@ -1,9 +1,4 @@
-"""Environment-driven configuration.
-
-Every value comes from the environment (``.env`` -> Compose -> container), never
-hard-coded, per the AGENTS.md conventions. Defaults mirror ``.env.example`` so
-the simulator can also be run from a plain virtualenv.
-"""
+"""Simulator settings from the environment; defaults match ``.env.example``."""
 
 from __future__ import annotations
 
@@ -56,7 +51,7 @@ class GeneratorConfig:
 
 @dataclass(frozen=True)
 class FaultConfig:
-    """Fault injection knobs (FR4.1, FR8.2)."""
+    """Fault injection knobs."""
 
     enabled: tuple[str, ...] = DEFAULT_FAULTS
     rate: float = 0.05

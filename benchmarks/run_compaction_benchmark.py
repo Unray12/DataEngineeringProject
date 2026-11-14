@@ -1,4 +1,4 @@
-"""Benchmark #4: effect of compaction on file count and query time (BR6).
+"""Benchmark #4: effect of compaction on file count and query time.
 
 Phase ``before`` loads many small commits into an Iceberg table and measures it. The recipe then
 runs ``just compact`` (dbt macro, ``rewrite_data_files``) and phase ``after`` measures again, so the

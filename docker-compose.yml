@@ -6,8 +6,7 @@
 #   serving     Cassandra + FastAPI
 #   app         Next.js web frontend (the API is the only data source)
 #
-# Rule from AGENTS.md: each profile runs on its own. `core` never depends on
-# `serving`.
+# Each profile can run on its own; `core` never depends on `serving`.
 
 name: ${COMPOSE_PROJECT_NAME:-agri-platform}
 
@@ -25,11 +24,10 @@ x-spark-env: &spark-env
   SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-2g}
   SPARK_DRIVER_CORES: ${SPARK_DRIVER_CORES:-4}
   SPARK_SHUFFLE_PARTITIONS: ${SPARK_SHUFFLE_PARTITIONS:-4}
-  # --- Iceberg catalog + warehouse (HDFS) ---
-  SPARK_CATALOG: lakehouse
-  SPARK_WAREHOUSE: ${HDFS_WAREHOUSE_PATH:-/warehouse}
-  SPARK_HIVE_METASTORE_URIS: ${HIVE_METASTORE_URI:-thrift://hive-metastore:9083}
-  SPARK_ICEBERG_VERSION: ${ICEBERG_VERSION:-1.7.1}
+  # --- Iceberg catalog + warehouse (HDFS), read by src/streaming/spark.py ---
+  HDFS_NAMENODE_URI: ${HDFS_NAMENODE_URI:-hdfs://namenode:8020}
+  HDFS_WAREHOUSE_PATH: ${HDFS_WAREHOUSE_PATH:-/warehouse}
+  HIVE_METASTORE_URI: ${HIVE_METASTORE_URI:-thrift://hive-metastore:9083}
   # --- Kafka ---
   KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka:29092}
   KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-sensor.readings.v1}
@@ -45,7 +43,7 @@ x-spark-env: &spark-env
   CASSANDRA_CONTACT_POINTS: ${CASSANDRA_CONTACT_POINTS:-cassandra:9042}
   CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-agri}
   CASSANDRA_WAIT_S: ${CASSANDRA_WAIT_S:-180}
-  # --- Alerts + quality rules (FR4.2, FR8.1, FR8.2, FR8.5) ---
+  # --- Alert and quality rules ---
   ALERT_DEBOUNCE_BATCHES: ${ALERT_DEBOUNCE_BATCHES:-2}
   ALERT_COOLDOWN_S: ${ALERT_COOLDOWN_S:-300}
   DEVICE_OFFLINE_MULTIPLIER: ${DEVICE_OFFLINE_MULTIPLIER:-4}
@@ -53,7 +51,6 @@ x-spark-env: &spark-env
   SIGNAL_POOR_MAX: ${SIGNAL_POOR_MAX:-0.3}
   # --- Master data + Trino ---
   REFERENCE_DATA_PATH: ${REFERENCE_DATA_PATH:-/app/reference/reference_data.json}
-  TRINO_URI: ${TRINO_URI:-trino://trino:8080}
   TRINO_CATALOG: ${TRINO_CATALOG:-lakehouse}
   TRINO_SCHEMA: ${TRINO_SCHEMA:-gold}
   TRINO_USER: ${TRINO_USER:-agri}
@@ -160,9 +157,8 @@ services:
       start_period: 20s
     networks: ["platform"]
 
-  # HTTP push receiver: sensors/gateways POST readings, this writes them to Kafka
-  # (AGENTS.md ingestion decision). It validates nothing; the streaming job
-  # quarantines malformed documents with full lineage (FR4.1).
+  # HTTP push receiver: sensors/gateways POST readings, this writes them to Kafka.
+  # It validates nothing; the streaming job quarantines malformed documents.
   ingest:
     profiles: ["core"]
     build:
@@ -305,8 +301,8 @@ services:
         condition: service_healthy
     networks: ["platform"]
 
-  # dbt runs bronze -> silver -> gold on Iceberg through the Spark Thrift Server
-  # (deferred: see README "Deferred work").
+  # dbt builds silver and gold on Iceberg. dbt-spark uses `method: session`
+  # (dbt/profiles.yml): Spark runs inside this container, no Thrift Server.
   dbt:
     profiles: ["processing"]
     build: *spark-build
@@ -323,7 +319,7 @@ services:
         condition: service_healthy
     networks: ["platform"]
 
-  # Test runner (`just test`): replays fixtures against the live stack.
+  # Test runner (`just test`): the pytest suite inside the Spark image.
   spark-tests:
     profiles: ["processing"]
     build: *spark-build

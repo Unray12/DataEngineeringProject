@@ -1,12 +1,8 @@
-"""Device state and payload generation.
+"""Simulated devices and their payloads.
 
-Devices, fields, farms and metric targets come from the shared reference data
-(``reference/reference_data.json``), so the simulator, the streaming job and the
-API agree on ids and thresholds. Each device reports every metric declared for
-it in the reference data, at its own reporting interval.
-
-Values are a bounded random walk around a per-metric baseline, so the stream
-looks like real telemetry (slow drift, small noise) rather than white noise.
+Devices come from the reference data. Each one reports its metrics at its own interval, as a random
+walk around a per-metric baseline (slow drift plus small noise), with optional injected faults and
+silent periods.
 """
 
 from __future__ import annotations
@@ -24,14 +20,10 @@ from common.reference import ReferenceData
 
 from .config import FaultConfig, GeneratorConfig
 
-# No "broken JSON" variant: the HTTP edge accepts only JSON objects and re-serialises them, so a
-# simulated broken body could never reach Kafka. An earlier variant added a stray key instead, which
-# the explicit schema ignores, so those readings were (correctly) stored as ok under a fault label.
+# No broken-JSON variant: the ingest service only accepts JSON objects, so one could never reach Kafka.
 MALFORMED_VARIANTS = ("missing_field", "invalid_timestamp", "malformed_value")
 
-# Typical starting point and noise amplitude per metric. Kept here (not in the
-# reference data) because it describes how the *simulator* behaves, not the
-# physical limits of the sensor.
+# Starting value and noise per metric: simulator behaviour, so not part of the reference data.
 METRIC_BASELINE: dict[str, float] = {
     "soil_moisture": 48.0,
     "soil_temperature": 24.0,
@@ -79,10 +71,6 @@ class ReadingGenerator:
     devices: list[DeviceState] = field(default_factory=list)
     _baselines: dict[tuple[str, str], float] = field(default_factory=dict)
 
-    # ----------------------------------------------------------------------------------
-    # Device registration
-    # ----------------------------------------------------------------------------------
-
     def register_device(
         self,
         device_id: str,
@@ -105,25 +93,6 @@ class ReadingGenerator:
         self.devices.append(device)
         return device
 
-    # ----------------------------------------------------------------------------------
-    # Fault injection (FR4.1/BR4, FR8.2)
-    # ----------------------------------------------------------------------------------
-
-    def schedule_fault(self, device_id: str, at: float) -> None:
-        """Make the next reading of a device carry a fault."""
-        for device in self.devices:
-            if device.device_id == device_id:
-                device.fault_scheduled_at = at
-                return
-
-    def inject_gap(self, device_id: str, now: float, duration_s: float | None = None) -> None:
-        """Make a device go silent (battery pull / gateway outage)."""
-        duration = duration_s if duration_s is not None else self.faults.gap_seconds_max
-        for device in self.devices:
-            if device.device_id == device_id:
-                device.asleep_until = now + duration
-                return
-
     def _maybe_schedule_fault(self, now: float) -> None:
         if self.faults.rate <= 0 or not self.devices:
             return
@@ -140,10 +109,6 @@ class ReadingGenerator:
         device = random.choice(self.devices)
         duration = random.uniform(self.faults.gap_seconds_min, self.faults.gap_seconds_max)
         device.asleep_until = now + duration
-
-    # ----------------------------------------------------------------------------------
-    # Payload generation
-    # ----------------------------------------------------------------------------------
 
     def next_payloads(self, now: float) -> list[dict[str, Any]]:
         """Return every payload due at ``now`` (one per due device metric)."""
@@ -201,8 +166,7 @@ class ReadingGenerator:
     ) -> dict[str, Any]:
         spec = self.reference.metrics[metric]
         base = self._walk(device, metric)
-        # Clamp after the noise too: a healthy sensor never reports negative rainfall or 101 % humidity,
-        # so only injected faults may leave the physical range.
+        # Clamp after adding noise, so only injected faults leave the physical range.
         value: Any = round(
             min(spec.max, max(spec.min, base + random.gauss(0, METRIC_NOISE.get(metric, 0.5)))), 3
         )
@@ -252,11 +216,6 @@ class ReadingGenerator:
         return payload
 
 
-# --------------------------------------------------------------------------------------
-# Fixture replay (kept for offline tests and benchmarks)
-# --------------------------------------------------------------------------------------
-
-
 def read_fixture(path: str) -> list[dict[str, Any]]:
     """Read fixture JSON Lines into a list of documents."""
     records: list[dict[str, Any]] = []
@@ -279,12 +238,10 @@ def stamp_fixture(records: list[dict[str, Any]], start_ts: float) -> list[dict[s
 
 
 def _jump(base: float, low: float, high: float, max_jump: float) -> float:
-    """A step of 2-3x ``max_jump``, kept inside the physical range.
+    """A step of 2-3x ``max_jump`` towards the bound with more room, clamped to the range.
 
-    An unclamped step leaves the range, and the range check (which runs first) then flags the reading
-    ``out_of_range`` instead of ``implausible_jump``. The step goes towards the bound with more room,
-    which is at least half the range, so even after clamping it stays well above ``max_jump`` (and above
-    the drift between the devices of one field, against which the jump is measured).
+    Outside the range the reading would be flagged ``out_of_range`` (that check runs first) instead of
+    ``implausible_jump``. Half the range is always more than ``max_jump``, so the step stays a jump.
     """
     step = max_jump * random.uniform(2, 3)
     target = base + step if high - base >= base - low else base - step

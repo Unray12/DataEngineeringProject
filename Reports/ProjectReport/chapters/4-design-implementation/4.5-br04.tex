@@ -85,8 +85,7 @@ rainfall & mm/h & 0 & 200 & 40 \\
 with counters as (
     select cast(date_trunc('day', window_start) as date) as day,
            sum(total) as total, sum(valid) as valid,
-           sum(duplicate) as duplicate, sum(out_of_range) as out_of_range,
-           sum(null_value) as quarantined
+           sum(duplicate) as duplicate, sum(out_of_range) as out_of_range
     from {{ source('ops', 'quality_counters') }} group by 1
 ),
 quarantine as (
@@ -95,13 +94,13 @@ quarantine as (
     from {{ source('ops', 'quarantine') }} group by 1
 )
 select c.day, c.valid, c.duplicate, c.out_of_range,
-       coalesce(q.quarantined, c.quarantined, 0) as quarantined, c.total
+       coalesce(q.quarantined, 0) as quarantined, c.total
 from counters c left join quarantine q on q.day = c.day
 \end{lstlisting}
 
-Cột \code{quarantined} lấy số bản ghi bị cách ly trong ngày; nếu ngày đó không có bản ghi cách ly nào, model dùng số bản ghi rỗng (\code{null\_value}) thay thế. Hai khái niệm này khác nhau (bản ghi rỗng vẫn nằm trong bronze), nên Mục~\ref{sec:5-correctness} đối chiếu chúng riêng.
+Cột \code{quarantined} là số bản ghi bị cách ly trong ngày, bằng 0 khi ngày đó không có bản ghi nào bị cách ly. Bản ghi rỗng (\code{null\_value}) không được tính vào cột này vì chúng vẫn nằm trong bronze với cờ riêng; Mục~\ref{sec:5-correctness} đếm chúng riêng.
 
-\paragraph{Bước 6: hiển thị (FR4.6).} FastAPI đọc \code{quality\_daily} và bảng silver qua Trino cho trang \emph{Data quality}, gồm biểu đồ theo ngày và bảng theo thiết bị có xem lineage. Trên đường gần thời gian thực, mỗi giá trị trả về kèm \code{quality\_flag} để giao diện đánh dấu điểm đáng ngờ.
+\paragraph{Bước 6: hiển thị (FR4.6).} FastAPI đọc \code{quality\_daily}, bảng silver và hai bảng \code{ops.quality\_counters}, \code{ops.quarantine} qua Trino cho trang \emph{Data quality}, gồm biểu đồ theo ngày và bảng theo thiết bị có xem lineage. Trên đường gần thời gian thực, mỗi giá trị trả về kèm \code{quality\_flag} để giao diện đánh dấu điểm đáng ngờ.
 
 \begin{figure}[H]
 \centering

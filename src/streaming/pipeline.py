@@ -1,20 +1,7 @@
-"""Micro-batch orchestration: validate, persist and alert (BR2, BR3, BR4, BR8).
+"""What happens to each micro-batch: validate, write bronze and ops, update Cassandra, raise alerts.
 
-Each micro-batch runs these stages:
-
-1. **Stage (Spark)** - resolve ``device_id`` against master data (FR1.2) and
-   separate schema-invalid events into a quarantine reason (FR4.1).
-2. **Read (Cassandra)** - previous ``latest_by_field`` value per (field, metric)
-   (jump baseline + latest guard) and ``device_status`` per device (outages).
-3. **Flag (Spark)** - de-duplicate on (device_id, metric, measured_at) (FR4.3),
-   validate ranges and implausible jumps (FR4.2), mark late data (FR3.4).
-4. **Persist (Iceberg/HDFS)** - MERGE bronze (raw, flagged), ops.quarantine,
-   ops.quality_counters, ops.device_gaps. All merges are keyed so replays are
-   idempotent (FR3.3).
-5. **Serve (Cassandra)** - readings_by_field_24h (TTL 48 h) and
-   latest_by_field for the near real-time dashboard (FR2.2), device_status,
-   then the alert state machine: thresholds (FR8.1), outages (FR8.2) with
-   debounce and cooldown (FR8.5) and automatic resolution (FR8.4).
+Every write is keyed (MERGE in Iceberg, primary-key upsert in Cassandra), so when Spark re-runs a
+batch after a crash it overwrites what the first attempt wrote instead of duplicating it.
 """
 
 from __future__ import annotations
@@ -42,6 +29,7 @@ from streaming.alerts import (
     evaluate,
     new_alert_id,
     resolve_open_alert,
+    threshold_conditions,
 )
 from streaming.alerts import (
     open_alert as mark_open,
@@ -90,7 +78,7 @@ class BatchProcessor:
         self.writer = writer
         self.alert_cfg = AlertConfig(debounce_batches=cfg.debounce_batches, cooldown_s=cfg.cooldown_s)
 
-        # Static maps (master data) resolved once; Spark broadcasts them.
+        # Reference data as Spark map literals, built once.
         self.device_field = self._map([(d.device_id, d.field_id) for d in reference.devices.values()])
         self.device_metrics = self._map([(d.device_id, list(d.metrics)) for d in reference.devices.values()])
         self.field_farm = self._map([(f.field_id, f.farm_id) for f in reference.fields.values()])
@@ -108,10 +96,6 @@ class BatchProcessor:
             literals.append(F.lit(value))
         return F.create_map(*literals)
 
-    # ------------------------------------------------------------------
-    # micro-batch entry point
-    # ------------------------------------------------------------------
-
     def process(self, batch: DataFrame, batch_id: int) -> None:
         started = datetime.now(UTC)
         batch.persist()
@@ -121,32 +105,31 @@ class BatchProcessor:
             batch.unpersist()
 
     def _process(self, batch: DataFrame, batch_id: int, started: datetime) -> None:
-        # -- stage 1: structural validation + master-data resolution ------
+        # 1. Structural checks; unknown devices and metrics go to quarantine.
         staged = self._stage(batch)
         quarantine_df = staged.filter(F.col("quarantine_reason").isNotNull())
         valid_df = staged.filter(F.col("quarantine_reason").isNull())
 
-        touched = valid_df.select("field_id", "metric", "device_id").distinct().collect()
+        touched = valid_df.select("field_id", "metric").distinct().collect()
         field_metrics = sorted({(row.field_id, row.metric) for row in touched})
-        fields = sorted({row.field_id for row in touched})
 
-        # -- stage 2: reads that the quality flags and outages need --------
+        # 2. State from Cassandra: last value per field/metric, last status per device.
         prev_latest = {key: self.writer.read_latest(*key) for key in field_metrics}
         prev_status = self.writer.read_device_status(list(self.ref.devices))
 
-        # -- stage 3: dedup, range/jump validation, lateness --------------
+        # 3. Quality flags.
         flagged = self._flag(valid_df, prev_latest)
 
-        # -- stage 4: Iceberg sinks (bronze + ops) -------------------------
+        # 4. Iceberg: bronze and the ops tables.
         quarantine_counts = self._quarantine_counts(quarantine_df)
-        self._write_quarantine(quarantine_df, batch_id, started)
-        flag_counts = self._write_bronze_and_counters(flagged, batch_id, started)
+        self._write_quarantine(quarantine_df, batch_id)
+        flag_counts = self._write_bronze_and_counters(flagged, batch_id)
 
         series_rows, latest_rows = self._collect_serving_rows(flagged, prev_latest, batch_id, started)
         device_rows = self._device_aggregates(flagged)
         device_count = device_rows.count()
 
-        # -- stage 5: Cassandra serving tables -----------------------------
+        # 5. Cassandra tables behind the near real-time dashboard.
         self.writer.write_series(series_rows)
         self.writer.write_latest(latest_rows)
 
@@ -154,9 +137,9 @@ class BatchProcessor:
             device_rows, prev_status, batch_id, started
         )
 
-        # -- stage 6: alerts (thresholds, device health, outages) ----------
+        # 6. Alerts.
         conditions = self._build_conditions(flagged, device_rows, prev_status, offline_devices, started)
-        opened, resolved = self._apply_conditions(conditions, fields, batch_id, started)
+        opened, resolved = self._apply_conditions(conditions, batch_id, started)
 
         events = sum(flag_counts.values()) + sum(quarantine_counts.values())
         log.info(
@@ -175,10 +158,6 @@ class BatchProcessor:
             resolved,
             (datetime.now(UTC) - started).total_seconds(),
         )
-
-    # ------------------------------------------------------------------
-    # stage 1: structural validation (FR4.1) + resolution (FR1.2)
-    # ------------------------------------------------------------------
 
     def _stage(self, batch: DataFrame) -> DataFrame:
         value = F.expr("try_cast(value_raw AS double)")
@@ -214,10 +193,6 @@ class BatchProcessor:
             .drop("resolved_field_id")
         )
 
-    # ------------------------------------------------------------------
-    # stage 3: quality flags (FR4.2, FR4.3, FR3.4, FR4.6)
-    # ------------------------------------------------------------------
-
     def _flag(self, valid: DataFrame, prev_latest: dict) -> DataFrame:
         baseline_value = self._map(
             [
@@ -249,11 +224,7 @@ class BatchProcessor:
             .withColumn("quality_flag", quality)
         )
 
-    # ------------------------------------------------------------------
-    # stage 4: Iceberg sinks (FR6.1, FR3.3, FR3.5, FR4.5)
-    # ------------------------------------------------------------------
-
-    def _write_quarantine(self, quarantine_df: DataFrame, batch_id: int, now: datetime) -> None:
+    def _write_quarantine(self, quarantine_df: DataFrame, batch_id: int) -> None:
         if quarantine_df.rdd.isEmpty():
             return
         source = quarantine_df.select(
@@ -280,15 +251,14 @@ class BatchProcessor:
             "AND t.source_offset = s.source_offset",
         )
 
-    def _write_bronze_and_counters(self, flagged: DataFrame, batch_id: int, now: datetime) -> dict[str, int]:
+    def _write_bronze_and_counters(self, flagged: DataFrame, batch_id: int) -> dict[str, int]:
         flag_counts = {
             row["quality_flag"]: row["count"] for row in flagged.groupBy("quality_flag").count().collect()
         }
         if not flag_counts:
             return {}
 
-        # Bronze: one row per (device_id, metric, measured_at); duplicates are
-        # collapsed here (FR4.3) and counted in ops.quality_counters (FR4.5).
+        # One bronze row per (device_id, metric, measured_at); duplicates are dropped here and only counted.
         bronze = (
             flagged.filter(F.col("dup_rank") == 1)
             .withColumn("batch_id", F.lit(batch_id).cast("long"))
@@ -325,14 +295,10 @@ class BatchProcessor:
         )
         return flag_counts
 
-    # ------------------------------------------------------------------
-    # stage 5: Cassandra serving tables (FR2.2, FR2.3, FR3.5)
-    # ------------------------------------------------------------------
-
     def _collect_serving_rows(
         self, flagged: DataFrame, prev_latest: dict, batch_id: int, now: datetime
     ) -> tuple[list[tuple], list[tuple]]:
-        """Rows visible to the near real-time dashboard (FR4.6: invalid data is
+        """Rows visible to the near real-time dashboard (invalid data is
         excluded, implausible jumps are carried with a visible quality flag)."""
         rows = (
             flagged.filter(F.col("quality_flag").isin("ok", "implausible_jump"))
@@ -416,7 +382,7 @@ class BatchProcessor:
         batch_id: int,
         now: datetime,
     ) -> tuple[list[Device], list[Device]]:
-        """Update device_status, detect outages and record gap rows (FR3.5, FR8.2)."""
+        """Update device_status, detect outages and record gap rows."""
         resumed: list[Device] = []
         offline: list[Device] = []
 
@@ -510,10 +476,6 @@ class BatchProcessor:
             "t.device_id = s.device_id AND t.gap_start = s.gap_start",
         )
 
-    # ------------------------------------------------------------------
-    # stage 6: alerts (FR8.1, FR8.2, FR8.4, FR8.5)
-    # ------------------------------------------------------------------
-
     def _build_conditions(
         self,
         flagged: DataFrame,
@@ -524,7 +486,7 @@ class BatchProcessor:
     ) -> list[Condition]:
         conditions: list[Condition] = []
 
-        # Crop-threshold conditions on this batch's valid values (FR8.1).
+        # Crop thresholds, on the batch average of valid readings.
         stats = {
             (row.field_id, row.metric): row
             for row in flagged.filter(F.col("quality_flag") == "ok")
@@ -538,65 +500,18 @@ class BatchProcessor:
             target = crop.target(metric) if crop else None
             if target is None or row.avg_value is None:
                 continue
-            avg_value = float(row.avg_value)
-            unit = self.ref.metrics[metric].unit
-            if target.alert_below is not None and avg_value < target.alert_below:
-                conditions.append(
-                    Condition(
-                        field_id=field_id,
-                        condition_code="low_soil_moisture" if metric == "soil_moisture" else f"low_{metric}",
-                        alert_type="low soil moisture" if metric == "soil_moisture" else f"low {metric}",
-                        severity="warning",
-                        breaching=True,
-                        message=(
-                            f"{metric.replace('_', ' ').title()} below the target range in {field_id}: "
-                            f"{avg_value:.1f} {unit} < {target.alert_below:.1f} {unit}"
-                        ),
-                        metric=metric,
-                        device_id=row.device_id,
-                        crop_code=crop.crop_code,
-                        observed_value=avg_value,
-                        threshold_value=target.alert_below,
-                    )
+            conditions.extend(
+                threshold_conditions(
+                    field_id=field_id,
+                    metric=metric,
+                    unit=self.ref.metrics[metric].unit,
+                    avg_value=float(row.avg_value),
+                    target=target,
+                    crop_code=crop.crop_code,
+                    device_id=row.device_id,
                 )
-            elif target.alert_above is not None and avg_value > target.alert_above:
-                conditions.append(
-                    Condition(
-                        field_id=field_id,
-                        condition_code="heat_stress" if metric == "air_temperature" else f"high_{metric}",
-                        alert_type="heat stress" if metric == "air_temperature" else f"high {metric}",
-                        severity="critical",
-                        breaching=True,
-                        message=(
-                            f"{metric.replace('_', ' ').title()} above the target range in {field_id}: "
-                            f"{avg_value:.1f} {unit} > {target.alert_above:.1f} {unit}"
-                        ),
-                        metric=metric,
-                        device_id=row.device_id,
-                        crop_code=crop.crop_code,
-                        observed_value=avg_value,
-                        threshold_value=target.alert_above,
-                    )
-                )
-            else:
-                # Condition met: still evaluated, so an open alert resolves (FR8.4).
-                conditions.append(
-                    Condition(
-                        field_id=field_id,
-                        condition_code="low_soil_moisture" if metric == "soil_moisture" else f"low_{metric}",
-                        alert_type="low soil moisture" if metric == "soil_moisture" else f"low {metric}",
-                        severity="warning",
-                        breaching=False,
-                        message="",
-                        metric=metric,
-                        device_id=row.device_id,
-                        crop_code=crop.crop_code,
-                        observed_value=avg_value,
-                        threshold_value=target.alert_below,
-                    )
-                )
+            )
 
-        # Implausible jumps (FR4.2) raise an informational alert once debounced.
         jumps = {
             (row.field_id, row.metric): row
             for row in flagged.filter(F.col("quality_flag") == "implausible_jump")
@@ -625,7 +540,6 @@ class BatchProcessor:
                 )
             )
 
-        # Device health conditions (FR8.2).
         for aggregate in device_rows.collect():
             device = self.ref.device(aggregate.device_id)
             if device is None:
@@ -663,9 +577,7 @@ class BatchProcessor:
                     )
                 )
 
-        # Outage condition per device (FR8.2): evaluated for every device of the
-        # reference data each batch, so silence is caught even when a whole
-        # field goes quiet.
+        # Checked for every known device, not only those in the batch, so a silent field is caught.
         offline_ids = {device.device_id for device in offline_devices}
         for device in self.ref.devices.values():
             previous = prev_status.get(device.device_id)
@@ -689,9 +601,7 @@ class BatchProcessor:
 
         return conditions
 
-    def _apply_conditions(
-        self, conditions: list[Condition], fields: list[str], batch_id: int, now: datetime
-    ) -> tuple[int, int]:
+    def _apply_conditions(self, conditions: list[Condition], batch_id: int, now: datetime) -> tuple[int, int]:
         opened = 0
         resolved = 0
         states: dict[str, dict[str, AlertState]] = {}

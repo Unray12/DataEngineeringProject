@@ -45,7 +45,7 @@ Tệp nhỏ & Có; phải tự gộp bằng cách viết lại các phân vùng 
 
 \paragraph{Điểm yếu đối với bài toán này.} Cassandra là kho \emph{theo truy vấn}: mỗi câu hỏi cần một bảng thiết kế riêng, và một truy vấn chưa được lường trước (ví dụ so sánh hai giai đoạn tùy ý hoặc gộp theo tuần) không thể trả lời bằng truy vấn tùy biến mà phải thêm bảng và nạp lại dữ liệu. Cassandra không có phép nối và gộp tự do. Việc giữ toàn bộ lịch sử thô cho mục đích xử lý lại cũng không phù hợp với một kho tối ưu cho ghi và tra cứu theo khóa. Cuối cùng, dữ liệu bronze, nguồn để dựng lại mọi chỉ báo, vẫn phải nằm ở nơi khác.
 
-\paragraph{Cách so sánh.} Benchmark \#2 (Mục~\ref{sec:5-bench-lookups}) chạy \emph{cùng một câu hỏi} của bảng điều khiển (lịch sử một thửa ruộng, so sánh nhiều thửa ruộng) trên Cassandra và trên Trino, đo độ trễ p50 và p95 theo số truy vấn đồng thời. Kết quả: Cassandra nhanh hơn Trino 15 đến 23 lần cho câu hỏi gần thời gian thực (Bảng~\ref{tab:5-bench-lookups}), nhưng phải thêm bảng cho mỗi câu hỏi phân tích; Mục~\ref{sec:5-comparison-storage} đối chiếu hai phương án.
+\paragraph{Cách so sánh.} Benchmark \#2 (Mục~\ref{sec:5-bench-lookups}) chạy \emph{cùng một câu hỏi} của bảng điều khiển (lịch sử một thửa ruộng, so sánh nhiều thửa ruộng) trên Cassandra và trên Trino, đo độ trễ p50 và p95 theo số truy vấn đồng thời. Kết quả: với câu hỏi gần thời gian thực, Cassandra nhanh hơn Trino khoảng 15 lần ở một máy khách và 23 đến 42 lần ở 10 máy khách (Bảng~\ref{tab:5-bench-lookups}), nhưng phải thêm bảng cho mỗi câu hỏi phân tích; Mục~\ref{sec:5-comparison-storage} đối chiếu hai phương án.
 
 \subsection{Phương án C: khoảng trigger khác, hoặc xử lý từng sự kiện}
 \label{sec:4-alt-trigger}

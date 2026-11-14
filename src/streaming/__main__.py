@@ -20,11 +20,11 @@ log = logging.getLogger("streaming")
 
 def reset_checkpoint(spark: SparkSession, location: str) -> None:
     """Delete the checkpoint directory (``just run-stream reset_checkpoint=yes``)."""
-    path = spark._jvm.org.apache.hadoop.fs.Path(location)  # noqa: SLF001 (PySpark idiom)
-    fs = path.getFileSystem(spark._jsc.hadoopConfiguration())  # noqa: SLF001
+    path = spark._jvm.org.apache.hadoop.fs.Path(location)
+    fs = path.getFileSystem(spark._jsc.hadoopConfiguration())
     if fs.exists(path):
         fs.delete(path, True)
-        log.warning("deleted checkpoint %s; the next run replays from %s", location, "the start offsets")
+        log.warning("deleted checkpoint %s; the next run starts from STARTING_OFFSETS", location)
 
 
 def main() -> None:

@@ -1,12 +1,5 @@
-# Task runner for the agriculture data engineering platform.
-#
-# `just` replaces `make` as the single entry point: every workflow is a recipe
-# here, and each recipe shells out to Docker Compose. Run `just` to list them.
-#
-# Values from `.env` are loaded into the environment of every recipe (see
-# `set dotenv-load`), so they are referenced as ${VAR}, not {{VAR}}.
-#
-# Docs: https://just.systems/man/en/
+# Every routine task of the platform. Run `just` to list them.
+# Values from .env are exported to every recipe, so recipes use ${VAR}, not {{VAR}}.
 
 set dotenv-load := true
 set shell := ["bash", "-euo", "pipefail", "-c"]
@@ -18,9 +11,7 @@ all-profiles := "--profile core --profile processing --profile serving --profile
 default:
     @just --list --unsorted
 
-# -----------------------------------------------------------------------------
-# Preflight
-# -----------------------------------------------------------------------------
+# --- Preflight ---
 
 # Create .env from the template
 init:
@@ -41,9 +32,7 @@ doctor:
 build:
     {{compose}} --profile core --profile processing --profile serving --profile app build
 
-# -----------------------------------------------------------------------------
-# Lifecycle
-# -----------------------------------------------------------------------------
+# --- Lifecycle ---
 
 # Start HDFS + Kafka + Hive Metastore + Trino + ingest
 up-core:
@@ -86,14 +75,11 @@ ps:
 logs *services:
     {{compose}} logs -f {{services}}
 
-# -----------------------------------------------------------------------------
-# HDFS
-# -----------------------------------------------------------------------------
+# --- HDFS ---
 
-# Internal: block until HDFS answers and a DataNode has registered.
-# The datanode check uses grep -c, not grep -q: -q exits on the first match and
-# closes the pipe, which makes `docker compose exec` fail with EPIPE (255) and,
-# under pipefail, turns the until-loop into an infinite one.
+# grep -c, not grep -q: -q closes the pipe early, `docker compose exec` then fails with
+# EPIPE and, under pipefail, the until-loop never ends.
+# Block until HDFS answers and a DataNode has registered
 _hdfs-ready:
     @echo "==> waiting for HDFS"
     @until {{compose}} exec -T namenode hdfs dfs -ls / >/dev/null 2>&1; do sleep 2; done
@@ -126,9 +112,7 @@ streaming-reset:
     {{compose}} exec -T namenode hdfs dfs -rm -r -f ${HDFS_CHECKPOINTS_PATH} || true
     @echo "checkpoints deleted - the next run replays from ${STARTING_OFFSETS}"
 
-# -----------------------------------------------------------------------------
-# Kafka
-# -----------------------------------------------------------------------------
+# --- Kafka ---
 
 # Create the sensor topic explicitly (auto-creation is also enabled)
 kafka-init:
@@ -137,9 +121,8 @@ kafka-init:
       --create --if-not-exists --topic ${KAFKA_SENSOR_TOPIC} \
       --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor 1
 
-# List topics and their end offsets.
-# Uses kafka-get-offsets.sh, not kafka.tools.GetOffsetShell: the old class is
-# removed in Kafka 3.8+ (NoClassDefFoundError).
+# (kafka.tools.GetOffsetShell no longer exists in Kafka 3.8+, hence kafka-get-offsets.sh)
+# List topics and their end offsets
 kafka-topics:
     {{compose}} exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server ${KAFKA_BOOTSTRAP} --list
     @{{compose}} exec -T kafka /opt/kafka/bin/kafka-get-offsets.sh \
@@ -156,13 +139,11 @@ kafka-reset:
     {{compose}} exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server ${KAFKA_BOOTSTRAP} --delete --topic ${KAFKA_SENSOR_TOPIC} || true
     @just kafka-init
 
-# -----------------------------------------------------------------------------
-# Trino / Iceberg
-# -----------------------------------------------------------------------------
+# --- Trino / Iceberg ---
 
-# Run a Trino query: just trino-sql "SELECT count(*) FROM lakehouse.bronze.sensor_readings"
-# The query goes through stdin, so Iceberg metadata tables work too:
+# The query goes through stdin, so metadata tables work too:
 #   just trino-sql 'SELECT snapshot_id, committed_at FROM lakehouse.gold."field_daily$snapshots"'
+# Run a Trino query: just trino-sql "SELECT count(*) FROM lakehouse.bronze.sensor_readings"
 trino-sql query="SHOW SCHEMAS FROM lakehouse":
     printf '%s\n' {{quote(query)}} | {{compose}} exec -T trino trino --server localhost:8080 --user ${TRINO_USER}
 
@@ -186,9 +167,7 @@ compact table="bronze.sensor_readings":
       dbt run-operation rewrite_data_files --args '{table: {{table}}}' \
       --project-dir /app/dbt --profiles-dir /app/dbt
 
-# -----------------------------------------------------------------------------
-# Pipelines
-# -----------------------------------------------------------------------------
+# --- Pipelines ---
 
 # Run the Spark Structured Streaming micro-batch job in the foreground
 run-stream trigger='' max_offsets='' reset_checkpoint='no':
@@ -199,9 +178,9 @@ run-stream trigger='' max_offsets='' reset_checkpoint='no':
       -e RESET_CHECKPOINT={{reset_checkpoint}} \
       spark-stream
 
-# Run the streaming job detached; follow it with: just logs spark-stream.
-# `compose up` has no -e flag, so overrides go through the shell environment
-# (compose.yml interpolates ${TRIGGER_INTERVAL:-30s}; empty falls back).
+# `compose up` has no -e flag, so overrides go through the shell environment (an empty value
+# falls back to the compose default).
+# Run the streaming job detached; follow it with: just logs spark-stream
 run-stream-bg trigger='' max_offsets='':
     @just _hdfs-ready
     TRIGGER_INTERVAL="{{trigger}}" MAX_OFFSETS_PER_TRIGGER="{{max_offsets}}" \
@@ -243,24 +222,21 @@ _cassandra-counts:
       SELECT count(*) AS alerts_by_field FROM agri.alerts_by_field; \
       SELECT status, count(*) FROM agri.alerts_by_status GROUP BY status;"
 
-# -----------------------------------------------------------------------------
-# dbt (bronze -> silver -> gold)
-# -----------------------------------------------------------------------------
+# --- dbt (bronze -> silver -> gold) ---
 
 # Build the dbt silver and gold models
 dbt-run:
     @just _hdfs-ready
     {{compose}} --profile core --profile processing run --rm dbt dbt build --project-dir /app/dbt --profiles-dir /app/dbt
 
-# Rebuild the incremental gold tables from scratch. Needed once after a change of their partitioning
-# or columns: an existing table keeps its old layout and loses its Iceberg snapshot history.
+# Needed after changing their partitioning or columns. Drops their snapshot history.
+# Rebuild the incremental gold tables from scratch
 dbt-full-refresh:
     @just _hdfs-ready
     {{compose}} --profile core --profile processing run --rm dbt dbt build --full-refresh --select gold --project-dir /app/dbt --profiles-dir /app/dbt
 
-# Complete batch flow: initialize Iceberg tables, build silver/gold, test, then compact the tables
-# the stream commits to every micro-batch (bronze and ops; ops.quality_counters gains a file per
-# batch, and before compaction /quality/devices took 5x longer, benchmark #6).
+# On ~12 GB of Docker memory, stop the stream first (two Spark drivers OOM-killed the NameNode).
+# Batch flow: create tables, build and test silver/gold, compact bronze and ops
 batch-run:
     @just lakehouse-init
     @just dbt-run
@@ -283,9 +259,7 @@ dbt-test:
 dbt-docs:
     {{compose}} --profile core --profile processing run --rm dbt dbt docs generate --project-dir /app/dbt --profiles-dir /app/dbt
 
-# -----------------------------------------------------------------------------
-# API
-# -----------------------------------------------------------------------------
+# --- API ---
 
 # Show the OpenAPI schema of the running API
 api-docs:
@@ -296,11 +270,9 @@ api-health:
     @curl -s http://localhost:${API_PORT}/health/live; echo
     @curl -s http://localhost:${API_PORT}/health/ready; echo
 
-# -----------------------------------------------------------------------------
-# Tests and quality
-# -----------------------------------------------------------------------------
+# --- Tests and quality ---
 
-# Run the containerised test suite against the running stack
+# Run the test suite inside the Spark image (needs the core profile running)
 test:
     @just _hdfs-ready
     {{compose}} --profile core --profile processing run --rm spark-tests
@@ -311,31 +283,24 @@ test-unit:
 
 # Lint with ruff
 lint:
-    docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim \
-      sh -c "pip install -q ruff==0.9.* && ruff check ."
+    uv run ruff check .
+    uv run ruff format --check .
 
 # Format with ruff
 fmt:
-    docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim \
-      sh -c "pip install -q ruff==0.9.* && ruff format ."
+    uv run ruff format .
 
-# -----------------------------------------------------------------------------
-# Benchmarks (AGENTS.md: results must record configuration)
-#
-# Every script writes benchmarks/results/<name>.csv whose first lines record the
-# configuration (trigger, data volume, hardware). #2-#4 only query the stores and run
-# inside the api image; #1, #5 and #6 start, stop or kill containers (or time the
-# published ports), so they run on the host with uv.
-# -----------------------------------------------------------------------------
+# --- Benchmarks ---
+# Each script writes benchmarks/results/<name>.csv with its configuration in the first lines.
+# #2-#4 run inside the api image; #1, #5 and #6 control containers, so they run on the host.
 
-# Benchmark #1: micro-batch trigger interval (latency, alert latency, throughput, CPU/memory).
-# Needs `just up`; restarts spark-stream per interval and leaves it running at 30 s. About 35 min.
+# Restarts spark-stream per interval and leaves it running at 30 s. About 35 min.
+# Benchmark #1: trigger interval vs latency, alert latency, CPU and commits
 bench-trigger triggers="10s,30s,60s" window="360":
     uv run python benchmarks/run_trigger_benchmark.py --triggers {{triggers}} --window {{window}}
 
-# Run one benchmark script inside the api image on the Compose network. The scripts write
-# benchmarks/results/*.csv, whose first lines record the configuration (AGENTS.md rule 4).
-# Hardware is detected here, not in justfile variables, so other recipes never call `docker info`.
+# Hardware is detected here rather than in justfile variables, so other recipes never need Docker.
+# Run a benchmark script inside the api image
 _bench script *args:
     cpu=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || uname -m); \
     cores=$(sysctl -n hw.ncpu 2>/dev/null || nproc); \
@@ -348,13 +313,13 @@ _bench script *args:
       -e COMPACT_SECONDS \
       api python /app/benchmarks/{{script}} {{args}}
 
-# Benchmark #2: Cassandra vs Trino-on-Iceberg for the same dashboard query (needs the stream
-# running and `just batch-run` done, so both stores hold data)
+# Needs data in both stores (stream has run, then `just batch-run`).
+# Benchmark #2: Cassandra vs Trino-on-Iceberg for the same dashboard query
 bench-lookups:
     @just _bench run_lookup_benchmark.py
 
-# Benchmark #3: Iceberg vs plain Hive/Parquet on the same data (restart Trino once after adding
-# trino/catalog/hive.properties: `docker compose restart trino`)
+# Restart Trino once after adding trino/catalog/hive.properties.
+# Benchmark #3: Iceberg vs plain Hive/Parquet on the same data
 bench-storage:
     @just _bench run_storage_benchmark.py
 
@@ -364,18 +329,17 @@ bench-compaction:
     start=$(date +%s); just compact bench.sensor_compaction; end=$(date +%s); \
       COMPACT_SECONDS=$((end - start)) just _bench run_compaction_benchmark.py --phase after
 
-# Benchmark #5: recovery and replay. SIGKILL the job mid-batch (and a normal stop) while the
-# simulator keeps sending, restart on the same checkpoint, and check every Kafka message is in
-# bronze or quarantine exactly once and every dashboard reading reached Cassandra. About 35 min.
-bench-replay scenarios="sigkill,stop" outage="180":
+# About 35 min.
+# Benchmark #5: kill or stop the stream mid-flow, restart, check every message landed once
+bench-replay scenarios="sigkill,sigkill-after-bronze,stop" outage="180":
     uv run python benchmarks/run_replay_benchmark.py --scenarios {{scenarios}} --outage {{outage}}
 
-# Data-correctness checks of the evaluation (section 5.2): injected faults vs detected (Kafka as ground
-# truth), gold field_daily recomputed from silver, implausible values in gold. Run after `just batch-run`.
+# Run after `just batch-run`. --since <UTC time> limits the fault check to newer messages.
+# Data checks: injected vs detected faults, gold vs silver, implausible values in gold
 check-correctness *args:
     uv run python benchmarks/run_correctness_checks.py {{args}}
 
-# Benchmark #6: API endpoint and page response times (needs `just up-app`): every FastAPI endpoint,
-# and every page as HTML plus its /api/* calls in parallel.
+# Needs `just up-app`. Pages are timed as the HTML plus their /api/* calls in parallel.
+# Benchmark #6: response time of every API endpoint and every page
 bench-web *args:
     uv run python benchmarks/run_web_benchmark.py {{args}}

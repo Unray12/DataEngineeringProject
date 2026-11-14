@@ -1,7 +1,4 @@
-"""Pure helpers for the near real-time endpoints (BR2, BR3).
-
-Kept free of FastAPI and Cassandra so they can be unit-tested with replayed data.
-"""
+"""Helpers for the near real-time endpoints (gaps in a series, outage counts), kept free of I/O for tests."""
 
 from __future__ import annotations
 
@@ -26,7 +23,7 @@ def target_state(value: float, target: CropTarget | None) -> TargetState:
 
 
 def gap_multiplier() -> float:
-    """A silence longer than this many reporting intervals is a gap (same rule as device outage, FR8.2)."""
+    """A silence longer than this many reporting intervals is a gap (the same rule as a device outage)."""
     return float(os.environ.get("DEVICE_OFFLINE_MULTIPLIER", "4.0"))
 
 

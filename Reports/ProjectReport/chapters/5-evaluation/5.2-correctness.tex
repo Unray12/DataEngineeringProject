@@ -156,4 +156,4 @@ GROUP BY 1, 2, 3 HAVING count(*) > 1;
 \subsection{Kiểm thử đơn vị}
 \label{sec:5-unit-tests}
 
-Ngoài các kiểm tra trên dữ liệu thật, logic quyết định được kiểm thử độc lập với Spark và Cassandra bằng \code{just test-unit}: 7 kiểm thử cho máy trạng thái cảnh báo, 11 cho logic mất kết nối và khoảng trống dữ liệu, 13 cho cấu hình, 8 cho dữ liệu danh mục, 11 cho lớp gần thời gian thực của API và 7 cho giá trị của bộ mô phỏng (thêm sau khi kiểm tra ở Mục~\ref{sec:5-fault-detection} phát hiện lỗi của bộ mô phỏng). Lần chạy cuối: 57/57 kiểm thử đạt.
+Ngoài các kiểm tra trên dữ liệu thật, logic quyết định được kiểm thử độc lập với Spark và Cassandra bằng \code{just test-unit}: 9 kiểm thử cho luật cảnh báo, 11 cho logic mất kết nối và khoảng trống dữ liệu, 13 cho cấu hình, 8 cho dữ liệu danh mục, 11 cho lớp gần thời gian thực của API và 7 cho giá trị của bộ mô phỏng (thêm sau khi kiểm tra ở Mục~\ref{sec:5-fault-detection} phát hiện lỗi của bộ mô phỏng). Lần chạy cuối: 59/59 kiểm thử đạt.

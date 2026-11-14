@@ -1,7 +1,7 @@
 # Shared image for the Python services that are not Spark jobs: the FastAPI
 # access layer, the HTTP ingest service and the sensor simulator. They need the
 # same runtime (Python 3.11 + the project's client libraries) but no Spark, so
-# the Spark/pyarrow bulk is filtered out of the dependency export.
+# pyspark and py4j are filtered out of the dependency export.
 FROM python:3.11-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.22 /uv /uvx /bin/

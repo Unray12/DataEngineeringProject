@@ -8,7 +8,7 @@
 ) }}
 
 -- Daily min, max and average per field and metric. Statistics use only readings with
--- quality_flag = 'ok', so a flagged spike can never reach a dashboard (FR4.6); the counts keep
+-- quality_flag = 'ok', so a flagged spike never reaches the analytical dashboards; the counts keep
 -- every non-null reading so the share of flagged data stays visible.
 select
     field_id,

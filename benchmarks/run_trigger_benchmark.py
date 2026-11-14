@@ -1,4 +1,4 @@
-"""Benchmark #1: micro-batch trigger interval 10 s / 30 s / 60 s (AGENTS.md, Nhân's part of BR2/BR3).
+"""Benchmark #1: micro-batch trigger interval 10 s / 30 s / 60 s.
 
 For each interval the script restarts the streaming job, lets it settle, then measures a fixed
 window of the normal simulator load:

@@ -7,8 +7,7 @@
     partition_by=['day']
 ) }}
 
--- Percentages divide doubles: Spark's decimal division would round them to two decimals.
--- Daily management indicators (FR5.3):
+-- Daily management indicators (percentages divide doubles; decimal division would round them):
 --   time_in_range_pct  share of readings inside the crop's target range (null without a target)
 --   hours_below_target hours in which the average soil moisture was under the target minimum
 with hourly as (

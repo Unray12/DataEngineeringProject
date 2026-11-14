@@ -35,9 +35,7 @@ function resolveRange(from?: string, to?: string): { from: string; to: string } 
   return { from: from ?? week.from, to: from && from > week.to ? from : week.to };
 }
 
-// ---------------------------------------------------------------------------
 // Mock mode
-// ---------------------------------------------------------------------------
 
 function mockRows(fieldId: string, metric: Metric, from: string, to: string): IndicatorRow[] {
   const daysBack = Math.min(400, Math.max(1, Math.ceil((MOCK_NOW - Date.parse(from)) / DAY_MS) + 2));
@@ -77,9 +75,7 @@ function mockCompare(fieldIds: string[], metric: Metric, from: string, to: strin
     .sort((left, right) => right.avg - left.avg);
 }
 
-// ---------------------------------------------------------------------------
 // API mode
-// ---------------------------------------------------------------------------
 
 async function fetchApi(path: string): Promise<unknown> {
   if (!env.API_BASE_URL) throw new ApiError(500, "API_BASE_URL is required in api mode", "config_error");
@@ -133,9 +129,7 @@ function apiCompare(body: unknown): CompareRow[] {
   });
 }
 
-// ---------------------------------------------------------------------------
 // Public entry points used by the route handlers
-// ---------------------------------------------------------------------------
 
 export async function getSummary(from?: string, to?: string): Promise<SummaryEnvelope> {
   const range = resolveRange(from, to);

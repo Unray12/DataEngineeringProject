@@ -1,10 +1,7 @@
-"""Lightweight HTTP ingest service: push -> Kafka (AGENTS.md ingestion decision).
+"""HTTP ingest service: devices and gateways POST readings, the service publishes them to Kafka.
 
-Sensors and gateways push readings to ``POST /v1/readings``; the service's only
-job is to publish them to the sensor topic. It deliberately does **not** enforce
-the event schema: the Spark streaming job owns the explicit schema and
-quarantines anything malformed (FR4.1), so bad data is recorded with its
-lineage instead of being silently rejected at the edge.
+It checks nothing about the payload. Validation happens in the streaming job, which keeps bad records
+in quarantine together with their Kafka offset, so nothing is dropped silently at the edge.
 """
 
 from __future__ import annotations
@@ -74,10 +71,10 @@ def publish(response: Response, payload: Any = Body(...)) -> dict[str, int]:
     """Accept one event or a list of events and publish them to Kafka.
 
     Returns 202 when at least one event was handed to the broker, 422 when the
-    envelope itself was unusable. The edge deliberately validates nothing else:
-    schema errors are recorded downstream with full lineage (FR4.1).
+    envelope itself was unusable. Nothing else is validated here:
+    schema errors are recorded downstream with full lineage.
     """
-    if producer is None:  # pragma: no cover - lifespan always runs
+    if producer is None:
         raise HTTPException(status_code=503, detail="producer not initialised")
     events = payload if isinstance(payload, list) else [payload]
     if not events:
@@ -116,6 +113,5 @@ def _produce(key: str, event: dict[str, Any], errors: list[str]) -> None:
         _topic(),
         key=key.encode("utf-8"),
         value=json.dumps(event, separators=(",", ":")).encode("utf-8"),
-        # confluent-kafka invokes the delivery report with (err, msg).
         on_delivery=lambda err, msg: errors.append(str(err)) if err else None,
     )

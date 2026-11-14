@@ -95,7 +95,7 @@ with hourly as (
     group by 1, 2, 3
 )
 select d.*,
-       cast(h.in_range_count * 100.0 / nullif(h.targeted_count, 0) as double)
+       cast(h.in_range_count as double) * 100 / nullif(h.targeted_count, 0)
            as time_in_range_pct,
        cast(coalesce(h.hours_below_target, 0) as int) as hours_below_target
 from {{ ref('field_daily') }} d

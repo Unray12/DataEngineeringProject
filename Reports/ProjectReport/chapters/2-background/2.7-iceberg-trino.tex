@@ -94,4 +94,4 @@ SELECT count(*) FROM lakehouse.bronze.sensor_readings
 FOR TIMESTAMP AS OF TIMESTAMP '2026-11-01 00:00:00 UTC';
 \end{lstlisting}
 
-\paragraph{Giới hạn.} Trino không thay thế được kho gần thời gian thực. Mỗi truy vấn phải đọc siêu dữ liệu Iceberg và tệp Parquet, nên độ trễ nằm ở cỡ trăm mili-giây tới giây, so với cỡ mười mili-giây của tra cứu theo khóa trong Cassandra. Đó là lý do hệ thống có hai đường phục vụ và không trộn nguồn trong cùng một biểu đồ; benchmark ở Mục~\ref{sec:5-bench-lookups} đo chênh lệch này.
+\paragraph{Giới hạn.} Trino không thay thế được kho gần thời gian thực. Mỗi truy vấn phải được lập kế hoạch và đọc siêu dữ liệu Iceberg cùng tệp Parquet, nên độ trễ ở cỡ vài chục tới vài trăm mili-giây (45--120~ms ở p50 trong benchmark \#2), so với vài mili-giây của tra cứu theo khóa trong Cassandra. Đó là lý do hệ thống có hai đường phục vụ và không trộn nguồn trong cùng một biểu đồ; benchmark ở Mục~\ref{sec:5-bench-lookups} đo chênh lệch này.

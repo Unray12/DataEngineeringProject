@@ -1,4 +1,4 @@
-"""Shared helpers for the benchmark scripts (AGENTS.md: results record their configuration).
+"""Shared helpers for the benchmark scripts.
 
 The scripts run inside the ``api`` image on the Compose network (``just bench-*``), so hosts
 come from the environment like everywhere else in the project.

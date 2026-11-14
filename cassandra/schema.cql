@@ -1,18 +1,18 @@
--- Cassandra schema for the serving layer (near real-time path, BR1/BR2/BR3/BR8).
+-- Cassandra schema: the near real-time serving tables.
 --
--- Design rule (AGENTS.md): query-first. One table per API query, with the
+-- Query-first: One table per API query, with the
 -- partition key chosen for that query, never a generic "one big table".
 --
 -- Tables (names match REQUIREMENTS.md section 5):
---   latest_by_field        GET /fields/{id}/latest        BR2 current conditions
---   readings_by_field_24h  GET /fields/{id}/series        BR2 last-24-hours series (TTL)
---   device_status          GET /devices/{id}/status       BR3/BR8 device health and gaps
---   alerts_by_field        GET /fields/{id}/alerts        BR8 alert history for one field
---   alerts_by_status       GET /alerts?status=open        BR8 active-alert list
---   alert_by_id            PATCH /alerts/{id}             BR8 acknowledge / resolve
---   alert_state_by_field   internal (streaming)           BR8 debounce, cooldown, lifecycle
+--   latest_by_field        GET /fields/{id}/latest        current conditions
+--   readings_by_field_24h  GET /fields/{id}/series        last-24-hours series (TTL)
+--   device_status          GET /devices/{id}/status       device health and gaps
+--   alerts_by_field        GET /fields/{id}/alerts        alert history of one field
+--   alerts_by_status       GET /alerts?status=open        active alerts
+--   alert_by_id            PATCH /alerts/{id}             acknowledge / resolve
+--   alert_state_by_field   internal (streaming)           debounce, cooldown, lifecycle
 --
--- Every readings table carries the lineage columns required by FR4.4
+-- Every readings table carries lineage columns
 -- (source offsets, ingested_at, batch_id, quality_flag) so any figure on a
 -- dashboard can be traced back to the batch that produced it.
 --
@@ -26,7 +26,7 @@ AND durable_writes = true;
 USE agri;
 
 -- ---------------------------------------------------------------------------
--- BR2 / FR2.2: latest reading per metric per field.
+-- latest reading per metric per field.
 --
 -- Query: "current value of every metric of one field". Partition key =
 -- field_id keeps a whole field on one replica; clustering by metric means one
@@ -41,9 +41,9 @@ CREATE TABLE IF NOT EXISTS latest_by_field (
     value         double,
     unit          text,
     measured_at   timestamp,   -- when the reading was taken (device clock, UTC)
-    ingested_at   timestamp,   -- when Kafka accepted the event (FR4.4)
-    quality_flag  text,        -- ok | implausible_jump (FR4.6: visibly flag)
-    batch_id      bigint,      -- Spark micro-batch that wrote the row (FR4.4)
+    ingested_at   timestamp,   -- when Kafka accepted the event
+    quality_flag  text,        -- ok | implausible_jump (shown with a flag)
+    batch_id      bigint,      -- Spark micro-batch that wrote the row
     source_topic  text,
     source_partition int,
     source_offset bigint,
@@ -52,12 +52,12 @@ CREATE TABLE IF NOT EXISTS latest_by_field (
 ) WITH default_time_to_live = 604800;  -- 7 days; overwritten by newer readings
 
 -- ---------------------------------------------------------------------------
--- BR2 / FR2.3: last-24-hours series for one field and metric.
+-- last-24-hours series for one field and metric.
 --
 -- Query: "all readings of (field, metric) in the last N hours, oldest first".
 -- The hourly bucket bounds the partition (24-48 rows per bucket) so the table
 -- grows wide in time but never in partition size. TTL keeps only the window
--- the dashboard needs (AGENTS.md: readings TTL 24-48 h).
+-- the dashboard needs (48 h).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS readings_by_field_24h (
     field_id      text,
@@ -72,10 +72,10 @@ CREATE TABLE IF NOT EXISTS readings_by_field_24h (
     batch_id      bigint,
     PRIMARY KEY ((field_id, metric), bucket, measured_at)
 ) WITH CLUSTERING ORDER BY (bucket ASC, measured_at ASC)
-  AND default_time_to_live = 172800;  -- 48 h, per AGENTS.md
+  AND default_time_to_live = 172800;  -- 48 h
 
 -- ---------------------------------------------------------------------------
--- BR3 / FR8.2: device health.
+-- device health.
 --
 -- Query: "status of one device". Partition key = device_id; a point lookup
 -- returns last-seen time, battery, signal and the most recent gap, which is
@@ -100,15 +100,11 @@ CREATE TABLE IF NOT EXISTS device_status (
 );
 
 -- ---------------------------------------------------------------------------
--- BR8 / FR8.3, FR8.4: alert history of one field, and the active-alert list.
---
--- alerts_by_field: "history of one field, newest first" (dashboard drill-down,
--- alert analysis through gold tables later). alerts_by_status: "all alerts in
--- a given state, newest first" (the dashboard's active-alert panel); the
--- streaming job inserts on open and both the job and the API move rows between
--- status partitions on resolve (Cassandra cannot update a clustering column).
--- alert_by_id: the lookup table behind PATCH /alerts/{id} (BR8 acceptance
--- criterion: acknowledge and resolve through the API).
+-- Alerts, stored three ways for three queries:
+--   alerts_by_field   history of one field, newest first
+--   alerts_by_status  all alerts in one state, newest first; a status change moves the row
+--                     between partitions (Cassandra cannot update a clustering column)
+--   alert_by_id       lookup behind PATCH /alerts/{id}
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS alerts_by_field (
     field_id      text,
@@ -167,7 +163,7 @@ CREATE TABLE IF NOT EXISTS alert_by_id (
 ) WITH default_time_to_live = 7776000;
 
 -- ---------------------------------------------------------------------------
--- BR8 / FR8.5: alert lifecycle state used by the streaming job.
+-- alert lifecycle state used by the streaming job.
 --
 -- One row per (field, condition) holds the debounce counter, the last
 -- emission time (cooldown guard, together with alert_guard semantics) and the

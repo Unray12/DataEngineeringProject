@@ -45,8 +45,8 @@ server-side, and FastAPI is the only service that accesses Cassandra or Trino.
 | Ingestion | HTTP service → Kafka KRaft |
 | Streaming | Spark Structured Streaming, 30-second trigger |
 | Lakehouse | HDFS + Apache Iceberg |
-| Catalog | Hive Metastore backed by Postgres |
-| Batch | dbt-spark executed by Spark |
+| Catalog | Hive Metastore (embedded Derby database on a Docker volume) |
+| Batch | dbt-spark (`method: session`, Spark runs in the dbt container) |
 | Live serving | Apache Cassandra |
 | Analytical serving | Trino over gold Iceberg |
 | API | FastAPI |
@@ -139,9 +139,10 @@ For a bounded demo instead:
 just sim-for 120
 ```
 
-The simulator intentionally injects malformed, late, duplicate, out-of-range,
-and outage data. The streaming job should quarantine or flag those records
-without crashing.
+The simulator injects faults on purpose: null, out-of-range and implausible
+values, duplicates, unknown devices, unexpected metrics, malformed payloads,
+and silent periods (outages). The streaming job quarantines or flags those
+records without crashing.
 
 ## Run the batch flow
 
@@ -195,9 +196,9 @@ just compact bronze.sensor_readings
 just lakehouse-tables
 ```
 
-The dbt profile is configured for Spark and the Hive-backed Iceberg catalog,
-matching the fixed architecture decision. Trino is used for analytical reads
-through FastAPI, not as the dbt execution engine.
+The dbt profile (`dbt/profiles.yml`) starts a Spark session inside the `dbt`
+container with the same Hive-backed Iceberg catalog as the streaming job. Trino
+is used for analytical reads through FastAPI, not as the dbt execution engine.
 
 ## Start and use the web app
 
@@ -283,8 +284,8 @@ GET /quality/summary
 GET /quality/devices
 ```
 
-If the gold tables have not been built yet, analytical endpoints return a
-clear `503` response instructing the operator to run the batch flow.
+If Trino is unreachable or the gold tables have not been built yet, analytical
+endpoints return `503` with a message to run the batch flow.
 
 ## Benchmarks
 
@@ -328,7 +329,7 @@ Follow logs:
 just logs api web spark-stream
 ```
 
-Run Python unit and integration tests:
+Run the Python unit tests, locally or inside the Spark image:
 
 ```bash
 just test-unit
@@ -365,20 +366,6 @@ just streaming-reset
 ```
 
 After a checkpoint reset, restart the stream before sending new simulator data.
-
-## Evaluation benchmarks
-
-The project evaluates:
-
-1. 10-second, 30-second, and 60-second streaming triggers
-2. Cassandra versus Trino-on-Iceberg dashboard latency
-3. Iceberg versus plain Hive/Parquet
-4. Query performance before and after compaction
-5. Recovery, replay, no-loss, and no-duplicate behavior
-
-Benchmark configuration must record trigger interval, data volume, hardware,
-and relevant service settings. Store scripts and generated results in
-`benchmarks/`.
 
 ## Troubleshooting
 

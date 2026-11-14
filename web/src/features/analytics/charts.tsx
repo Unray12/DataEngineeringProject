@@ -97,7 +97,7 @@ export function HistoryChart({ rows, granularity, unit, target, label }: History
 
 type PeriodProps = { points: AlignedPoint[]; unit: string; granularity: Granularity; label: string };
 
-/** Current period against the previous one of the same length, overlaid by position (FR6.3). */
+/** Current period against the previous one of the same length, overlaid by position. */
 export function PeriodChart({ points, unit, granularity, label }: PeriodProps) {
   return (
     <div className="h-[260px] w-full" role="img" aria-label={`${label}: current period compared with the previous period`}>
