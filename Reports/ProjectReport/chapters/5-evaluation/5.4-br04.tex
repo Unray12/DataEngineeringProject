@@ -1,0 +1,25 @@
+% Phần BR4 của Mục 5.4 (người phụ trách: Tịnh).
+\subsection{BR4 -- Dữ liệu đáng tin cậy}
+\label{sec:5-eff-br04}
+
+Bảng~\ref{tab:5-eff-br04} đối chiếu các tiêu chí chấp nhận của BR4 với bằng chứng thu được.
+
+{\small
+\begin{longtblr}[
+  caption = {Tiêu chí chấp nhận của BR4 và bằng chứng},
+  label = {tab:5-eff-br04},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[2.6,l]X[2.6,l]X[2,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Các lỗi do bộ mô phỏng tiêm vào (trùng, đột biến, payload hỏng, thiết bị lạ) đều được phát hiện và đếm trong báo cáo chất lượng & Bảng~\ref{tab:5-fault-result}; trang \emph{Data quality} hiển thị cùng số liệu & Đạt: 601/601 lỗi được phát hiện và phân loại đúng (Mục~\ref{sec:5-fault-detection}) \\
+Mọi con số trên bảng điều khiển truy ngược được về offset nguồn và lô & Cột lineage trên mọi dòng bronze và silver; bảng lineage theo thiết bị trên trang \emph{Data quality} (Hình~\ref{fig:4-br04-ui}) & Đạt: 0 dòng thiếu cột lineage trong 108\,837 dòng bronze và 108\,797 dòng silver \\
+Test dbt thất bại chặn làm mới gold (FR4.7) & Log \code{just dbt-run} khi cố ý làm hỏng một test silver (bỏ \code{rainfall} khỏi danh sách giá trị hợp lệ của cột \code{metric}); ba model gold phụ thuộc silver bị bỏ qua, riêng \code{quality\_daily} vẫn được dựng vì chỉ đọc các bảng \code{ops} & Đạt: 1 test thất bại, 24 nút bị bỏ qua (3 model gold cùng 21 test của chúng), gold không được làm mới \\
+Bảng điều khiển loại bỏ hoặc đánh dấu dữ liệu lỗi (FR4.6) & API trả \code{quality\_flag} cho mọi số đo gần thời gian thực; biểu đồ trang Live loại các số đo \code{suspect} và \code{invalid} khỏi giá trị tin cậy (kiểm thử đơn vị \code{continuity.test.ts}) & Đạt \\
+\end{longtblr}
+}
+
+\paragraph{Kịch bản minh họa.} Người dùng mở trang \emph{Data quality}, chọn khoảng 7 ngày và thấy số bản ghi hợp lệ, trùng, ngoài khoảng và bị cách ly theo từng ngày. Khi chọn một thiết bị, bảng lineage hiện topic, phân vùng, offset, mã lô và thời điểm nhận của các bản ghi mới nhất (Hình~\ref{fig:4-br04-ui}). Với dữ liệu hiện có, ngày 9/11 có 47\,162 bản ghi hợp lệ, 32 bản trùng, 798 bản ngoài khoảng và 219 bản bị cách ly; thiết bị F001-S01 có 5\,161 bản ghi, trong đó 5\,147 hợp lệ và 14 bị gắn cờ.

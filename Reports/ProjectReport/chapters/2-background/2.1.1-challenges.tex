@@ -1,0 +1,10 @@
+\subsection{Thách thức của xử lý luồng thuần túy}
+\label{sec:2-challenges}
+
+Trong xử lý luồng thuần túy (pure stream processing), hệ thống xử lý từng sự kiện ngay khi sự kiện đến. Cách làm này cho độ trễ rất thấp, song với dữ liệu cảm biến nông nghiệp lại gặp một số khó khăn như sau:
+
+\begin{itemize}
+  \item \textbf{Khôi phục trạng thái đang xử lý.} Engine luồng giữ trạng thái theo từng khóa (như bộ đếm, cửa sổ hay giá trị gần nhất) trong bộ nhớ của các nút xử lý. Để khôi phục sau sự cố, engine phải lưu trạng thái này định kỳ để khi khởi động lại sẽ nạp lại toàn bộ trạng thái đã lưu rồi phát lại các sự kiện đến sau lần lưu cuối. Trạng thái càng lớn thì việc lưu và nạp lại càng tốn thời gian. Chẳng hạn, khi một cổng LoRaWAN gửi dồn dữ liệu tích lũy trong nhiều giờ mất kết nối, engine phải giữ và lưu lại trạng thái của mọi thiết bị liên quan ngay trong lúc xử lý đợt dữ liệu đó.
+  \item \textbf{Nguy cơ ghi trùng sau sự cố.} Khi xử lý từng sự kiện, engine không có ranh giới rõ ràng để biết sự kiện nào đã được ghi ra nơi lưu (sink). Nếu tác vụ sập ngay sau khi ghi một sự kiện nhưng trước khi kịp lưu tiến độ, thì sau khi khởi động lại, sự kiện đó sẽ được xử lý và ghi thêm một lần nữa. Để tránh điều này, nơi lưu phải cùng checkpoint của engine tham gia một giao thức cam kết hai pha, hoặc mọi thao tác ghi phải idempotent, tức là ghi lại nhiều lần vẫn cho cùng một kết quả. Chẳng hạn, nếu nhật ký lượng nước tưới được cập nhật bằng phép cộng dồn, một sự kiện bị ghi lại sẽ được cộng hai lần.
+  \item \textbf{Chi phí của độ trễ dưới một giây.} Để đạt độ trễ dưới một giây, engine phải chạy liên tục, giữ trạng thái trong bộ nhớ và xử lý dữ liệu đến sai thứ tự bằng watermark cho từng sự kiện. Chi phí này không đáng với những tác vụ không cần độ trễ đó. Ví dụ, nhiệt độ đất là một thông số biến thiên chậm nên chu kỳ cập nhật 30 giây đã đáp ứng nhu cầu canh tác.
+\end{itemize}

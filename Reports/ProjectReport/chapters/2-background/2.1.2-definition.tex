@@ -1,4 +1,4 @@
-\section{Khái niệm xử lý micro-batch}
+\subsection{Khái niệm xử lý micro-batch}
 \label{sec:2-definition}
 
 Micro-batch là mô hình xử lý lai: chia một luồng dữ liệu liên tục, không giới hạn thành chuỗi các khối dữ liệu nhỏ, hữu hạn (micro-batch), mỗi khối được thực thi sau một khoảng thời gian ngắn. Kleppmann mô tả ý tưởng này là ``chia luồng thành các khối nhỏ và xử lý mỗi khối như một tiến trình xử lý theo lô thu nhỏ'' \cite{kleppmann2017ddia}.
@@ -7,7 +7,7 @@ Nhờ ranh giới rõ ràng của từng khối, mỗi lô có thể được gh
 
 \begin{figure}[H]
 \centering
-\hinhtrong{0.85\linewidth}{4.5cm}{Luồng sự kiện liên tục được chia thành các micro-batch theo chu kỳ trigger}
-\caption{Rời rạc hóa luồng dữ liệu thành các micro-batch}
+\includegraphics[width=0.9\linewidth]{microbatch-concept.png}
+\caption[So sánh xử lý theo lô, micro-batch và xử lý luồng thuần túy]{So sánh xử lý theo lô, micro-batch và xử lý luồng thuần túy \cite{conduktor_microbatch}}
 \label{fig:2-microbatch-concept}
 \end{figure}

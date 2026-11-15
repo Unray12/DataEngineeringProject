@@ -1,0 +1,44 @@
+% Phần BR5 của Mục 5.4 (người phụ trách: Khang).
+\subsection{BR5 -- Quản lý dựa trên dữ liệu}
+\label{sec:5-eff-br05}
+
+Bảng~\ref{tab:5-eff-br05} đối chiếu các tiêu chí chấp nhận của BR5 với bằng chứng thu được trên hệ thống chạy thật (dữ liệu từ bộ mô phỏng, qua Kafka, Spark, Iceberg, dbt và Trino). Mọi truy vấn trong mục này chạy bằng \code{just trino-sql}.
+
+{\small
+\begin{longtblr}[
+  caption = {Tiêu chí chấp nhận của BR5 và bằng chứng},
+  label = {tab:5-eff-br05},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[2.2,l]X[3.4,l]X[0.9,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Tổng hợp gold khớp với silver cho các thửa ruộng và giai đoạn lấy mẫu & Tính lại nhỏ nhất, lớn nhất, trung bình từ silver (chỉ bản ghi hợp lệ) cho \emph{mọi} nhóm (thửa ruộng, chỉ số, ngày): 403 nhóm có dữ liệu hợp lệ, 403 nhóm khớp hoàn toàn với \code{field\_daily}; số bản ghi hợp lệ cũng khớp 403/403. Time-in-range tính lại độc lập từ silver và \code{ops.crop\_targets}: 171 cặp, 171 khớp (sai số dưới $10^{-9}$). & Đạt \\
+Đổi khoảng mục tiêu thì indicator cập nhật ở lần làm mới gold kế tiếp & Đổi \code{soil\_moisture.min} của cây ngô từ 25 lên 60 trong \code{reference\_data.json}, chạy \code{just lakehouse-init} và \code{just dbt-run} (khoảng một phút). Với F002 (ngô): time-in-range của độ ẩm đất từ 100,0\% xuống 0,0\%, số giờ dưới mục tiêu từ 0 lên 18 (Bảng~\ref{tab:5-target-change}). Sau khi trả khoảng mục tiêu về 25 và chạy lại, indicator về 100,0\% và 0 giờ. & Đạt \\
+Indicator tưới tiêu cho biết số giờ dưới mục tiêu của từng thửa ruộng & 18 giờ do gold tính trùng với 18 giờ tính độc lập từ silver (số giờ mà trung bình độ ẩm đất theo giờ thấp hơn mục tiêu nhỏ nhất). & Đạt \\
+Bảng điều khiển so sánh các thửa ruộng cạnh nhau & Trang \emph{Analytics} xếp hạng 8 thửa ruộng theo time-in-range kèm giá trị trung bình và số giờ dưới mục tiêu (Hình~\ref{fig:4-br05-ui}). & Đạt \\
+\end{longtblr}
+}
+
+\begin{table}[H]
+\centering
+\caption{Đổi khoảng mục tiêu của cây ngô và indicator của F002 (độ ẩm đất)}
+\label{tab:5-target-change}
+\small
+\begin{tblr}{
+  colspec = {X[2.2,l]X[1.2,c]X[1.2,c]X[1.2,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Trạng thái & Mục tiêu nhỏ nhất & Time-in-range & Giờ dưới mục tiêu \\
+Ban đầu (gold) & 25 & 100,0\% & 0 \\
+Sau khi đổi (gold) & 60 & 0,0\% & 18 \\
+Sau khi đổi (tính độc lập từ silver) & 60 & 0,0\% & 18 \\
+Sau khi trả lại (gold) & 25 & 100,0\% & 0 \\
+\end{tblr}
+\end{table}
+
+\paragraph{Một lỗi đã được phát hiện nhờ đối chiếu.} Lần đối chiếu đầu cho thấy 12 trong 171 cặp lệch nhau ở chữ số thập phân thứ hai. Nguyên nhân nằm ở \emph{truy vấn kiểm chứng}: phép chia số thập phân của nó làm tròn tỷ lệ phần trăm, trong khi gold chia số thực. Truy vấn kiểm chứng được sửa để chia số thực thì 171/171 khớp. Các model gold cũng được đổi sang chia số thực (\code{cast(... as double)}) để không phụ thuộc vào cách làm tròn của phép chia thập phân. Đối chiếu độc lập cũng cho thấy 77 trong 480 dòng của \code{field\_daily} không có bản ghi hợp lệ nào (một ngày mà mọi bản ghi của chỉ số đó đều bị gắn cờ, ví dụ lượng mưa); các dòng này có thống kê rỗng và API bỏ qua chúng thay vì hiển thị bằng 0.
+
+\paragraph{Kịch bản minh họa.} Người quản lý mở trang \emph{Analytics}, chọn độ ẩm đất và khoảng 7 ngày, rồi xem bảng xếp hạng các thửa ruộng theo tỷ lệ thời gian trong khoảng mục tiêu và số giờ dưới mục tiêu. Khối ``What to do'' cho một câu khuyến nghị (ví dụ ``F004 Coffee Slope stayed at or above its soil-moisture target over the last 18 days. No irrigation needed.''). Khi khoảng mục tiêu thay đổi như Bảng~\ref{tab:5-target-change}, câu này đổi thành khuyến nghị tưới. Phần đổi khoảng mục tiêu rồi chờ gold làm mới mất khoảng một phút, nên trong video được quay trước và tua nhanh.

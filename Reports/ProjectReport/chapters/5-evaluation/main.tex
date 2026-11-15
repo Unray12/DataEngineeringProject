@@ -1,14 +1,14 @@
 \chapter{ĐÁNH GIÁ}
 \label{chap:5-evaluation}
 
-% TODO: đoạn dẫn nhập chương
+Giải pháp được đánh giá bằng ba câu hỏi: dữ liệu sau khi xử lý có đúng không, hệ thống có đủ nhanh và bền không, và ứng dụng có giúp người dùng đạt được các yêu cầu nghiệp vụ không. Vì tất cả phép đo đều dùng dữ liệu mô phỏng trên một máy duy nhất, các con số cho thấy cơ chế hoạt động đúng và có chi phí chấp nhận được chứ không phải hiệu năng ở quy mô triển khai thật.
 
 \input{chapters/5-evaluation/5.1-setup}
 \input{chapters/5-evaluation/5.2-correctness}
 
 \section{Hiệu năng của giải pháp}
 \label{sec:5-performance}
-Mục này trình bày sáu benchmark mà đề tài yêu cầu (\code{AGENTS.md}, \code{REQUIREMENTS.md} mục 7). Bảng~\ref{tab:5-bench-overview} cho biết mỗi benchmark trả lời câu hỏi nào và cho yêu cầu nghiệp vụ nào. Mọi benchmark chạy trên cùng một máy (Bảng~\ref{tab:5-environment}), là một recipe \code{just} và ghi kết quả cùng cấu hình vào \code{benchmarks/results/*.csv}.
+Bảng~\ref{tab:5-bench-overview} cho biết 6 benchmark trả lời câu hỏi nào và phục vụ cho yêu cầu nghiệp vụ nào. Mọi benchmark chạy trên cùng một máy (Bảng~\ref{tab:5-environment}), là một recipe \code{just} và ghi kết quả cùng cấu hình vào \code{benchmarks/results/*.csv}.
 
 \begin{table}[H]
 \centering
@@ -35,11 +35,15 @@ Mục này trình bày sáu benchmark mà đề tài yêu cầu (\code{AGENTS.md
 
 \section{Hiệu quả hỗ trợ khai thác dữ liệu qua ứng dụng}
 \label{sec:5-effectiveness}
-% TODO: minh họa từng BR
-\input{chapters/5-evaluation/5.4-br01-br07}
-\input{chapters/5-evaluation/5.4-br02-br03}
-\input{chapters/5-evaluation/5.4-br04-br08}
-\input{chapters/5-evaluation/5.4-br05-br06}
+Mục này đối chiếu tiêu chí chấp nhận của từng yêu cầu nghiệp vụ với bằng chứng thu được trên hệ thống đang chạy. Mỗi yêu cầu có một bảng gồm tiêu chí, bằng chứng và kết quả (\emph{Đạt}, \emph{Một phần} hoặc \emph{Chưa đạt}), kèm một kịch bản minh họa cách người dùng thực hiện công việc qua ứng dụng. Phần lớn bằng chứng lấy từ các phép đo ở Mục~\ref{sec:5-correctness} và Mục~\ref{sec:5-performance}.
+\input{chapters/5-evaluation/5.4-br01}
+\input{chapters/5-evaluation/5.4-br02}
+\input{chapters/5-evaluation/5.4-br03}
+\input{chapters/5-evaluation/5.4-br04}
+\input{chapters/5-evaluation/5.4-br05}
+\input{chapters/5-evaluation/5.4-br06}
+\input{chapters/5-evaluation/5.4-br07}
+\input{chapters/5-evaluation/5.4-br08}
 
 \section{So sánh với giải pháp thay thế}
 \label{sec:5-comparison}
@@ -48,4 +52,9 @@ Mục này trình bày sáu benchmark mà đề tài yêu cầu (\code{AGENTS.md
 
 \section{Thảo luận}
 \label{sec:5-discussion}
-% TODO
+
+\paragraph{Nguồn của độ trễ.} Ở mọi kiểm tra, thời gian chờ của người dùng chủ yếu đến từ chu kỳ micro-batch chứ không phải từ lớp API hay kho dữ liệu: các truy vấn phục vụ chỉ mất từ vài mili-giây đến vài trăm mili-giây, trong khi độ mới của dữ liệu bị chặn dưới bởi chu kỳ trigger. Vì vậy muốn dữ liệu và cảnh báo đến sớm hơn thì phải rút ngắn chu kỳ trigger, và cái giá của việc đó là tải xử lý cao hơn và nhiều commit hơn (Mục~\ref{sec:5-comparison-trigger}).
+
+\paragraph{Điều việc đánh giá phát hiện ra.} Nhiều lỗi chỉ lộ ra khi đo. Kiểm tra lỗi tiêm vào phát hiện ba lỗi của bộ mô phỏng: bước nhảy gần như luôn vượt khoảng vật lý nên kiểm tra bước nhảy hầu như không được thử, một biến thể ``JSON hỏng'' thực ra không hỏng, và nhiễu đo được cộng sau bước giới hạn khoảng nên 643 số đo bình thường nằm ngoài khoảng. Benchmark ứng dụng web phát hiện ứng dụng đang chạy ở chế độ phát triển và các bảng \code{ops} có quá nhiều tệp nhỏ; sau khi sửa, thời gian sẵn sàng của trang giảm từ 15 đến khoảng 130 lần. Đối soát độc lập với gold phát hiện lỗi làm tròn ở chính truy vấn kiểm chứng. Điều này cho thấy các phép kiểm tra tự động trên dữ liệu thật có giá trị hơn việc chỉ kiểm thử đơn vị.
+
+\paragraph{Giới hạn của kết quả.} Các kết luận ở trên chỉ áp dụng trong phạm vi dữ liệu mô phỏng và môi trường một máy; các giới hạn cụ thể được nêu ở Mục~\ref{sec:6-limits}.

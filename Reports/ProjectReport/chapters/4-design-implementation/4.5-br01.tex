@@ -1,9 +1,9 @@
-\subsection{BR01 -- Tập trung hóa giám sát nông nghiệp}
+\subsection{BR1 -- Tập trung hóa giám sát nông nghiệp}
 \label{sec:4-br01}
 
 \paragraph{Yêu cầu.} Quản lý trang trại cần một góc nhìn thống nhất về các trang trại, thửa ruộng và thiết bị thay vì sử dụng các công cụ riêng lẻ ở từng nơi (FR1.1--FR1.4).
 
-\paragraph{Luồng dữ liệu.} Giải pháp xoay quanh một nguồn \emph{dữ liệu danh mục} (reference data) duy nhất, mô tả trang trại, thửa ruộng và thiết bị cùng quan hệ giữa chúng. Mọi thành phần đều dùng chung nguồn này: bộ mô phỏng biết cần sinh dữ liệu cho thiết bị nào, tác vụ Spark gán định danh cho từng số đo, còn FastAPI dựng cây phân cấp trả về cho giao diện. Hình~\ref{fig:4-br01-flow} mô tả luồng này.
+\paragraph{Luồng dữ liệu.} Giải pháp xoay quanh một nguồn \emph{dữ liệu danh mục} (reference data) duy nhất, mô tả trang trại, thửa ruộng và thiết bị cùng quan hệ giữa chúng. Mọi thành phần đều dùng chung nguồn này: bộ mô phỏng biết cần sinh dữ liệu cho thiết bị nào, tác vụ Spark gán định danh cho từng số đo, còn FastAPI dựng cây phân cấp trả về cho giao diện. Hình~\ref{fig:4-br01-flow} mô tả luồng dữ liệu nói trên.
 
 \begin{figure}[H]
 \centering
@@ -24,13 +24,13 @@
 \draw[arr] (s)--node[right, font=\scriptsize]{thiết bị lạ}(q);
 \draw[dsh] (r.north) -- ++(0,0.7) -| node[above, pos=0.25, font=\scriptsize]{danh sách trang trại, thửa ruộng, thiết bị} (a.north);
 \end{tikzpicture}}
-\caption{Luồng dữ liệu của BR01}
+\caption{Luồng dữ liệu của BR1}
 \label{fig:4-br01-flow}
 \end{figure}
 
-\paragraph{Bước 1: dữ liệu danh mục (FR1.1).} Dữ liệu danh mục nằm trong một tệp JSON, gồm 4 trang trại, 8 thửa ruộng và 24 thiết bị. Mỗi thiết bị gắn với đúng một thửa ruộng, mỗi thửa ruộng thuộc đúng một trang trại, và mỗi thiết bị khai báo các chỉ số đo được cùng chu kỳ báo cáo. Tệp được nạp một lần khi dịch vụ khởi động thành các đối tượng bất biến (Đoạn mã~\ref{lst:4-reference-model}). Thêm một thửa ruộng hay thiết bị mới chỉ cần sửa tệp này và khởi động lại dịch vụ, không phải sửa mã.
+\paragraph{Bước 1: dữ liệu danh mục (FR1.1).} Dữ liệu danh mục nằm trong một tệp JSON, gồm 4 trang trại, 8 thửa ruộng và 24 thiết bị. Mỗi thiết bị gắn với đúng một thửa ruộng, mỗi thửa ruộng thuộc đúng một trang trại, mỗi thiết bị khai báo các chỉ số đo được cùng chu kỳ báo cáo. Tệp được nạp một lần khi dịch vụ khởi động thành các đối tượng bất biến (Đoạn mã~\ref{lst:4-reference-model}). Thêm một thửa ruộng hay thiết bị mới chỉ cần sửa tệp này và khởi động lại dịch vụ, không phải sửa mã.
 
-\begin{lstlisting}[language=Python, caption={Mô hình dữ liệu danh mục (\texttt{src/common/reference.py}, rút gọn)}, label={lst:4-reference-model}]
+\begin{lstlisting}[language=Python, caption={Mô hình dữ liệu danh mục (rút gọn)}, label={lst:4-reference-model}]
 @dataclass(frozen=True)
 class Field:
     field_id: str
@@ -46,9 +46,9 @@ class Device:
     reporting_interval_s: float
 \end{lstlisting}
 
-\paragraph{Bước 2: gán định danh cho số đo (FR1.2).} Bản ghi của cảm biến chỉ mang \code{device\_id}; hệ thống không tin vào các trường \code{farm\_id} hay \code{field\_id} do thiết bị tự khai. Trong mỗi micro-batch, Spark tra \code{device\_id} trong dữ liệu danh mục để suy ra thửa ruộng, rồi từ thửa ruộng suy ra trang trại (Đoạn mã~\ref{lst:4-resolve}). Các bảng tra này nhỏ nên được phát quảng bá (broadcast) tới các executor. Số đo của một thiết bị không có trong danh mục không thể gán thửa ruộng nên bị cách ly (quarantined) với lý do \code{unknown\_device} (Mục~\ref{sec:4-br04}), thay vì được ghi vào kho với định danh trống. Nhờ đó mọi số đo trong Cassandra và Iceberg đều có đủ ba định danh.
+\paragraph{Bước 2: gán định danh cho số đo (FR1.2).} Bản ghi của cảm biến chỉ mang \code{device\_id}; hệ thống không tin vào các trường \code{farm\_id} hay \code{field\_id} do thiết bị tự khai. Trong mỗi micro-batch, Spark tra \code{device\_id} trong dữ liệu danh mục để suy ra thửa ruộng, rồi từ thửa ruộng suy ra trang trại (Đoạn mã~\ref{lst:4-resolve}). Các bảng tra này nhỏ nên được phát quảng bá (broadcast) tới các executor. Số đo của một thiết bị không có trong danh mục không thể gán thửa ruộng nên bị cách ly (quarantined) với lý do \code{unknown\_device} (Mục~\ref{sec:4-br04}) thay vì được ghi vào kho với định danh trống. Nhờ đó mọi số đo trong Cassandra và Iceberg đều có đủ 3 định danh.
 
-\begin{lstlisting}[language=Python, caption={Gán thửa ruộng và trang trại cho số đo (\texttt{src/streaming/pipeline.py})}, label={lst:4-resolve}]
+\begin{lstlisting}[language=Python, caption={Gán thửa ruộng và trang trại cho số đo}, label={lst:4-resolve}]
 self.device_field = self._map(
     [(d.device_id, d.field_id) for d in reference.devices.values()])
 self.field_farm = self._map(
@@ -59,9 +59,9 @@ batch.withColumn("resolved_field_id", self.device_field[F.col("device_id")])
      .withColumn("farm_id", self.field_farm[F.col("resolved_field_id")])
 \end{lstlisting}
 
-\paragraph{Bước 3: cây phân cấp qua API (FR1.3).} FastAPI cung cấp ba endpoint tương ứng ba tầng của cây: \code{/farms}, \code{/farms/\{farm\_id\}/fields} và \code{/devices}. Hai endpoint đầu chỉ đọc dữ liệu danh mục nên không tốn truy vấn vào Cassandra; endpoint thứ ba ghép danh mục với trạng thái hiện tại của thiết bị trong bảng \code{device\_status}. Đoạn mã~\ref{lst:4-fields-endpoint} là endpoint trả danh sách thửa ruộng của một trang trại: tham số \code{farm\_id} không hợp lệ cho lỗi 404, và mỗi thửa ruộng kèm số thiết bị để giao diện hiển thị ngay mà không phải gọi thêm.
+\paragraph{Bước 3: cây phân cấp qua API (FR1.3).} FastAPI cung cấp ba endpoint tương ứng ba tầng của cây: \code{/farms}, \code{/farms/\{farm\_id\}/fields} và \code{/devices}. Hai endpoint đầu chỉ đọc dữ liệu danh mục nên không tốn truy vấn vào Cassandra; endpoint thứ ba ghép danh mục với trạng thái hiện tại của thiết bị trong bảng \code{device\_status}. Đoạn mã~\ref{lst:4-fields-endpoint} là endpoint trả danh sách thửa ruộng của một trang trại: tham số \code{farm\_id} không hợp lệ cho lỗi 404, đồng thời mỗi thửa ruộng có kèm theo số thiết bị để giao diện hiển thị ngay mà không phải gọi thêm.
 
-\begin{lstlisting}[language=Python, caption={Endpoint danh sách thửa ruộng của một trang trại (\texttt{src/api/main.py})}, label={lst:4-fields-endpoint}]
+\begin{lstlisting}[language=Python, caption={Endpoint danh sách thửa ruộng của một trang trại}, label={lst:4-fields-endpoint}]
 @app.get("/farms/{farm_id}/fields")
 def list_fields(farm_id: str) -> list[dict[str, Any]]:
     ref = _ref()
@@ -80,15 +80,15 @@ def list_fields(farm_id: str) -> list[dict[str, Any]]:
     ]
 \end{lstlisting}
 
-Trạng thái của từng thiết bị (\code{online}, \code{offline} hoặc \code{unknown} khi chưa có số đo nào) lấy từ \code{device\_status} (một bảng Cassandra có khóa phân vùng là \code{device\_id}), nên mỗi thiết bị được tra bằng một truy vấn điểm. Thiết bị có trong danh mục nhưng chưa từng gửi số đo vẫn xuất hiện trong kết quả với trạng thái \code{unknown}, để người quản lý thấy được thiết bị chưa hoạt động thay vì không thấy gì.
+Trạng thái của từng thiết bị (\code{online}, \code{offline} hoặc \code{unknown} khi chưa có số đo nào) lấy từ \code{device\_status} (một bảng Cassandra có khóa phân vùng là \code{device\_id}), nên mỗi thiết bị được tra bằng một truy vấn điểm. Thiết bị có trong danh mục nhưng chưa từng gửi số đo vẫn xuất hiện trong kết quả với trạng thái \code{unknown} để người quản lý thấy được thiết bị chưa hoạt động thay vì không thấy gì.
 
-\paragraph{Bước 4: một màn hình cho mọi trang trại (FR1.4).} Trang \emph{Live} của ứng dụng web hiển thị cùng lúc các thửa ruộng của mọi trang trại trong một màn hình, mỗi thửa ruộng kèm số đo hiện tại (Hình~\ref{fig:4-br01-ui}); trang \emph{Devices} liệt kê thiết bị theo cùng cây phân cấp. Bộ lọc theo trang trại và theo thửa ruộng ở đầu trang thu hẹp nội dung đang hiển thị; chọn một trang trại sẽ đặt lại bộ lọc thửa ruộng để tránh một lựa chọn không còn hợp lệ. Dữ liệu của trang chỉ đến từ Cassandra qua FastAPI và được tải lại sau mỗi 30 giây (Mục~\ref{sec:2-refresh-cache}).
+\paragraph{Bước 4: một màn hình cho mọi trang trại (FR1.4).} Trang \emph{Overview} của ứng dụng web hiển thị cùng lúc mọi trang trại trong một màn hình: các thẻ tóm tắt số trang trại, thửa ruộng, thiết bị trực tuyến và cảnh báo mở, danh sách trang trại và thửa ruộng kèm điều kiện hiện tại, và cột những việc cần chú ý (Hình~\ref{fig:4-br01-ui}). Bộ lọc theo trang trại và theo thửa ruộng ở đầu trang thu hẹp nội dung đang hiển thị; chọn một trang trại sẽ đặt lại bộ lọc thửa ruộng để tránh một lựa chọn không còn hợp lệ. Từ một thửa ruộng, người dùng mở trang chi tiết của nó, còn trang \emph{Devices} liệt kê thiết bị theo cùng cây phân cấp. Dữ liệu của trang chỉ đến từ Cassandra qua FastAPI và được tải lại sau mỗi 30 giây (Mục~\ref{sec:2-refresh-cache}).
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{br01-live.png}
-\caption{Trang Live: tám thửa ruộng của bốn trang trại trong một màn hình, có bộ lọc theo trang trại và thửa ruộng}
+\includegraphics[width=0.85\linewidth]{ui-overview.png}
+\caption{Trang Overview: bộ lọc theo trang trại và thửa ruộng, các thẻ tóm tắt và danh sách trang trại, thửa ruộng trong một màn hình}
 \label{fig:4-br01-ui}
 \end{figure}
 
-\paragraph{Kết quả.} Nguồn danh mục duy nhất cho ra một cây phân cấp nhất quán ở mọi tầng: số đo, API và giao diện. Mục~\ref{sec:5-effectiveness} kiểm tra các tiêu chí chấp nhận của BR01, gồm việc thêm một thửa ruộng chỉ bằng thay đổi danh mục và việc cách ly số đo của thiết bị lạ.
+\paragraph{Kết quả.} Nguồn danh mục duy nhất cho ra một cây phân cấp nhất quán ở mọi tầng: số đo, API và giao diện. Mục~\ref{sec:5-effectiveness} kiểm tra các tiêu chí chấp nhận của BR1, gồm việc thêm một thửa ruộng chỉ bằng thay đổi danh mục và việc cách ly số đo của thiết bị lạ.

@@ -6,6 +6,8 @@ Mọi kết quả trong chương này được đo trên cùng một môi trư�
 \subsection{Phần cứng và phần mềm}
 \label{sec:5-hardware}
 
+Bảng~\ref{tab:5-environment} ghi lại cấu hình phần cứng, bộ nhớ cấp cho Docker và cấu hình Spark.
+
 {\small
 \begin{longtblr}[
   caption = {Môi trường thực nghiệm},
@@ -25,15 +27,15 @@ Hệ điều hành & macOS 27.2.1 \\
 Docker Engine, Compose & Docker Engine 29.8.2, Compose 5.5.0 \\
 Thành phần hệ thống & Theo Bảng~\ref{tab:4-versions} \\
 Spark & \code{local[*]} (mọi nhân CPU mà Docker cấp), driver 2~GB, 4 phân vùng shuffle \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \subsection{Dữ liệu thực nghiệm}
 \label{sec:5-data}
 
-Dữ liệu được sinh bởi bộ mô phỏng cảm biến (Mục~\ref{sec:4-application}) dựa trên dữ liệu danh mục \code{reference/reference\_data.json}: 4 trang trại, 8 thửa ruộng, 24 thiết bị, 4 loại cây trồng (lúa, ngô, cà chua, cà phê) và 5 chỉ số. Mỗi thiết bị báo cáo 5 giây một lần. Các giá trị ngẫu nhiên của bộ mô phỏng có hạt giống cố định, nhưng thời điểm đo lấy từ đồng hồ thật và mã sự kiện là UUID ngẫu nhiên, nên hai lần chạy cho chuỗi sự kiện tương tự chứ không giống hệt; vì vậy các kiểm tra ở Mục~\ref{sec:5-correctness} so với nhãn đi kèm từng sự kiện chứ không so với một tập dữ liệu cố định.
+Dữ liệu được sinh bởi bộ mô phỏng cảm biến (Mục~\ref{sec:4-application}) dựa trên dữ liệu danh mục \code{reference/reference\_data.json}: 4 trang trại, 8 thửa ruộng, 24 thiết bị, 4 loại cây trồng (lúa, ngô, cà chua, cà phê) và 5 chỉ số. Mỗi thiết bị báo cáo 5 giây một lần. Các giá trị ngẫu nhiên của bộ mô phỏng dùng giá trị khởi tạo (seed) cố định, nhưng thời điểm đo lấy từ đồng hồ thật và mã sự kiện là UUID ngẫu nhiên nên hai lần chạy cho chuỗi sự kiện tương tự chứ không giống hệt. Vì vậy các kiểm tra ở Mục~\ref{sec:5-correctness} so với nhãn đi kèm từng sự kiện chứ không so với một tập dữ liệu cố định.
 
-Bộ mô phỏng tiêm lỗi có chủ đích và đánh dấu mỗi sự kiện lỗi bằng trường \code{simulated\_fault}. Trường này đi theo bản ghi vào bronze (và nằm trong \code{raw\_payload} của bản ghi bị cách ly), nên có thể so số lỗi tiêm vào với số lỗi hệ thống phát hiện được mà không cần nhãn bên ngoài.
+Bộ mô phỏng fault injection và đánh dấu mỗi sự kiện lỗi bằng trường \code{simulated\_fault}. Trường này đi theo bản ghi vào bronze (và nằm trong \code{raw\_payload} của bản ghi bị cách ly) nên có thể so số fault injection với số lỗi hệ thống phát hiện được mà không cần nhãn bên ngoài.
 
 {\small
 \begin{longtblr}[
@@ -46,7 +48,7 @@ Bộ mô phỏng tiêm lỗi có chủ đích và đánh dấu mỗi sự kiện
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 Tham số & Mặc định & Ý nghĩa \\
-\code{SIM\_SEED} & 42 & Hạt giống ngẫu nhiên \\
+\code{SIM\_SEED} & 42 & Giá trị khởi tạo (seed) của bộ sinh số ngẫu nhiên \\
 \code{SIM\_RATE\_HZ} & 1 & Số nhịp sinh dữ liệu mỗi giây \\
 \code{SIM\_FAULT\_RATE} & 0,05 & Xác suất ở mỗi nhịp có một thiết bị ngẫu nhiên được lên lịch tiêm lỗi \\
 \code{SIM\_FAULTS} & 7 loại & \code{null\_value}, \code{out\_of\_range}, \code{implausible\_jump}, \code{duplicate}, \code{unknown\_device}, \code{unexpected\_metric}, \code{malformed} \\
@@ -56,8 +58,10 @@ Tham số & Mặc định & Ý nghĩa \\
 \end{longtblr}
 }
 
-\subsection{Tham số của đường xử lý}
+\subsection{Tham số của luồng xử lý}
 \label{sec:5-params}
+
+Bảng~\ref{tab:5-params} liệt kê giá trị mặc định của các tham số điều khiển tác vụ streaming và cơ chế cảnh báo.
 
 {\small
 \begin{longtblr}[
@@ -85,7 +89,7 @@ Tham số & Giá trị & Ý nghĩa \\
 \subsection{Quy trình chạy lại}
 \label{sec:5-procedure}
 
-Các benchmark chạy trên tập dữ liệu tích lũy của hệ thống (khoảng 41 nghìn số đo trong bronze trên 12 ngày có dữ liệu, cộng dữ liệu sinh ra trong lúc đo), không xóa sạch giữa các lần đo, vì một số phép đo (gold, time travel, compaction) cần lịch sử. Benchmark \#2--\#4 tự tạo dữ liệu tổng hợp của mình trong schema \code{bench}. Trình tự đã dùng:
+Các benchmark chạy trên tập dữ liệu tích lũy của hệ thống (khoảng 41 nghìn số đo trong bronze trên 12 ngày có dữ liệu, cộng dữ liệu sinh ra trong lúc đo), không xóa sạch giữa các lần đo vì một số phép đo (gold, time travel, compaction) cần lịch sử. Benchmark \#2--\#4 tự tạo dữ liệu tổng hợp của mình trong schema \code{bench}. Trình tự đã dùng:
 
 \begin{lstlisting}[language=bash, caption={Trình tự chạy các benchmark và kiểm tra}, label={lst:5-procedure}]
 just up && just up-app        # all profiles, data volumes kept

@@ -1,22 +1,22 @@
 \chapter{PHÂN TÍCH YÊU CẦU VÀ DỮ LIỆU}
 \label{chap:3-requirements}
 
-Chương này xác định hệ thống phục vụ ai và cần những dữ liệu gì, gồm lĩnh vực ứng dụng, các bên liên quan, các yêu cầu nghiệp vụ cùng nhu cầu về dữ liệu, và nguồn dữ liệu sẵn có. Đây là cơ sở để thiết kế giải pháp ở Chương~\ref{chap:4-design}.
+Người quản lý trang trại cần biết thửa ruộng nào đang thiếu nước, người vận hành cần biết thiết bị nào vừa mất kết nối, còn nhà phân tích cần so sánh các mùa vụ với nhau. Mỗi nhu cầu đòi hỏi một loại dữ liệu và một độ trễ khác nhau, nên cần xác định rõ người dùng, yêu cầu và nguồn dữ liệu trước khi thiết kế giải pháp.
 
 \section{Lĩnh vực ứng dụng: giám sát nông nghiệp}
 \label{sec:3-domain}
 
 Nông nghiệp hiện đại ngày càng dựa vào số đo thu thập bởi các thiết bị chuyên dụng thay cho kinh nghiệm cảm tính. Độ ẩm đất cho biết khi nào cần tưới, nhiệt độ và độ ẩm không khí báo trước nguy cơ sốc nhiệt hay bệnh hại, còn lượng mưa quyết định lượng nước cần bổ sung. Khi các số đo này được cảm biến IoT thu thập tự động và gửi về qua mạng diện rộng tầm xa như LoRaWAN, người quản lý có thể theo dõi nhiều thửa ruộng cùng lúc mà không phải ra đồng đo từng điểm.
 
-Tuy vậy, lượng dữ liệu tăng nhanh cũng kéo theo những khó khăn mà một nông trại khó tự giải quyết. Thứ nhất, dữ liệu đến từ nhiều trang trại và nhiều loại thiết bị, mỗi nơi một dạng. Thứ hai, thiết bị có thể mất kết nối hoặc hết pin nên số liệu bị đứt đoạn; ngược lại, một bản tin được gửi lại có thể làm dữ liệu bị trùng. Thứ ba, cảm biến thỉnh thoảng trả về giá trị vô lý, chẳng hạn độ ẩm vượt quá 100\%, và nếu không được kiểm tra, giá trị đó sẽ làm sai lệch cả biểu đồ lẫn quyết định tưới. Cuối cùng, người dùng cần hai góc nhìn khác nhau: tình trạng hiện tại để kịp thời xử lý, và lịch sử dài hạn để so sánh giữa các mùa vụ.
+Tuy vậy, lượng dữ liệu tăng nhanh cũng kéo theo những khó khăn mà một nông trại khó tự giải quyết. Thứ nhất, dữ liệu đến từ nhiều trang trại và nhiều loại thiết bị, mỗi nơi một dạng. Thứ hai, thiết bị có thể mất kết nối hoặc hết pin nên số liệu bị đứt đoạn; ngược lại, một bản ghi được gửi lại có thể làm dữ liệu bị trùng. Thứ ba, cảm biến thỉnh thoảng trả về giá trị vô lý, chẳng hạn độ ẩm vượt quá 100\%; những giá trị này sẽ làm sai lệch cả biểu đồ lẫn quyết định tưới nếu không được kiểm tra. Cuối cùng, người dùng cần hai góc nhìn khác nhau: tình trạng hiện tại để kịp thời xử lý và lịch sử dài hạn để so sánh giữa các mùa vụ.
 
-Những khó khăn này không nằm ở giao diện hay thuật toán phân tích, mà nằm ở khâu chuẩn bị dữ liệu, sao cho dữ liệu đáng tin cậy và phục vụ đúng nhu cầu của từng nhóm người dùng. Đó chính là phạm vi của kỹ thuật dữ liệu, và là lý do nhóm chọn giám sát nông nghiệp làm lĩnh vực ứng dụng.
+Những khó khăn này không nằm ở giao diện hay thuật toán phân tích mà nằm ở khâu chuẩn bị dữ liệu sao cho dữ liệu đáng tin cậy và phục vụ đúng nhu cầu của từng nhóm người dùng. Đó chính là phạm vi của kỹ thuật dữ liệu và là lý do nhóm chọn giám sát nông nghiệp làm lĩnh vực ứng dụng.
 
-Trong phạm vi đề tài, nhóm xây dựng một hệ thống giám sát mô phỏng gồm bốn trang trại ở các địa phương phía Nam (Thành phố Hồ Chí Minh, Đồng Nai, Tây Ninh và Đồng Tháp), với tám thửa ruộng trồng lúa, ngô, cà chua và cà phê. Dữ liệu của hệ thống được mô phỏng; nguồn dữ liệu cụ thể được trình bày ở mục~\ref{sec:3-data-sources}.
+Trong phạm vi đề tài, nhóm xây dựng một hệ thống giám sát mô phỏng gồm 4 trang trại ở các địa phương phía Nam (Thành phố Hồ Chí Minh, Đồng Nai, Tây Ninh và Đồng Tháp) với 8 thửa ruộng trồng lúa, ngô, cà chua và cà phê. Vì đề tài không triển khai thiết bị thật, số đo của hệ thống được sinh ra bởi một bộ mô phỏng (xem Mục~\ref{sec:3-data-sources}).
 
-\section{Các bên liên quan}
+\section{Các bên liên quan (stakeholders)}
 \label{sec:3-stakeholders}
-Hệ thống phục vụ bốn nhóm người dùng: ba nhóm bên ngoài trực tiếp ra quyết định và hành động dựa trên dữ liệu, và một nhóm nội bộ chịu trách nhiệm giữ cho dữ liệu đáng tin cậy. Bảng~\ref{tab:3-stakeholders} tóm tắt nhu cầu chính của từng nhóm và các yêu cầu nghiệp vụ (Mục~\ref{sec:3-br}) phục vụ nhu cầu cho mỗi nhóm.
+Hệ thống phục vụ 4 nhóm người dùng: 3 nhóm bên ngoài trực tiếp ra quyết định và hành động dựa trên dữ liệu và 1 nhóm nội bộ chịu trách nhiệm giữ cho dữ liệu đáng tin cậy. Bảng~\ref{tab:3-stakeholders} tóm tắt nhu cầu chính của từng nhóm và các yêu cầu nghiệp vụ (Mục~\ref{sec:3-br}) phục vụ nhu cầu cho mỗi nhóm.
 
 \begin{table}[H]
 \centering
@@ -24,23 +24,23 @@ Hệ thống phục vụ bốn nhóm người dùng: ba nhóm bên ngoài trực
 \label{tab:3-stakeholders}
 \small
 \begin{tblr}{
-  colspec = {X[0.6,c]X[1.7,l]X[5,l]X[1.5,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  colspec = {X[0.5,c]X[2.2,l]X[4.5,l]X[1.2,c]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 Mã & Nhóm người dùng & Nhu cầu chính & Yêu cầu liên quan \\
-U1 & Quản lý trang trại & Có cái nhìn tổng hợp trên nhiều trang trại; xem xu hướng và so sánh các thửa ruộng để quyết định việc tưới và phân bổ nguồn lực. & BR01, BR05, BR07 \\
-U2 & Người vận hành trang trại & Nhận cảnh báo kịp thời về điều kiện bất thường và thiết bị ngừng hoạt động; ghi lại việc đã xử lý. & BR02, BR08 \\
-U3 & Nhà phân tích dữ liệu & Truy cập dữ liệu lịch sử, so sánh giữa các mùa vụ và đánh giá hiệu quả của các cách quản lý. & BR06, BR07 \\
-U4 & Nhóm quản lý dữ liệu (nội bộ) & Dữ liệu đáng tin cậy, truy vết được và không bị đứt đoạn. & BR03, BR04 \\
+U1 & Quản lý trang trại & Có cái nhìn tổng hợp trên nhiều trang trại; xem xu hướng và so sánh các thửa ruộng để quyết định việc tưới và phân bổ nguồn lực. & BR1, BR5, BR7 \\
+U2 & Nhân viên vận hành trang trại & Nhận cảnh báo kịp thời về điều kiện bất thường và thiết bị ngừng hoạt động; ghi lại việc đã xử lý. & BR2, BR8 \\
+U3 & Nhà phân tích dữ liệu & Truy cập dữ liệu lịch sử, so sánh giữa các mùa vụ và đánh giá hiệu quả của các cách quản lý. & BR6, BR7 \\
+U4 & Nhóm quản lý dữ liệu (nội bộ) & Dữ liệu đáng tin cậy, truy vết được và không bị đứt đoạn. & BR3, BR4 \\
 \end{tblr}
 \end{table}
 
 Điểm chung của ba nhóm đầu là họ không phải chuyên gia kỹ thuật. Người quản lý và người vận hành cần thông tin dễ hiểu để hành động ngay, còn nhà phân tích cần dữ liệu trong khoảng thời gian đủ dài để so sánh giữa các giai đoạn. Vì vậy, hệ thống không chỉ lưu giữ dữ liệu mà còn phải trình bày dữ liệu theo cách mỗi nhóm đọc được ngay. Nhóm quản lý dữ liệu là người dùng nội bộ của chính hệ thống, quan tâm đến chất lượng và tính liên tục của dữ liệu hơn là nội dung về nông nghiệp.
 
-\section{Yêu cầu nghiệp vụ}
+\section{Yêu cầu nghiệp vụ, chức năng và phi chức năng}
 \label{sec:3-br}
 
-Từ nhu cầu của các nhóm người dùng ở Mục~\ref{sec:3-stakeholders}, nhóm xác định tám yêu cầu nghiệp vụ liệt kê trong Bảng~\ref{tab:3-br}.
+Từ nhu cầu của các nhóm người dùng ở Mục~\ref{sec:3-stakeholders}, nhóm xác định 8 yêu cầu nghiệp vụ liệt kê trong Bảng~\ref{tab:3-br}.
 
 {\small
 \begin{longtblr}[
@@ -48,29 +48,114 @@ Từ nhu cầu của các nhóm người dùng ở Mục~\ref{sec:3-stakeholders
   label = {tab:3-br},
 ]{
   width = \linewidth,
-  colspec = {X[0.9,l]X[2,l]X[5,l]X[1.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  colspec = {X[0.7,l]X[2.2,l]X[5,l]X[1.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
   rowhead = 1,
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 ID & Yêu cầu & Mô tả & Phụ trách \\
-BR01 & Tập trung hóa giám sát nông nghiệp & Cung cấp góc nhìn hợp nhất về trang trại, thửa ruộng và thiết bị giám sát để quản lý nhất quán trên nhiều địa điểm. & Đạt \\
-BR02 & Nâng cao nhận biết điều kiện đồng ruộng & Cung cấp kịp thời thông tin về môi trường và điều kiện đồng ruộng, giảm phụ thuộc vào đo thủ công. & Nhân \\
-BR03 & Duy trì tính liên tục của giám sát & Giảm thiểu khoảng trống dữ liệu và bảo toàn thông tin khi thiết bị, kết nối hoặc dịch vụ gián đoạn tạm thời. & Nhân \\
-BR04 & Thiết lập dữ liệu nông nghiệp đáng tin cậy & Bảo đảm thông tin nhất quán, tin cậy, truy vết được; giảm rủi ro do số đo không hợp lệ, trùng lặp hoặc gây hiểu nhầm. & Tịnh \\
-BR05 & Hỗ trợ quản lý trang trại dựa trên dữ liệu & Dùng số đo và xu hướng để định hướng tưới tiêu, phân bổ tài nguyên và quản lý thửa ruộng, giảm lãng phí. & Khang \\
-BR06 & Đánh giá lịch sử và lập kế hoạch & Lưu trữ lịch sử để so sánh giữa các giai đoạn, nhận diện mùa vụ, đánh giá thực hành quản lý và lập kế hoạch. & Khang \\
-BR07 & Làm cho thông tin dễ tiếp cận & Cung cấp tóm tắt, xu hướng và so sánh thửa ruộng dễ hiểu cho quản lý và nhà phân tích. & Đạt \\
-BR08 & Hỗ trợ ứng phó sớm với rủi ro & Phát hiện sớm điều kiện bất thường và thiết bị ngừng hoạt động, theo dõi quá trình xử lý. & Tịnh \\
+BR1 & Tập trung hóa giám sát nông nghiệp & Cung cấp góc nhìn hợp nhất về trang trại, thửa ruộng và thiết bị giám sát để quản lý nhất quán trên nhiều địa điểm. & Đạt \\
+BR2 & Nâng cao nhận biết điều kiện đồng ruộng & Cung cấp kịp thời thông tin về môi trường và điều kiện đồng ruộng, giảm phụ thuộc vào đo thủ công. & Nhân \\
+BR3 & Duy trì tính liên tục của giám sát & Giảm thiểu khoảng trống dữ liệu và bảo toàn thông tin khi thiết bị, kết nối hoặc dịch vụ gián đoạn tạm thời. & Nhân \\
+BR4 & Thiết lập dữ liệu nông nghiệp đáng tin cậy & Bảo đảm thông tin nhất quán, tin cậy, truy vết được; giảm rủi ro do số đo không hợp lệ, trùng lặp hoặc gây hiểu nhầm. & Tịnh \\
+BR5 & Hỗ trợ quản lý trang trại dựa trên dữ liệu & Dùng số đo và xu hướng để định hướng tưới tiêu, phân bổ tài nguyên và quản lý thửa ruộng, giảm lãng phí. & Khang \\
+BR6 & Đánh giá lịch sử và lập kế hoạch & Lưu trữ lịch sử để so sánh giữa các giai đoạn, nhận diện mùa vụ, đánh giá thực hành quản lý và lập kế hoạch. & Khang \\
+BR7 & Làm cho thông tin dễ tiếp cận & Cung cấp tóm tắt, xu hướng và so sánh thửa ruộng dễ hiểu cho quản lý và nhà phân tích. & Đạt \\
+BR8 & Hỗ trợ ứng phó sớm với rủi ro & Phát hiện sớm điều kiện bất thường và thiết bị ngừng hoạt động, theo dõi quá trình xử lý. & Tịnh \\
+\end{longtblr}
+}
+
+Mỗi yêu cầu nghiệp vụ được cụ thể hóa thành các yêu cầu chức năng (Functional Requirement, FR) tương ứng (Bảng~\ref{tab:3-fr}).
+
+{\small
+\begin{longtblr}[
+  caption = {Các yêu cầu chức năng theo từng yêu cầu nghiệp vụ},
+  label = {tab:3-fr},
+]{
+  width = \linewidth,
+  colspec = {X[0.7,l]X[6,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  rowhead = 1,
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Mã & Yêu cầu chức năng \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR1 -- Tập trung hóa giám sát nông nghiệp & \\
+FR1.1 & Duy trì dữ liệu danh mục về trang trại, thửa ruộng và thiết bị (gồm ánh xạ thiết bị với thửa ruộng và vị trí). \\
+FR1.2 & Mỗi số đo được lưu cùng \code{farm\_id}, \code{field\_id} và \code{device\_id} suy ra từ dữ liệu danh mục. \\
+FR1.3 & API cung cấp phân cấp trang trại, thửa ruộng, thiết bị, kèm trạng thái hiện tại của từng thực thể. \\
+FR1.4 & Bảng điều khiển gần thời gian thực hiển thị mọi trang trại trong một màn hình và lọc được theo trang trại, thửa ruộng. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR2 -- Nâng cao nhận biết điều kiện đồng ruộng & \\
+FR2.1 & Thu nhận số đo độ ẩm đất, nhiệt độ đất, nhiệt độ không khí, độ ẩm không khí và lượng mưa qua Kafka. \\
+FR2.2 & Spark micro-batch (trigger 30 giây) ghi số đo mới nhất và các tổng hợp trượt ngắn hạn vào Cassandra. \\
+FR2.3 & API trả về giá trị mới nhất của từng chỉ số theo thửa ruộng và chuỗi số đo 24 giờ gần nhất. \\
+FR2.4 & Bảng điều khiển gần thời gian thực hiển thị giá trị hiện tại, xu hướng gần đây và thời điểm cập nhật cuối. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR3 -- Duy trì tính liên tục của giám sát & \\
+FR3.1 & Kafka giữ sự kiện đủ lâu (cấu hình được, mặc định 7 ngày) để phát lại sau sự cố xử lý. \\
+FR3.2 & Các tác vụ Spark streaming dùng checkpoint bền vững và tiếp tục từ offset đã commit cuối cùng sau khi khởi động lại. \\
+FR3.3 & Việc ghi vào Cassandra và Iceberg là idempotent, nên phát lại không tạo bản ghi trùng. \\
+FR3.4 & Số đo đến muộn hoặc sai thứ tự được chấp nhận trong ngưỡng watermark đã cấu hình. Dữ liệu cũ hơn vẫn được lưu ở bronze và được lần chạy batch kế tiếp xử lý. \\
+FR3.5 & Khoảng trống dữ liệu của từng thiết bị được phát hiện và ghi lại thành bản ghi khoảng trống tường minh, không bị che giấu. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR4 -- Thiết lập dữ liệu nông nghiệp đáng tin cậy & \\
+FR4.1 & Áp dụng schema tường minh cho mọi sự kiện. Sự kiện sai hình thức được chuyển vào bảng cách ly thay vì làm tác vụ thất bại. \\
+FR4.2 & Kiểm tra khoảng giá trị theo từng chỉ số (ví dụ độ ẩm không khí 0--100\%, giới hạn nhiệt độ hợp lý) và gắn cờ các bước nhảy bất thường. \\
+FR4.3 & Khử trùng lặp theo \code{(device\_id, metric, measured\_at)}. \\
+FR4.4 & Giữ siêu dữ liệu nguồn gốc (lineage) trên mọi bản ghi: topic, partition và offset nguồn, \code{ingested\_at}, \code{batch\_id} và cờ chất lượng. \\
+FR4.5 & Công bố tóm tắt chất lượng dữ liệu hằng ngày (số bản ghi hợp lệ, trùng, ngoài khoảng và bị cách ly theo từng thiết bị), dựng bằng một model dbt. \\
+FR4.6 & Bảng điều khiển phải loại bỏ hoặc đánh dấu rõ dữ liệu không hợp lệ. \\
+FR4.7 & Các model dbt ở tầng silver và gold có test (không rỗng, khóa duy nhất, khoảng giá trị chấp nhận được), và một test thất bại sẽ chặn việc làm mới tầng gold bị ảnh hưởng. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR5 -- Hỗ trợ quản lý trang trại dựa trên dữ liệu & \\
+FR5.1 & Các bảng gold cung cấp tổng hợp theo giờ và theo ngày cho từng thửa ruộng và chỉ số (nhỏ nhất, lớn nhất, trung bình, số bản ghi, thời gian ngoài khoảng mục tiêu). \\
+FR5.2 & Khoảng mục tiêu theo loại cây trồng và giai đoạn sinh trưởng là dữ liệu danh mục cấu hình được. \\
+FR5.3 & Các indicator của gold gồm time-in-range theo thửa ruộng và một indicator tưới tiêu đơn giản (ví dụ số giờ dưới ngưỡng độ ẩm đất mục tiêu). \\
+FR5.4 & Bảng điều khiển trong ngày so sánh các thửa ruộng cạnh nhau theo các indicator này. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR6 -- Đánh giá lịch sử và lập kế hoạch & \\
+FR6.1 & Bronze giữ toàn bộ dữ liệu thô, và gold giữ các tổng hợp trong toàn bộ lịch sử của dự án. \\
+FR6.2 & Các bảng gold được phân vùng theo ngày (và theo trang trại khi có lợi) để truy vấn theo khoảng thời gian hiệu quả. \\
+FR6.3 & Bảng điều khiển hỗ trợ so sánh giữa các giai đoạn (ngày với ngày, tuần với tuần, mùa vụ với mùa vụ) và xem lịch sử theo từng thửa ruộng. \\
+FR6.4 & Time travel của Iceberg cho phép tái tạo các báo cáo cũ. \\
+FR6.5 & Các tệp nhỏ do ghi streaming sinh ra được gộp (compaction) theo lịch. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR7 -- Làm cho thông tin dễ tiếp cận & \\
+FR7.1 & FastAPI là lớp truy cập duy nhất của ứng dụng web; frontend không truy cập trực tiếp cơ sở dữ liệu hay kho lưu trữ. \\
+FR7.2 & Có các endpoint cho tóm tắt (theo trang trại hoặc thửa ruộng), xu hướng và so sánh thửa ruộng, từ cả Cassandra và Trino. \\
+FR7.3 & Ứng dụng web có bảng điều khiển gần thời gian thực và bảng điều khiển trong ngày hoặc theo ngày, với bộ lọc nhất quán. \\
+FR7.4 & Phản hồi từ Trino được lưu đệm ngắn hạn trong API, và kết quả được phân trang. \\
+FR7.5 & Biểu đồ dễ hiểu với người không chuyên: nhãn rõ ràng, có đơn vị, khoảng thời gian và chỉ dẫn độ mới của dữ liệu. \\
+\SetCell[c=2]{l, font=\bfseries, bg=gray!8} BR8 -- Hỗ trợ ứng phó sớm với rủi ro & \\
+FR8.1 & Phát hiện vượt ngưỡng theo từng chỉ số và loại cây trồng (ví dụ độ ẩm đất thấp, nhiệt độ cực đoan, độ ẩm không khí bất thường) và tốc độ thay đổi bất thường. \\
+FR8.2 & Phát hiện thiết bị mất kết nối khi không có dữ liệu trong một bội số cấu hình được của chu kỳ báo cáo; đồng thời gắn cờ pin yếu và chất lượng tín hiệu kém. \\
+FR8.3 & Cảnh báo được lưu kèm loại, mức độ, thửa ruộng, thiết bị, thời điểm bắt đầu và trạng thái. \\
+FR8.4 & Vòng đời cảnh báo open, acknowledged, resolved, kèm người thực hiện, thời điểm và ghi chú tùy chọn; cảnh báo mất kết nối tự đóng khi dữ liệu trở lại. \\
+FR8.5 & Tránh bão cảnh báo: debounce (điều kiện phải kéo dài qua N micro-batch) và cooldown theo loại cảnh báo. \\
+FR8.6 & Bảng điều khiển gần thời gian thực liệt kê các cảnh báo đang mở; lịch sử cảnh báo dùng để phân tích thông qua các bảng gold. \\
+\end{longtblr}
+}
+
+Ngoài các yêu cầu chức năng, hệ thống còn phải đáp ứng các yêu cầu phi chức năng (Non-Functional Requirement, NFR) về hiệu năng, độ bền, cách triển khai và bảo mật, liệt kê trong Bảng~\ref{tab:3-nfr}. Các mục tiêu này áp dụng cho toàn hệ thống chứ không gắn với một yêu cầu nghiệp vụ riêng, và có thể điều chỉnh sau khi đo benchmark.
+
+{\small
+\begin{longtblr}[
+  caption = {Các yêu cầu phi chức năng},
+  label = {tab:3-nfr},
+]{
+  width = \linewidth,
+  colspec = {X[0.7,l]X[2,l]X[5,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  rowhead = 1,
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Mã & Lĩnh vực & Mục tiêu \\
+NFR1 & Độ mới của dữ liệu gần thời gian thực & Số đo hiển thị được qua API trong vòng 90 giây kể từ khi tới Kafka. \\
+NFR2 & Độ trễ đọc của Cassandra & Truy vấn theo khóa trả về trong vài chục mili-giây trên dữ liệu demo. \\
+NFR3 & Chu kỳ làm mới tầng gold & Theo giờ đối với dữ liệu trong ngày, theo ngày đối với tổng hợp theo ngày. \\
+NFR4 & Độ bền dữ liệu & Không mất dữ liệu khi khởi động lại bất kỳ dịch vụ đơn lẻ nào. \\
+NFR5 & Tính idempotent & Phát lại và chạy lại không tạo bản ghi trùng. \\
+NFR6 & Triển khai & Toàn bộ hệ thống chạy được bằng các profile của Docker Compose. \\
+NFR7 & Quy trình phát triển & Môi trường Python được khóa bằng \code{uv}, tác vụ thường xuyên là recipe \code{just}, biến đổi batch là model dbt có test. \\
+NFR8 & Bảo mật & Không lưu thông tin xác thực trong mã nguồn; cấu hình đi qua biến môi trường. \\
 \end{longtblr}
 }
 
 \section{Nhu cầu sử dụng dữ liệu}
 \label{sec:3-data-needs}
-Mỗi yêu cầu nghiệp vụ dẫn đến một nhu cầu cụ thể về dữ liệu: người dùng nào đặt câu hỏi gì, cần loại xử lý nào và chấp nhận độ trễ bao nhiêu. Mục này trình bày các nhu cầu đó theo từng cặp yêu cầu, làm cơ sở để lựa chọn cách xử lý và lưu trữ dữ liệu ở Chương~\ref{chap:4-design}.
-\input{chapters/3-requirements/3.4-data-needs-br1-br7}
-\input{chapters/3-requirements/3.4-data-needs-br2-br3}
-\input{chapters/3-requirements/3.4-data-needs-br4-br8}
-\input{chapters/3-requirements/3.4-data-needs-br5-br6}
+
+\input{chapters/3-requirements/3.4-data-needs}
 
 \section{Nguồn dữ liệu và đặc trưng dữ liệu}
 \label{sec:3-data-sources}
@@ -98,23 +183,22 @@ Mỗi sự kiện biểu diễn một số đo của một thiết bị tại m�
 Mã trang trại và thửa ruộng không được xem là thông tin định tuyến đáng tin cậy từ thiết bị. Tác vụ streaming tra \code{device\_id} trong dữ liệu danh mục rồi tự xác định \code{field\_id} và \code{farm\_id}. Cách này tránh trường hợp một thiết bị gửi nhầm hoặc giả mạo thông tin vị trí.
 
 \paragraph{Dữ liệu danh mục.}
-Tệp \code{reference/reference\_data.json} là nguồn sự thật dùng chung cho cấu trúc trang trại, thửa ruộng, thiết bị, loại cây trồng và định nghĩa chỉ số. Cấu hình hiện tại gồm 4 trang trại, 8 thửa ruộng, 24 thiết bị, 4 loại cây trồng và 5 chỉ số. Mỗi thiết bị khai báo thửa ruộng mà nó thuộc về, các chỉ số mà nó được phép đo, chu kỳ báo cáo, pin và chất lượng tín hiệu ban đầu. Dữ liệu danh mục còn lưu giới hạn vật lý của từng chỉ số và khoảng mục tiêu theo loại cây trồng. Bộ mô phỏng, tác vụ streaming và API đều đọc cùng tệp này, nhờ đó không phải duy trì ba bản ánh xạ riêng biệt.
+Tệp \code{reference/reference\_data.json} là nguồn dữ liệu duy nhất dùng chung cho cấu trúc trang trại, thửa ruộng, thiết bị, loại cây trồng và định nghĩa chỉ số. Cấu hình hiện tại gồm 4 trang trại, 8 thửa ruộng, 24 thiết bị, 4 loại cây trồng và 5 chỉ số. Mỗi thiết bị khai báo thửa ruộng mà nó thuộc về, các chỉ số mà nó được phép đo, chu kỳ báo cáo, pin và chất lượng tín hiệu ban đầu. Dữ liệu danh mục còn lưu giới hạn vật lý của từng chỉ số và khoảng mục tiêu theo loại cây trồng. Bộ mô phỏng, tác vụ streaming và API đều đọc cùng tệp này, nhờ đó không phải duy trì ba bản ánh xạ riêng biệt.
 
 \paragraph{Bộ mô phỏng.}
-Bộ mô phỏng tạo dữ liệu theo chu kỳ của từng thiết bị. Giá trị không được chọn độc lập ngẫu nhiên ở mỗi lần gửi mà di chuyển theo random walk quanh một giá trị cơ sở, sau đó bị giới hạn trong khoảng vật lý của chỉ số. Cách sinh này tạo ra chuỗi có biến đổi từ từ giống telemetry hơn so với nhiễu trắng hoàn toàn ngẫu nhiên.
+Bộ mô phỏng tạo dữ liệu theo chu kỳ của từng thiết bị. Giá trị không được chọn độc lập ngẫu nhiên ở mỗi lần gửi mà di chuyển theo random walk quanh một giá trị cơ sở, sau đó bị giới hạn trong khoảng vật lý của chỉ số. Cách sinh này tạo ra chuỗi biến đổi từ từ, giống dữ liệu đo từ xa (telemetry) thực tế hơn so với white noise.
 
-Để kiểm tra khả năng xử lý dữ liệu không hoàn hảo, bộ mô phỏng còn chủ động tạo bảy loại lỗi được liệt kê ở Bảng~\ref{tab:3-sim-faults}. Ngoài ra, một thiết bị có thể được đặt vào trạng thái im lặng trong một khoảng thời gian để mô phỏng mất nguồn, mất kết nối hoặc lỗi gateway.
+Để kiểm tra khả năng xử lý dữ liệu không hoàn hảo, bộ mô phỏng còn chủ động tạo 7 loại lỗi được liệt kê ở Bảng~\ref{tab:3-sim-faults}. Ngoài ra, một thiết bị có thể được đặt vào trạng thái im lặng trong một khoảng thời gian để mô phỏng mất nguồn, mất kết nối hoặc lỗi gateway.
 
-\begin{table}[H]
-\centering
-\caption{Các lỗi được bộ mô phỏng chủ động tạo}
-\label{tab:3-sim-faults}
-\small
-\begin{tblr}{
-  colspec = {X[2,l]X[4,l]},
-  rows = {abovesep=2pt, belowsep=2pt},
-  hlines, vlines,
-  row{1} = {font=\bfseries, bg=gray!20},
+{\small
+\begin{longtblr}[
+  caption = {Các lỗi được bộ mô phỏng chủ động tạo},
+  label = {tab:3-sim-faults},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[2,l]X[4,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 Loại lỗi & Ý nghĩa \\
 \code{null\_value} & Sự kiện có cấu trúc hợp lệ nhưng giá trị đo bị rỗng \\
@@ -124,17 +208,17 @@ Loại lỗi & Ý nghĩa \\
 \code{unknown\_device} & Mã thiết bị không tồn tại trong dữ liệu danh mục \\
 \code{unexpected\_metric} & Thiết bị gửi một loại chỉ số không được đăng ký cho nó \\
 \code{malformed} & Thiếu trường bắt buộc, timestamp sai hoặc giá trị không chuyển được thành số \\
-\end{tblr}
-\end{table}
+\end{longtblr}
+}
 
 \subsection{Đặc trưng dữ liệu}
 \label{sec:3-data-characteristics}
 
-Dữ liệu cảm biến của đề tài có khối lượng không lớn so với một hệ thống IoT sản xuất, nhưng có đủ các đặc trưng của dữ liệu luồng để kiểm chứng kiến trúc. Với 8 thửa ruộng, mỗi thửa có ba thiết bị, cùng tạo năm chuỗi chỉ số theo thửa ruộng, hệ thống có 40 chuỗi đo. Chu kỳ báo cáo hiện tại là 5 giây, tương đương tối đa khoảng 8 số đo mỗi giây hay khoảng 691\,200 số đo mỗi ngày nếu tất cả thiết bị hoạt động liên tục. Trong các benchmark, tốc độ thực tế xấp xỉ 7--8 sự kiện mỗi giây do lịch phát và các khoảng im lặng của thiết bị.
+Dữ liệu cảm biến của đề tài có khối lượng không lớn so với một hệ thống IoT sản xuất, nhưng có đủ các đặc trưng của dữ liệu luồng để kiểm chứng kiến trúc. Với 8 thửa ruộng, mỗi thửa có 3 thiết bị cùng tạo 5 chuỗi chỉ số theo thửa ruộng, tức hệ thống có tổng cộng 40 chuỗi đo. Chu kỳ báo cáo hiện tại là 5 giây, tương đương tối đa khoảng 8 số đo mỗi giây hay khoảng 691\,200 số đo mỗi ngày nếu tất cả thiết bị hoạt động liên tục. Trong các benchmark, tốc độ thực tế xấp xỉ 7--8 sự kiện mỗi giây do lịch phát và các khoảng im lặng của thiết bị.
 
-Đặc trưng quan trọng hơn khối lượng là dữ liệu có thứ tự thời gian không hoàn hảo. Một số đo có \code{measured\_at} là thời điểm cảm biến quan sát hiện tượng, trong khi \code{ingested\_at} là thời điểm Kafka nhận sự kiện. Hai thời điểm này có thể khác nhau nếu kết nối bị gián đoạn, do đó sự kiện có thể đến muộn hoặc không theo đúng thứ tự đo. Pipeline cấu hình watermark một giờ trên \code{measured\_at} để xác định chính sách event-time và giới hạn state cho các phép xử lý stateful nếu có. Trong hiện thực hiện tại, chưa có phép xử lý stateful sử dụng watermark để loại bản ghi đến muộn; bản ghi không bị loại chỉ vì vượt watermark. Các số đo trễ hơn 600 giây được đánh dấu bằng \code{is\_late} và vẫn được lưu vào bronze.
+Đặc trưng quan trọng hơn khối lượng là thời điểm dữ liệu đến hệ thống không phải lúc nào cũng khớp với thời điểm đo. Một số đo có \code{measured\_at} là thời điểm cảm biến quan sát hiện tượng, trong khi \code{ingested\_at} là thời điểm Kafka nhận sự kiện. Hai thời điểm này có thể khác nhau nếu kết nối bị gián đoạn, do đó sự kiện có thể đến muộn hoặc không theo đúng thứ tự đo. Pipeline đặt watermark trên \code{measured\_at} với độ trễ cho phép là một giờ, tức ngưỡng đến muộn mà các phép xử lý có trạng thái dùng để chốt kết quả và giải phóng bộ nhớ. Hiện chưa có phép xử lý nào như vậy, nên không bản ghi nào bị loại chỉ vì đến muộn quá một giờ. Thay vào đó, các số đo trễ hơn 600 giây được đánh dấu bằng \code{is\_late} và vẫn được lưu vào bronze.
 
-Dữ liệu còn có thể bị trùng do retry, bị sai cấu trúc, chứa giá trị ngoài giới hạn hoặc bị thiếu hoàn toàn trong một khoảng thời gian. Đặc biệt, trường hợp thiết bị im lặng không được biểu diễn bằng một giá trị 0. Một giá trị 0 có thể là số đo hợp lệ đối với một số chỉ số, trong khi im lặng nghĩa là không có quan sát. Vì vậy pipeline tạo các bản ghi khoảng trống riêng, còn giao diện ngắt đường biểu diễn tại những khoảng này.
+Dữ liệu còn có thể bị trùng do retry, bị sai cấu trúc, chứa giá trị ngoài giới hạn hoặc bị thiếu hoàn toàn trong một khoảng thời gian. Đặc biệt, khi thiết bị im lặng, không thể điền vào khoảng thời gian đó bằng giá trị 0. Giá trị 0 có thể là số đo hợp lệ đối với một số chỉ số, trong khi im lặng nghĩa là không có quan sát. Vì vậy pipeline tạo các bản ghi khoảng trống riêng, còn giao diện ngắt đường biểu diễn tại những khoảng này.
 
 Các đặc trưng trên quyết định lựa chọn giải pháp ở Chương~\ref{chap:4-design}: Kafka được dùng làm bộ đệm bền vững và có thể phát lại; Spark Structured Streaming xử lý theo thời gian sự kiện và micro-batch; Cassandra phục vụ dữ liệu mới nhất với độ trễ thấp; còn Iceberg lưu lại lịch sử đầy đủ để xử lý lại và phân tích.
 

@@ -1,0 +1,36 @@
+% Phần BR3 của Mục 5.4 (người phụ trách: Nhân).
+\subsection{BR3 -- Duy trì tính liên tục của giám sát}
+\label{sec:5-eff-br03}
+
+BR3 có ba tiêu chí chấp nhận liên quan tới khôi phục và khoảng trống dữ liệu. Hai tiêu chí đầu được kiểm tra trực tiếp bằng benchmark \#5, trong đó tác vụ streaming bị dừng 180 giây trong khi bộ mô phỏng vẫn tiếp tục gửi sự kiện.
+
+{\small
+\begin{longtblr}[
+  caption = {Tiêu chí chấp nhận của BR3 và bằng chứng},
+  label = {tab:5-eff-br03},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[2.5,l]X[3.7,l]X[0.8,c]},
+  rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines,
+  row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Dừng Spark trong vài phút rồi khởi động lại không làm mất hoặc nhân đôi số đo downstream &
+Ba kịch bản benchmark \#5 kiểm tra tổng cộng 9\,224 message Kafka: 0 mất, 0 khóa trùng bronze, 0 offset trùng quarantine, 0 số đo hiển thị được thiếu trong Cassandra &
+Đạt \\
+Phát lại một khoảng Kafka cho kết quả logic giống nhau ở Cassandra và Iceberg &
+Kịch bản \code{sigkill-after-bronze}: 238 dòng đã commit vào bronze trước khi tiến trình bị dừng đột ngột; lô được chạy lại và \code{MERGE} cùng khóa chính Cassandra không tạo bản ghi logic mới &
+Đạt \\
+Một lần thiết bị ngừng báo cáo tạo khoảng trống có thời điểm bắt đầu và kết thúc &
+Logic gap có 11 kiểm thử đơn vị đạt; trạng thái offline mở gap và số đo mới tiếp theo đóng gap; \code{ops.device\_gaps} lưu \code{gap\_start}, \code{gap\_end} và thời lượng &
+Đạt \\
+\end{longtblr}
+}
+
+Kịch bản \code{sigkill-after-bronze} là phép thử quan trọng nhất cho idempotency. Trước khi tiến trình bị dừng đột ngột, 238 dòng của micro-batch đã được ghi vào bronze nhưng Cassandra chưa được cập nhật. Sau khi khởi động lại bằng cùng checkpoint, Spark chạy lại đúng phạm vi offset của lô đó. Các dòng bronze đã có được cập nhật bằng \code{MERGE} thay vì chèn thêm, còn các thao tác Cassandra ghi vào cùng primary key. Truy vấn đếm khóa trùng trên toàn bộ bronze sau ba kịch bản trả về rỗng.
+
+Khả năng bắt kịp sau gián đoạn cũng được kiểm chứng. Trong trường hợp dừng có trật tự, 1\,440 sự kiện tích lũy trong ba phút dừng được đưa cùng với các sự kiện kế tiếp vào lô 1\,640 sự kiện và xử lý trong 10,8 giây. Với hai trường hợp bị \code{SIGKILL}, lô đầu tiên hoàn tất sau khoảng 54--56 giây; chậm hơn trường hợp dừng có trật tự nhưng vẫn không mất dữ liệu.
+
+Kết quả này cần được hiểu trong giới hạn của môi trường thử nghiệm: mỗi kịch bản chỉ chạy một lần, Kafka và HDFS đều dùng cấu hình một nút, và benchmark không kiểm tra trường hợp toàn bộ checkpoint bị mất. Trong phạm vi các sự cố một dịch vụ mà yêu cầu đề tài đặt ra, BR3 đạt các tiêu chí chấp nhận.

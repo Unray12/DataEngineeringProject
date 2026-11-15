@@ -1,0 +1,47 @@
+% Phần BR7 của Mục 5.4 (người phụ trách: Đạt).
+\subsection{BR7 -- Thông tin dễ tiếp cận}
+\label{sec:5-eff-br07}
+
+Bảng~\ref{tab:5-eff-br07} đối chiếu các tiêu chí chấp nhận của BR7 với bằng chứng.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR7 và bằng chứng}
+\label{tab:5-eff-br07}
+\small
+\begin{tblr}{
+  colspec = {X[2.6,l]X[3.4,l]X[1,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Quản lý xem được bản tóm tắt của một thửa ruộng bất kỳ sau tối đa vài lần nhấp & Từ trang Overview, một lần nhấp vào dòng của thửa ruộng mở trang chi tiết có tóm tắt riêng của thửa ruộng (Hình~\ref{fig:4-ui-field}); từ bất kỳ trang nào, một lần nhấp ở thanh điều hướng quay về Overview & Đạt \\
+Các biểu đồ phân tích tải trong thời gian thỏa thuận trên khối lượng dữ liệu demo & Thời gian dữ liệu của trang sẵn sàng, p50 / p95 (Bảng~\ref{tab:5-bench-web-pages}): Insights 19 / 23~ms, Analytics 7 / 10~ms, Data quality 6 / 7~ms, thửa ruộng 20 / 26~ms; lần tải đầu sau khi bộ đệm hết hạn tốn thêm tối đa khoảng 200~ms & Đạt \\
+\end{tblr}
+\end{table}
+
+Tiêu chí thứ nhất đạt với một đến hai lần nhấp tùy trang xuất phát. Với tiêu chí thứ hai, yêu cầu không ấn định một con số cụ thể; nhóm lấy mức ``vài giây cho một truy vấn tương tác'' ở Bảng~\ref{tab:3-needs} làm ngưỡng. Mọi trang phân tích có dữ liệu sẵn sàng trong không quá 26~ms ở p95 khi bộ đệm đã ấm, và thêm khoảng 60--200~ms khi bộ đệm hết hạn (Mục~\ref{sec:5-bench-web}), thấp hơn ngưỡng hàng chục lần. Số đo này chỉ tính tới lúc dữ liệu về tới trình duyệt, chưa gồm thời gian vẽ biểu đồ.
+
+\paragraph{Các yêu cầu chức năng.} Bảng~\ref{tab:5-fr7} tổng hợp mức độ đáp ứng của từng yêu cầu chức năng của BR7. FR7.4 chỉ được đáp ứng một phần: hiện tại lưu đệm được thực hiện ở route handler của Next.js (khoảng hai phút) và giới hạn kích thước kết quả bằng tham số \code{limit}, chưa có phân trang đầy đủ bằng con trỏ hay số trang.
+
+{\small
+\begin{longtblr}[
+  caption = {Mức độ đáp ứng các yêu cầu chức năng của BR7},
+  label = {tab:5-fr7},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[0.8,l]X[4,l]X[1.4,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Mã & Cách đáp ứng & Mức độ \\
+FR7.1 & Trình duyệt chỉ gọi route handler của Next.js, route handler chỉ gọi FastAPI; không có kết nối trực tiếp tới Kafka, HDFS, Cassandra hay Trino & Đạt \\
+FR7.2 & Endpoint tóm tắt, xu hướng và so sánh cho cả đường Cassandra và đường Trino (Bảng~\ref{tab:4-br07-endpoints}) & Đạt \\
+FR7.3 & Cả hai loại bảng điều khiển với bộ lọc trang trại và thửa ruộng lưu trên URL & Đạt \\
+FR7.4 & Lưu đệm ở route handler, giới hạn kích thước kết quả bằng \code{limit} & Một phần \\
+FR7.5 & Nhãn dễ hiểu, đơn vị, khoảng thời gian, thời điểm lấy dữ liệu và câu mô tả bằng ngôn ngữ thông thường & Đạt \\
+\end{longtblr}
+}
+
+\paragraph{Kiểm thử phần diễn đạt.} Các hàm sinh câu mô tả và so sánh của trang Insights là hàm thuần túy, được kiểm thử bằng 22 ca kiểm thử đơn vị (vitest); toàn bộ đều đạt. Các ca này bao gồm trường hợp thiếu dữ liệu của khoảng trước, hai giá trị gần như bằng nhau và đánh giá thay đổi so với khoảng mục tiêu của cây trồng. Phần này kiểm tra tính đúng đắn của câu chữ, còn việc người dùng thực sự hiểu được câu chữ đó nằm ngoài phạm vi đánh giá của đề tài.
+
+\paragraph{Kịch bản minh họa.} Quản lý trang trại mở trang Overview, thấy cột \emph{What needs attention} và nhấp vào thửa ruộng F003. Trang chi tiết cho biết điều kiện hiện tại và thứ hạng độ ẩm đất của F003 so với bảy thửa ruộng còn lại trong 7 ngày gần nhất. Để so sánh toàn bộ, người dùng nhấp \emph{Compare all fields} để sang trang Insights (Hình~\ref{fig:4-br07-ui}).

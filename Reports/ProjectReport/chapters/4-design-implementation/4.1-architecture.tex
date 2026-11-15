@@ -2,7 +2,7 @@
 \section{Kiến trúc tổng thể}
 \label{sec:4-architecture}
 
-Kiến trúc của hệ thống xuất phát từ hai loại nhu cầu về dữ liệu ở Mục~\ref{sec:3-data-needs}: người dùng vừa cần biết tình trạng hiện tại trong vòng khoảng một phút, vừa cần lịch sử đầy đủ để phân tích. Hai nhu cầu này khác nhau về độ trễ và khối lượng truy vấn, nên một kho dữ liệu duy nhất khó đáp ứng tốt cả hai. Vì vậy, kiến trúc được tổ chức theo nguyên tắc \emph{một luồng dữ liệu, hai đường phục vụ}: toàn bộ số đo đi qua cùng một đường thu thập và xử lý, sau đó được ghi ra hai nơi với mục đích khác nhau. Hình~\ref{fig:4-architecture} mô tả kiến trúc tổng thể.
+Kiến trúc của hệ thống xuất phát từ hai loại nhu cầu về dữ liệu ở Mục~\ref{sec:3-data-needs}: người dùng vừa cần biết tình trạng hiện tại trong vòng khoảng một phút, vừa cần lịch sử đầy đủ để phân tích. Hai nhu cầu này khác nhau về độ trễ và khối lượng truy vấn nên một kho dữ liệu duy nhất khó đáp ứng tốt cả hai. Vì vậy, kiến trúc được tổ chức theo nguyên tắc \emph{một luồng dữ liệu, hai đường phục vụ}: toàn bộ số đo đi qua cùng một đường thu thập và xử lý, sau đó được ghi ra hai nơi với mục đích khác nhau. Hình~\ref{fig:4-architecture} mô tả kiến trúc tổng thể của hệ thống.
 
 \begin{figure}[H]
 \centering
@@ -83,7 +83,7 @@ FastAPI & Lớp truy cập dữ liệu duy nhất, đọc từ Cassandra hoặc 
 \subsection{Hai loại bảng điều khiển (dashboard)}
 \label{sec:4-dashboards}
 
-Hai đường phục vụ tương ứng với hai loại bảng điều khiển trong ứng dụng, với các đặc điểm ở Bảng~\ref{tab:4-dashboards}. Bảng điều khiển gần thời gian thực chỉ đọc từ Cassandra, còn bảng điều khiển theo ngày chỉ đọc từ các bảng gold qua Trino. Một biểu đồ không bao giờ trộn dữ liệu từ hai nguồn này để người dùng luôn biết con số mình đang xem có độ mới như thế nào.
+Hai đường phục vụ tương ứng với hai loại bảng điều khiển trong ứng dụng với các đặc điểm liệt kê ở Bảng~\ref{tab:4-dashboards}. Bảng điều khiển gần thời gian thực chỉ đọc từ Cassandra, còn bảng điều khiển theo ngày chỉ đọc từ các bảng gold qua Trino. Một biểu đồ không bao giờ trộn dữ liệu từ hai nguồn này để người dùng luôn biết con số mình đang xem có độ mới như thế nào.
 
 \begin{table}[H]
 \centering
@@ -112,5 +112,3 @@ Ba nguyên tắc chi phối toàn bộ kiến trúc.
   \item \textbf{Ghi lại được mà không trùng lặp.} Mọi thao tác ghi đều có thể thực hiện lại mà không tạo bản ghi trùng, nên việc phát lại sau sự cố cho kết quả giống lần đầu. Nguyên tắc này phục vụ BR3 và BR4.
   \item \textbf{Một điểm truy cập duy nhất.} Ứng dụng web chỉ lấy dữ liệu qua FastAPI và không truy cập trực tiếp Kafka, HDFS, Cassandra hay Trino (Mục~\ref{sec:2-api-web}). Nguyên tắc này phục vụ BR1 và BR7.
 \end{itemize}
-
-Các mục tiếp theo đi vào từng phần của kiến trúc này: công nghệ lưu trữ, công nghệ xử lý và mô hình dữ liệu, trước khi trình bày cách hiện thực từng yêu cầu nghiệp vụ.

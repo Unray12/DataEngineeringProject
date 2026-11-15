@@ -1,9 +1,9 @@
-\subsection{BR04 -- Thiết lập dữ liệu đáng tin cậy}
+\subsection{BR4 -- Thiết lập dữ liệu đáng tin cậy}
 \label{sec:4-br04}
 
-\paragraph{Yêu cầu.} Người dùng không được ra quyết định dựa trên số đo sai, trùng hoặc gây hiểu nhầm, và mọi con số phải truy ngược được về nguồn (FR4.1--FR4.7).
+\paragraph{Yêu cầu.} Người dùng không được ra quyết định dựa trên số đo sai, trùng hoặc gây hiểu nhầm, đồng thời mọi con số phải truy ngược được về nguồn (FR4.1--FR4.7).
 
-\paragraph{Luồng dữ liệu.} Việc bảo đảm chất lượng được đặt ở hai nơi. Kiểm định chạy \emph{trong} mỗi micro-batch của Spark, nên dữ liệu lỗi bị chặn trước khi tới bảng điều khiển gần thời gian thực. Tổng hợp và kiểm thử chạy \emph{sau} trong dbt, nên tầng gold chỉ được làm mới khi dữ liệu đạt các test. Hình~\ref{fig:4-br04-flow} mô tả luồng này.
+\paragraph{Luồng dữ liệu.} Việc bảo đảm chất lượng được đặt ở hai nơi. Kiểm định chạy \emph{trong} mỗi micro-batch của Spark nên dữ liệu lỗi bị chặn trước khi tới bảng điều khiển gần thời gian thực. Tổng hợp và kiểm thử chạy \emph{sau} trong dbt, do đó tầng gold chỉ được làm mới khi dữ liệu đạt các test. Hình~\ref{fig:4-br04-flow} mô tả trực quan luồng dữ liệu này.
 
 \begin{figure}[H]
 \centering
@@ -26,13 +26,13 @@
 \draw[arr] (f)--(b); \draw[arr] (f.east) to[bend left=40] (c.east);
 \draw[arr] (b)--(sv); \draw[arr] (c)--(sv); \draw[arr] (sv)--(g);
 \end{tikzpicture}
-\caption{Luồng bảo đảm chất lượng dữ liệu của BR04}
+\caption{Luồng bảo đảm chất lượng dữ liệu của BR4}
 \label{fig:4-br04-flow}
 \end{figure}
 
-\paragraph{Bước 1: schema tường minh (FR4.1).} Tác vụ không suy diễn schema. Mọi trường của payload được đọc dưới dạng chuỗi, để phân biệt được hai trường hợp: giá trị sai kiểu (ví dụ \code{"value": "high"}) là lỗi cấu trúc và bị cách ly, còn giá trị \code{null} hợp lệ về JSON là một số đo rỗng và chỉ bị gắn cờ.
+\paragraph{Bước 1: schema tường minh (FR4.1).} Tác vụ không suy diễn schema. Mọi trường của payload được đọc dưới dạng chuỗi, để phân biệt được hai trường hợp: giá trị sai kiểu (ví dụ \code{"value": "high"}) là lỗi cấu trúc và bị cách ly, còn giá trị \code{null} hợp lệ theo JSON là một số đo rỗng và chỉ bị gắn cờ.
 
-\begin{lstlisting}[language=Python, caption={Schema tường minh của payload (\texttt{src/streaming/config.py})}, label={lst:4-payload-schema}]
+\begin{lstlisting}[language=Python, caption={Schema tường minh của payload}, label={lst:4-payload-schema}]
 PAYLOAD_COLUMNS = {
     "event_id": "string", "device_id": "string", "metric": "string",
     "value": "string", "reading_ts": "string",
@@ -42,9 +42,9 @@ PAYLOAD_COLUMNS = {
 schema = StructType([StructField(n, StringType(), True) for n in PAYLOAD_COLUMNS])
 \end{lstlisting}
 
-\paragraph{Bước 2: cách ly lỗi cấu trúc.} Mỗi bản ghi được gán một lý do cách ly theo thứ tự ưu tiên ở Đoạn mã~\ref{lst:4-quarantine-reason}. Bản ghi có lý do khác rỗng đi vào \code{ops.quarantine}; phần còn lại đi tiếp. Nhờ vậy một payload hỏng không làm dừng cả micro-batch.
+\paragraph{Bước 2: cách ly lỗi cấu trúc.} Mỗi bản ghi được gán một lý do cách ly theo thứ tự ưu tiên ở Đoạn mã~\ref{lst:4-quarantine-reason}. Bản ghi có lý do khác rỗng đi vào \code{ops.quarantine}, phần còn lại đi tiếp. Nhờ vậy một payload hỏng không làm dừng cả micro-batch.
 
-\begin{lstlisting}[language=Python, caption={Lý do cách ly (\texttt{src/streaming/pipeline.py}, \texttt{\_stage})}, label={lst:4-quarantine-reason}]
+\begin{lstlisting}[language=Python, caption={Lý do cách ly}, label={lst:4-quarantine-reason}]
 reason = (
     F.when(~F.col("json_ok"), F.lit("invalid_json"))
     .when(blank_device | blank_metric | blank_ts, F.lit("missing_field"))
@@ -57,11 +57,11 @@ reason = (
 )
 \end{lstlisting}
 
-\paragraph{Bước 3: gắn cờ chất lượng (FR4.2, FR4.3).} Với các bản ghi hợp lệ về cấu trúc, cờ \code{quality\_flag} nhận một trong năm giá trị: \code{duplicate}, \code{null\_value}, \code{out\_of\_range}, \code{implausible\_jump} hoặc \code{ok}. Ngưỡng của từng chỉ số nằm trong dữ liệu danh mục (Bảng~\ref{tab:4-metric-ranges}), nên đổi ngưỡng không cần sửa mã. Bước nhảy được so với giá trị mới nhất của cùng thửa ruộng và chỉ số trong Cassandra.
+\paragraph{Bước 3: gắn cờ chất lượng (FR4.2, FR4.3).} Với các bản ghi hợp lệ về cấu trúc, cờ \code{quality\_flag} nhận 1 trong các giá trị: \code{duplicate}, \code{null\_value}, \code{out\_of\_range}, \code{implausible\_jump} hoặc \code{ok}. Ngưỡng của từng chỉ số nằm trong dữ liệu danh mục (Bảng~\ref{tab:4-metric-ranges}) nên đổi ngưỡng không cần sửa mã. Bước nhảy được so với giá trị mới nhất của cùng thửa ruộng và chỉ số trong Cassandra.
 
 \begin{table}[H]
 \centering
-\caption{Ngưỡng kiểm định theo chỉ số (\texttt{reference/reference\_data.json})}
+\caption{Ngưỡng kiểm định theo chỉ số}
 \label{tab:4-metric-ranges}
 \small
 \begin{tblr}{
@@ -77,11 +77,11 @@ rainfall & mm/h & 0 & 200 & 40 \\
 \end{tblr}
 \end{table}
 
-\paragraph{Bước 4: ghi bronze, bảng đếm và lineage (FR4.4, FR4.5).} Bản ghi được ghi vào bronze bằng \code{MERGE} theo khóa \code{(device\_id, metric, measured\_at)}, kèm sáu cột lineage. Đồng thời mỗi lô ghi một dòng đếm cho mỗi cặp thiết bị và chỉ số vào \code{ops.quality\_counters} (tổng, hợp lệ, trùng, rỗng, ngoài khoảng, bước nhảy, đến muộn). Bảng đếm này là nguồn của báo cáo chất lượng hằng ngày.
+\paragraph{Bước 4: ghi bronze, bảng đếm và lineage (FR4.4, FR4.5).} Bản ghi được ghi vào bronze bằng \code{MERGE} theo khóa \code{(device\_id, metric, measured\_at)}, kèm 6 cột lineage. Đồng thời mỗi lô ghi một dòng đếm cho mỗi cặp thiết bị và chỉ số vào \code{ops.quality\_counters} (tổng, hợp lệ, trùng, rỗng, ngoài khoảng, bước nhảy, đến muộn). Bảng đếm này là nguồn của báo cáo chất lượng hằng ngày.
 
-\paragraph{Bước 5: dbt và tầng gold (FR4.5, FR4.7).} Model silver khử trùng lặp lần thứ hai (Đoạn mã~\ref{lst:2-silver}) và mang các test ở Đoạn mã~\ref{lst:2-silver-tests}. Model gold \code{quality\_daily} cộng bảng đếm theo ngày và ghép với số bản ghi bị cách ly:
+\paragraph{Bước 5: dbt và tầng gold (FR4.5, FR4.7).} Model silver khử trùng lặp thêm một lần nữa (Đoạn mã~\ref{lst:2-silver}) và được kiểm tra bằng các test ở Đoạn mã~\ref{lst:2-silver-tests}. Model gold \code{quality\_daily} cộng bảng đếm theo ngày và ghép với số bản ghi bị cách ly:
 
-\begin{lstlisting}[language=SQL, caption={Model gold tóm tắt chất lượng (\texttt{dbt/models/gold/quality\_daily.sql}, rút gọn)}, label={lst:4-quality-daily}]
+\begin{lstlisting}[language=SQL, caption={Model gold tóm tắt chất lượng (rút gọn)}, label={lst:4-quality-daily}]
 with counters as (
     select cast(date_trunc('day', window_start) as date) as day,
            sum(total) as total, sum(valid) as valid,
@@ -98,15 +98,15 @@ select c.day, c.valid, c.duplicate, c.out_of_range,
 from counters c left join quarantine q on q.day = c.day
 \end{lstlisting}
 
-Cột \code{quarantined} là số bản ghi bị cách ly trong ngày, bằng 0 khi ngày đó không có bản ghi nào bị cách ly. Bản ghi rỗng (\code{null\_value}) không được tính vào cột này vì chúng vẫn nằm trong bronze với cờ riêng; Mục~\ref{sec:5-correctness} đếm chúng riêng.
+Cột \code{quarantined} là số bản ghi bị cách ly trong ngày, có giá trị bằng 0 khi ngày đó không có bản ghi nào bị cách ly. Bản ghi rỗng (\code{null\_value}) không được tính vào cột này vì chúng vẫn nằm trong bronze với cờ riêng (Mục~\ref{sec:5-correctness}).
 
-\paragraph{Bước 6: hiển thị (FR4.6).} FastAPI đọc \code{quality\_daily}, bảng silver và hai bảng \code{ops.quality\_counters}, \code{ops.quarantine} qua Trino cho trang \emph{Data quality}, gồm biểu đồ theo ngày và bảng theo thiết bị có xem lineage. Trên đường gần thời gian thực, mỗi giá trị trả về kèm \code{quality\_flag} để giao diện đánh dấu điểm đáng ngờ.
+\paragraph{Bước 6: hiển thị (FR4.6).} FastAPI đọc \code{quality\_daily}, bảng silver và hai bảng \code{ops.quality\_counters}, \code{ops.quarantine} qua Trino cho trang \emph{Data quality}, gồm biểu đồ theo ngày và bảng theo thiết bị có xem lineage. Trên luồng dữ liệu gần thời gian thực, mỗi giá trị trả về kèm \code{quality\_flag} để giao diện đánh dấu điểm đáng ngờ.
 
 \begin{figure}[H]
 \centering
-\hinhtrong{0.9\linewidth}{6cm}{Trang Data quality: biểu đồ theo ngày và bảng lineage của một thiết bị}
-\caption{Trang chất lượng dữ liệu của ứng dụng}
+\includegraphics[width=0.95\linewidth]{br04-quality.png}
+\caption{Trang chất lượng dữ liệu: biểu đồ theo ngày và lineage của thiết bị F001-S01 (số bản ghi, lô, partition và offset nguồn)}
 \label{fig:4-br04-ui}
 \end{figure}
 
-\paragraph{Kết quả.} Mọi bản ghi lỗi đều được giữ lại với lý do hoặc cờ, và mọi dòng mang lineage. Hai điểm còn thiếu ở bản đầu đã được sửa trước khi đánh giá ở Chương~\ref{chap:5-evaluation}. Thứ nhất, model gold \code{field\_daily} chỉ tính min, max và trung bình trên các dòng có \code{quality\_flag = 'ok'}; cột \code{reading\_count} vẫn đếm mọi giá trị khác rỗng, và hai cột \code{valid\_count}, \code{flagged\_count} cho biết tỷ lệ dữ liệu bị gắn cờ. Thứ hai, các cột min, max và trung bình của \code{field\_daily} có test khoảng giá trị (\code{accepted\_range}, khoảng chung $[-30, 200]$ cho mọi chỉ số), nên một giá trị nằm ngoài khoảng đó lọt vào gold sẽ làm \code{just dbt-test} thất bại (FR4.7); khoảng riêng của từng chỉ số được kiểm tra ở Mục~\ref{sec:5-implausible}.
+\paragraph{Kết quả.} Mọi bản ghi lỗi đều được giữ lại với lý do hoặc cờ, ngoài ra mỗi dòng cũng có mang lineage. Hai điểm còn thiếu ở bản đầu đã được sửa trước khi đánh giá ở Chương~\ref{chap:5-evaluation}. Thứ nhất, model gold \code{field\_daily} chỉ tính min, max và trung bình trên các dòng có \code{quality\_flag = 'ok'}; cột \code{reading\_count} vẫn đếm mọi giá trị khác rỗng, và hai cột \code{valid\_count}, \code{flagged\_count} cho biết tỷ lệ dữ liệu bị gắn cờ. Thứ hai, các cột min, max và trung bình của \code{field\_daily} có test khoảng giá trị (\code{accepted\_range}, khoảng chung $[-30, 200]$ cho mọi chỉ số), nên một giá trị nằm ngoài khoảng đó lọt vào gold sẽ làm \code{just dbt-test} thất bại (FR4.7). Khoảng riêng của từng chỉ số được kiểm tra ở Mục~\ref{sec:5-implausible}.

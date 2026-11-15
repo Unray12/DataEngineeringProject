@@ -7,6 +7,8 @@ Hệ thống có hai nhu cầu lưu trữ trái ngược nhau. Bảng điều kh
 \subsection{Hai kho cho hai nhu cầu}
 \label{sec:4-two-stores}
 
+Bảng~\ref{tab:4-two-stores} so sánh hai kho theo thời gian giữ dữ liệu, cách truy cập, độ trễ truy vấn, độ mới của dữ liệu, cách ghi và loại bảng điều khiển mà mỗi kho phục vụ.
+
 {\small
 \begin{longtblr}[
   caption = {So sánh hai kho dữ liệu của hệ thống},
@@ -21,27 +23,29 @@ Tiêu chí & Cassandra & Iceberg trên HDFS \\
 Dữ liệu giữ & 24--48 giờ (TTL); trạng thái cảnh báo 90 ngày & Toàn bộ lịch sử (bronze), tổng hợp (gold) \\
 Mẫu truy cập & Tra cứu theo khóa, đọc theo phân vùng & Quét theo khoảng ngày, gộp, so sánh \\
 Độ trễ truy vấn & Vài mili-giây & Vài chục tới vài trăm mili-giây (qua Trino) \\
-Độ tươi dữ liệu & Vài giây tới một phút & Theo lần làm mới gold \\
+Độ mới dữ liệu & Vài giây tới một phút & Theo lần làm mới gold \\
 Ghi & Ghi nhanh theo lô nhỏ & Ghi theo commit, cần gộp tệp \\
 Phục vụ & Bảng điều khiển gần thời gian thực & Bảng điều khiển trong ngày, theo ngày \\
 \end{longtblr}
 }
 
-Quy tắc đi kèm: bảng điều khiển gần thời gian thực chỉ đọc Cassandra, bảng điều khiển phân tích chỉ đọc Trino. Một biểu đồ không bao giờ trộn hai nguồn, để người dùng không so sánh hai con số có độ tươi khác nhau mà không biết.
+Quy tắc đi kèm: bảng điều khiển gần thời gian thực chỉ đọc Cassandra, bảng điều khiển phân tích chỉ đọc Trino. Một biểu đồ không bao giờ trộn dữ liệu từ hai nguồn, để người dùng không vô tình so sánh hai số liệu có độ mới khác nhau.
 
-\subsection{Vì sao chọn Iceberg trên HDFS}
+\subsection{Lý do chọn Iceberg trên HDFS}
 \label{sec:4-why-iceberg}
 
-\paragraph{Nhu cầu.} Lớp lưu trữ phân tích phải: (1) giữ toàn bộ dữ liệu thô để xử lý lại khi sửa lỗi (FR6.1); (2) nhận ghi liên tục từ streaming mà người đọc vẫn thấy dữ liệu nhất quán; (3) ghi idempotent để phát lại không sinh bản ghi trùng (FR3.3); (4) lọc nhanh theo khoảng ngày (FR6.2); (5) cho xem lại quá khứ để tái tạo báo cáo cũ (BR6).
+\paragraph{Nhu cầu.} Lớp lưu trữ phân tích phải: (1) giữ toàn bộ dữ liệu thô để xử lý lại khi sửa lỗi (FR6.1); (2) nhận ghi liên tục từ streaming mà các truy vấn đọc vẫn thấy dữ liệu nhất quán; (3) ghi idempotent để phát lại không sinh bản ghi trùng (FR3.3); (4) lọc nhanh theo khoảng ngày (FR6.2); (5) cho xem lại quá khứ để tái tạo báo cáo cũ (BR6).
 
-\paragraph{Vì sao không phải Parquet thuần.} Thư mục Parquet đáp ứng (1) nhưng không đáp ứng (2) và (3): không có giao dịch, nên một lô ghi dở có thể bị người đọc thấy, và không có \code{MERGE} nên phát lại phải tự khử trùng. Việc lọc theo ngày phụ thuộc quy ước tên thư mục mà người viết truy vấn phải nhớ. Không có snapshot nên không xem lại được quá khứ. Mục~\ref{sec:4-alternative} và benchmark \#3 (Mục~\ref{sec:5-bench-storage}) so sánh cụ thể.
+\paragraph{Vì sao không phải Parquet thuần?} Thư mục Parquet đáp ứng (1) nhưng không đáp ứng (2), (3) và (5) vì thiếu giao dịch, thiếu \code{MERGE} và thiếu snapshot. Mục~\ref{sec:4-alt-parquet} so sánh từng nhu cầu và benchmark \#3 (Mục~\ref{sec:5-bench-storage}) đo cụ thể.
 
-\paragraph{Vì sao HDFS.} HDFS có sẵn trong bộ công cụ của môn học và là nơi Iceberg, Spark và Trino đều đọc được qua cùng một cấu hình Hadoop. Hệ thống tệp phân tán cũng giữ nguyên được mô hình triển khai ``dữ liệu nằm cạnh tính toán'' khi mở rộng thêm nút. Hạn chế là tệp nhỏ (Mục~\ref{sec:2-hdfs}), được xử lý bằng compaction ở Mục~\ref{sec:4-compaction}.
+\paragraph{Vì sao sử dụng HDFS?} HDFS có sẵn trong bộ công cụ của môn học và là nơi Iceberg, Spark và Trino đều đọc được qua cùng một cấu hình Hadoop. Hệ thống tệp phân tán cũng giữ được nguyên tắc đưa tính toán đến gần dữ liệu (data locality) khi mở rộng thêm nút. Điểm yếu của HDFS là xử lý kém các tệp nhỏ (Mục~\ref{sec:2-hdfs}); đề tài khắc phục bằng cách gộp tệp định kỳ (compaction, Mục~\ref{sec:4-compaction}).
 
-\paragraph{Vì sao Hive Metastore.} Catalog phải được Spark và Trino dùng chung (Mục~\ref{sec:2-hms}). Hive Metastore là catalog được cả hai connector hỗ trợ sẵn. Trong đề tài, metastore dùng cơ sở dữ liệu Derby nhúng lưu trong một volume Docker. Cách này đủ cho một nút, nhưng Derby nhúng chỉ cho \emph{một} tiến trình mở cơ sở dữ liệu, nên không thể chạy thêm bản metastore thứ hai để chịu lỗi. Tài liệu thiết kế dự kiến backend Postgres cho môi trường thật; đây là một khác biệt có chủ ý của bản demo, được nêu lại ở phần hạn chế (Chương~\ref{chap:6-conclusion}).
+\paragraph{Vì sao sử dụng Hive Metastore?} Catalog phải được Spark và Trino dùng chung (Mục~\ref{sec:2-hms}). Hive Metastore là catalog được cả hai connector hỗ trợ sẵn. Trong đề tài, metastore dùng cơ sở dữ liệu Derby nhúng lưu trong một volume Docker. Cách này đủ dùng cho một nút, nhưng Derby nhúng chỉ cho phép \emph{một} tiến trình truy cập cơ sở dữ liệu tại một thời điểm nên không thể chạy thêm một metastore thứ hai để chịu lỗi. Với môi trường triển khai thật, thiết kế dự kiến dùng Postgres làm cơ sở dữ liệu của metastore; bản demo cố ý dùng Derby thay cho Postgres, và hạn chế này được nêu ở Mục~\ref{sec:6-limits}.
 
 \subsection{Bảng quyết định công nghệ lưu trữ}
 \label{sec:4-storage-decisions}
+
+Bảng~\ref{tab:4-storage-decisions} tóm tắt các lựa chọn công nghệ quyết định cách dữ liệu được lưu giữ và truy vấn, cùng lý do chính của từng lựa chọn; phiên bản đầy đủ của tất cả thành phần nằm ở Bảng~\ref{tab:4-versions}.
 
 {\small
 \begin{longtblr}[
@@ -64,14 +68,12 @@ Phân vùng & Theo ngày (\code{days(measured\_at)}) & Truy vấn lịch sử l�
 \end{longtblr}
 }
 
-Phiên bản cụ thể của từng thành phần nằm ở Bảng~\ref{tab:4-versions}; chỉ định dạng, catalog và engine được tóm tắt lại ở đây vì chúng quyết định cách dữ liệu được giữ và đọc.
-
 \subsection{Cấu hình Spark ghi Iceberg}
 \label{sec:4-spark-iceberg}
 
-Tác vụ streaming và tác vụ khởi tạo dựng phiên Spark ở cùng một nơi, \code{src/streaming/spark.py}. dbt không dùng mã Python này mà khai báo lại các thuộc tính catalog trong hồ sơ \code{dbt/profiles.yml} (Đoạn mã~\ref{lst:4-spark-catalog}), nên hai nơi phải được giữ khớp nhau.
+Tác vụ streaming và tác vụ khởi tạo dựng phiên Spark ở cùng một nơi. dbt không dùng mã Python này mà khai báo lại các thuộc tính catalog trong hồ sơ \code{dbt/profiles.yml} (Đoạn mã~\ref{lst:4-spark-catalog}), nên hai nơi phải được giữ khớp nhau.
 
-\begin{lstlisting}[caption={Catalog Iceberg trong Spark (\texttt{dbt/profiles.yml}, rút gọn)}, label={lst:4-spark-catalog}]
+\begin{lstlisting}[caption={Catalog Iceberg trong Spark (rút gọn)}, label={lst:4-spark-catalog}]
 server_side_parameters:
   spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
   spark.sql.catalog.lakehouse: org.apache.iceberg.spark.SparkCatalog
@@ -84,9 +86,9 @@ server_side_parameters:
 \subsection{Compaction các tệp nhỏ}
 \label{sec:4-compaction}
 
-Tác vụ streaming commit mỗi 30 giây (Mục~\ref{sec:2-iceberg}), nên bảng bronze tích lũy nhiều tệp nhỏ. Đề tài gộp chúng bằng một \emph{macro} dbt gọi thủ tục \code{rewrite\_data\_files} của Iceberg, đúng theo quy ước ``không viết script riêng, mọi việc là recipe \code{just}''. Đoạn mã~\ref{lst:4-compaction} là macro, và recipe \code{just compact} gọi nó.
+Tác vụ streaming commit mỗi 30 giây (Mục~\ref{sec:2-iceberg}), nên bảng bronze tích lũy nhiều tệp nhỏ. Đề tài gộp chúng bằng một \emph{macro} dbt gọi thủ tục \code{rewrite\_data\_files} của Iceberg (Đoạn mã~\ref{lst:4-compaction}). Theo quy ước của dự án, mọi tác vụ định kỳ là một recipe \code{just} chứ không phải script riêng, nên macro này được chạy qua recipe \code{just compact}.
 
-\begin{lstlisting}[language=SQL, caption={Macro compaction (\texttt{dbt/macros/compaction.sql})}, label={lst:4-compaction}]
+\begin{lstlisting}[language=SQL, caption={Macro compaction}, label={lst:4-compaction}]
 {% macro rewrite_data_files(table) %}
   {% set target = table if table.startswith('lakehouse.') else 'lakehouse.' ~ table %}
   {% set statement %}
@@ -105,4 +107,4 @@ just compact bronze.sensor_readings
 # = dbt run-operation rewrite_data_files --args '{table: bronze.sensor_readings}'
 \end{lstlisting}
 
-\code{just batch-run} gọi compaction cho bảng bronze và ba bảng \code{ops} (\code{quality\_counters}, \code{quarantine}, \code{device\_gaps}), vì tác vụ streaming commit vào cả bốn bảng ở mỗi lô. Các bảng \code{ops} được thêm vào sau benchmark \#6: trước khi gộp, \code{ops.quality\_counters} có 1\,300 tệp cho 12\,688 dòng và endpoint \code{/quality/devices} mất 846 ms ở p50, sau khi gộp còn khoảng 150--200 ms (Mục~\ref{sec:5-bench-web}). Người vận hành vẫn phải chạy \code{just batch-run} bằng tay; lập lịch định kỳ (ví dụ bằng cron trong một container) và mở rộng sang các bảng gold là việc còn lại. Trong benchmark \#4 (Mục~\ref{sec:5-bench-compaction}), macro này gộp 720 tệp nhỏ thành 30 tệp trong 15 giây và làm truy vấn gộp 7 ngày nhanh gấp 2,1 lần.
+\code{just batch-run} gọi compaction cho bảng bronze và ba bảng \code{ops} (\code{quality\_counters}, \code{quarantine}, \code{device\_gaps}) vì tác vụ streaming commit vào cả bốn bảng ở mỗi lô. Hiện người vận hành phải chạy \code{just batch-run} bằng tay; việc lập lịch định kỳ (ví dụ bằng cron trong một container) và mở rộng compaction sang các bảng gold chưa được thực hiện. Hiệu quả của compaction được đo ở Mục~\ref{sec:5-bench-compaction} và Mục~\ref{sec:5-bench-web}.

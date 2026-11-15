@@ -2,14 +2,14 @@
 \section{Giải pháp thay thế để so sánh}
 \label{sec:4-alternative}
 
-Đề tài so sánh giải pháp chính với ba phương án thay thế: hai ở lớp lưu trữ và phục vụ phân tích (A, B) và một ở lớp xử lý luồng (C). Mỗi phương án dưới đây có một benchmark ở Chương~\ref{chap:5-evaluation}, nên so sánh dựa trên số đo chứ không chỉ dựa trên lập luận.
+Đề tài so sánh giải pháp chính với 3 phương án thay thế: 2 phương án thay đổi ở lớp lưu trữ và phục vụ phân tích (A, B) và 1 phương án ở lớp xử lý luồng (C). Mỗi phương án dưới đây đều có benchmark ở Chương~\ref{chap:5-evaluation} nên phần so sánh ở đây dựa trên số đo chứ không chỉ dựa trên lập luận.
 
 \subsection{Phương án A: Hive/Parquet thuần thay cho Iceberg}
 \label{sec:4-alt-parquet}
 
 \paragraph{Mô tả.} Bảng bronze và gold là bảng ngoài (external table) của Hive trên thư mục Parquet, phân vùng theo thư mục \code{day=YYYY-MM-DD}. Spark ghi tệp vào đúng thư mục ngày, Hive Metastore ghi nhận các phân vùng, Trino đọc qua connector Hive.
 
-\paragraph{Điểm mạnh.} Đơn giản; ít khái niệm; đọc ghi nhanh với tệp lớn; không có lớp siêu dữ liệu để quản lý.
+\paragraph{Điểm mạnh.} Đơn giản, ít khái niệm, đọc ghi nhanh với tệp lớn, không có lớp siêu dữ liệu để quản lý.
 
 \paragraph{Điểm yếu đối với bài toán này.} Bảng~\ref{tab:4-alt-parquet} đối chiếu từng nhu cầu với hai phương án.
 
@@ -24,39 +24,39 @@
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 Nhu cầu & Hive/Parquet thuần & Iceberg \\
-Ghi đồng thời với đọc & Người đọc có thể thấy tệp ghi dở & Snapshot nguyên tử, người đọc luôn thấy trạng thái nhất quán \\
-Ghi idempotent khi phát lại & Không có \code{MERGE}; phải tự khử trùng hoặc ghi đè cả phân vùng & \code{MERGE INTO} theo khóa tự nhiên \\
+Ghi đồng thời với đọc & Truy vấn đọc có thể gặp tệp chưa ghi xong & Snapshot nguyên tử, truy vấn đọc luôn thấy trạng thái nhất quán \\
+Ghi idempotent khi phát lại & Không có \code{MERGE}, phải tự khử trùng hoặc ghi đè cả phân vùng & \code{MERGE INTO} theo khóa tự nhiên \\
 Lọc theo ngày & Dựa vào tên thư mục và cột phân vùng riêng & Phân vùng ẩn theo \code{days(measured\_at)} \\
 Sửa schema & Đổi tên cột có thể làm hỏng tệp cũ & Cột được định danh bằng số; thêm, đổi tên không viết lại dữ liệu \\
-Xem lại quá khứ & Không có & Du hành thời gian theo snapshot \\
-Tệp nhỏ & Có; phải tự gộp bằng cách viết lại các phân vùng & Có; \code{rewrite\_data\_files} tạo snapshot mới nên không chặn người đọc \\
+Xem lại quá khứ & Không có & Time travel theo snapshot \\
+Tệp nhỏ & Có, phải tự gộp bằng cách viết lại các phân vùng & Có, \code{rewrite\_data\_files} tạo snapshot mới nên không chặn các truy vấn đang đọc \\
 Độ phức tạp vận hành & Thấp & Cao hơn (siêu dữ liệu, dọn snapshot) \\
 \end{longtblr}
 }
 
-\paragraph{Cách so sánh.} Benchmark \#3 (Mục~\ref{sec:5-bench-storage}) ghi cùng 1,2 triệu dòng, qua 240 commit, vào hai kiểu bảng (catalog \code{hive} trong \code{trino/catalog/hive.properties}) rồi đo thời gian truy vấn, số tệp và hành vi khi ghi, đồng thời thử thật phát lại một lô, du hành thời gian và đổi tên cột.
+\paragraph{Cách so sánh.} Benchmark \#3 (Mục~\ref{sec:5-bench-storage}) ghi cùng 1,2 triệu dòng, qua 240 commit, vào hai kiểu bảng (catalog \code{hive} trong \code{trino/catalog/hive.properties}) rồi đo thời gian truy vấn, số tệp và hành vi khi ghi, đồng thời kiểm tra trực tiếp các thao tác: ghi lại một lô, time travel và đổi tên cột.
 
 \subsection{Phương án B: chỉ dùng Cassandra để phục vụ lịch sử}
 \label{sec:4-alt-cassandra}
 
-\paragraph{Mô tả.} Không có đường Trino. Ngoài các bảng gần thời gian thực, Cassandra giữ cả các bảng tổng hợp theo ngày (ví dụ \code{daily\_by\_field}) và API đọc lịch sử từ đó \cite{cassandra_docs}. Hệ thống chỉ còn một kho phục vụ.
+\paragraph{Mô tả.} Không sử dụng luồng dữ liệu qua Trino. Ngoài các bảng gần thời gian thực, Cassandra giữ cả các bảng tổng hợp theo ngày (ví dụ \code{daily\_by\_field}) và API đọc lịch sử từ đó \cite{cassandra_docs}. Hệ thống chỉ còn một kho phục vụ.
 
-\paragraph{Điểm mạnh.} Một kho thay cho hai; độ trễ đọc thấp và ổn định; ít thành phần phải vận hành.
+\paragraph{Điểm mạnh.} Chỉ dùng 1 kho dữ liệu thay vì dùng đến 2 kho, độ trễ đọc thấp và ổn định, ít thành phần phải vận hành.
 
-\paragraph{Điểm yếu đối với bài toán này.} Cassandra là kho \emph{theo truy vấn}: mỗi câu hỏi cần một bảng thiết kế riêng, và một truy vấn chưa được lường trước (ví dụ so sánh hai giai đoạn tùy ý hoặc gộp theo tuần) không thể trả lời bằng truy vấn tùy biến mà phải thêm bảng và nạp lại dữ liệu. Cassandra không có phép nối và gộp tự do. Việc giữ toàn bộ lịch sử thô cho mục đích xử lý lại cũng không phù hợp với một kho tối ưu cho ghi và tra cứu theo khóa. Cuối cùng, dữ liệu bronze, nguồn để dựng lại mọi chỉ báo, vẫn phải nằm ở nơi khác.
+\paragraph{Điểm yếu đối với bài toán này.} Cassandra là kho \emph{theo truy vấn}: mỗi câu hỏi cần một bảng thiết kế riêng, ngoài ra một truy vấn chưa được lường trước (ví dụ so sánh hai giai đoạn tùy ý hoặc gộp theo tuần) không thể trả lời bằng truy vấn tùy biến mà phải thêm bảng và nạp lại dữ liệu. Cassandra không có phép nối và gộp tự do. Việc giữ toàn bộ lịch sử thô cho mục đích xử lý lại cũng không phù hợp với một kho tối ưu cho ghi và tra cứu theo khóa. Hơn nữa, dữ liệu bronze (nguồn để dựng lại mọi indicator) vẫn phải nằm ở nơi khác.
 
-\paragraph{Cách so sánh.} Benchmark \#2 (Mục~\ref{sec:5-bench-lookups}) chạy \emph{cùng một câu hỏi} của bảng điều khiển (lịch sử một thửa ruộng, so sánh nhiều thửa ruộng) trên Cassandra và trên Trino, đo độ trễ p50 và p95 theo số truy vấn đồng thời. Kết quả: với câu hỏi gần thời gian thực, Cassandra nhanh hơn Trino khoảng 15 lần ở một máy khách và 23 đến 42 lần ở 10 máy khách (Bảng~\ref{tab:5-bench-lookups}), nhưng phải thêm bảng cho mỗi câu hỏi phân tích; Mục~\ref{sec:5-comparison-storage} đối chiếu hai phương án.
+\paragraph{Cách so sánh.} Benchmark \#2 (Mục~\ref{sec:5-bench-lookups}) chạy \emph{cùng một truy vấn} của bảng điều khiển (lịch sử một thửa ruộng, so sánh nhiều thửa ruộng) trên Cassandra và trên Trino, đo độ trễ p50 và p95 theo số truy vấn đồng thời. Mục~\ref{sec:5-comparison-storage} đối chiếu kết quả với phương án này.
 
-\subsection{Phương án C: khoảng trigger khác, hoặc xử lý từng sự kiện}
+\subsection{Phương án C: đổi chu kỳ trigger hoặc xử lý từng sự kiện}
 \label{sec:4-alt-trigger}
 
-\paragraph{Mô tả.} Giải pháp chính chạy micro-batch với trigger 30 giây (Mục~\ref{sec:5-params}). Phương án C có hai dạng. Dạng thứ nhất giữ Spark nhưng đổi \code{TRIGGER\_INTERVAL} thành 10 giây hoặc 60 giây, chỉ là một biến môi trường. Dạng thứ hai là xử lý từng sự kiện ngay khi đến, theo kiểu Apache Flink (Mục~\ref{sec:2-three-models}); dạng này chỉ được phân tích, không xây dựng, vì Flink nằm ngoài bảng quyết định công nghệ của đề tài.
+\paragraph{Mô tả.} Giải pháp chính chạy micro-batch với trigger 30 giây (Mục~\ref{sec:5-params}). Phương án C có 2 dạng. Dạng thứ nhất giữ Spark nhưng đổi \code{TRIGGER\_INTERVAL} thành 10 giây hoặc 60 giây. Dạng thứ hai là xử lý từng sự kiện ngay khi đến theo kiểu Apache Flink (Mục~\ref{sec:2-three-models}); dạng này chỉ được phân tích, không xây dựng vì Flink nằm ngoài bảng quyết định công nghệ của đề tài.
 
-\paragraph{Đánh đổi theo thiết kế.} Trigger ngắn hơn làm dữ liệu và cảnh báo đến bảng điều khiển sớm hơn, nhưng mỗi lô là một lần \code{MERGE} vào bronze và các bảng \code{ops}, tức là một commit Iceberg và thêm tệp nhỏ; chi phí cố định của mỗi lô (đọc trạng thái từ Cassandra, lập kế hoạch truy vấn Spark) cũng lặp lại nhiều hơn. Trigger dài hơn thì ngược lại, và vì cảnh báo cần 2 lô vi phạm liên tiếp (debounce), độ trễ cảnh báo tăng gần gấp đôi chu kỳ. Xử lý từng sự kiện cho độ trễ cỡ mili-giây, nhưng Iceberg không ghi được từng dòng một cách hiệu quả nên vẫn phải gom lô trước khi ghi lakehouse, và trạng thái debounce, cooldown phải chuyển vào bộ nhớ trạng thái của engine luồng.
+\paragraph{Đánh đổi theo thiết kế.} Chu kỳ trigger ngắn hơn đưa dữ liệu và cảnh báo đến bảng điều khiển sớm hơn, nhưng mỗi lô là một lần \code{MERGE} vào bronze và các bảng \code{ops}, tức một commit Iceberg và thêm các tệp nhỏ. Chi phí cố định của mỗi lô (đọc trạng thái từ Cassandra, lập kế hoạch truy vấn Spark) cũng lặp lại thường xuyên hơn. Chu kỳ dài hơn thì ngược lại; hơn nữa, vì cảnh báo cần 2 lô vi phạm liên tiếp (debounce), độ trễ cảnh báo xấp xỉ gấp đôi chu kỳ. Xử lý từng sự kiện cho độ trễ cỡ mili-giây, nhưng Iceberg không ghi từng dòng một cách hiệu quả nên vẫn phải gom lô trước khi ghi vào lakehouse; ngoài ra trạng thái debounce và cooldown phải chuyển vào bộ nhớ trạng thái của engine luồng.
 
-\paragraph{Cách so sánh.} Benchmark \#1 (Mục~\ref{sec:5-bench-trigger}) chạy cùng tải mô phỏng với trigger 10, 30 và 60 giây, đo độ trễ đầu-cuối, độ trễ cảnh báo mất kết nối, thời gian xử lý mỗi lô, CPU, bộ nhớ và số commit Iceberg; Mục~\ref{sec:5-comparison-trigger} đối chiếu các phương án.
+\paragraph{Cách so sánh.} Benchmark \#1 (Mục~\ref{sec:5-bench-trigger}) chạy cùng tải mô phỏng với trigger 10, 30 và 60 giây, đo độ trễ đầu-cuối, độ trễ cảnh báo mất kết nối, thời gian xử lý mỗi lô, CPU, bộ nhớ và số commit Iceberg. Mục~\ref{sec:5-comparison-trigger} đối chiếu các phương án.
 
 \subsection{Kết luận về lựa chọn}
 \label{sec:4-alt-conclusion}
 
-Hai phương án A và B đơn giản hơn giải pháp chính, nhưng mỗi phương án bỏ mất một thứ mà tài liệu yêu cầu: Hive/Parquet bỏ mất giao dịch, ghi idempotent và time travel (BR3, BR4, BR6); Cassandra-only bỏ mất khả năng phân tích tùy ý trên toàn bộ lịch sử (BR5, BR6). Phương án C cho thấy 30 giây là điểm cân bằng giữa độ trễ và chi phí ghi, không phải một giới hạn của công nghệ. Giải pháp chính trả giá bằng độ phức tạp, được đánh giá ở Mục~\ref{sec:5-comparison}.
+Hai phương án A và B đơn giản hơn giải pháp chính, nhưng mỗi phương án bỏ mất một thứ mà đề tài cần: Hive/Parquet bỏ mất giao dịch, ghi idempotent và time travel (BR3, BR4, BR6); Cassandra-only bỏ mất khả năng phân tích tùy ý trên toàn bộ lịch sử (BR5, BR6). Phương án C cho thấy 30 giây là điểm cân bằng giữa độ trễ và chi phí ghi, không phải một giới hạn của công nghệ. Giải pháp chính trả giá bằng độ phức tạp, được đánh giá ở Mục~\ref{sec:5-comparison}.

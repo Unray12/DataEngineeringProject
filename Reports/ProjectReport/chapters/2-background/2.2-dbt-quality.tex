@@ -1,7 +1,7 @@
-\section{dbt và kỹ thuật bảo đảm chất lượng dữ liệu}
+\section{Quản lý chất lượng dữ liệu với dbt}
 \label{sec:2-dbt-quality}
 
-Phần trên giải thích cách dữ liệu được đưa vào hệ thống theo từng micro-batch. Mục này trình bày nhóm kỹ thuật bảo đảm dữ liệu đó \emph{đáng tin cậy}: kiến trúc phân tầng medallion, công cụ biến đổi dbt, cách kiểm định, cách ly bản ghi lỗi và lưu vết nguồn gốc (lineage). Đây là cơ sở cho yêu cầu BR4 và cho phần đánh giá tính đúng đắn ở Chương~\ref{chap:5-evaluation}.
+Một số đo sai hoặc bị trùng có thể dẫn đến một quyết định sai như xác định nhầm lượng nước cần tưới hoặc bỏ sót một thiết bị hỏng. Vì vậy, bên cạnh việc xử lý nhanh, hệ thống còn phải bảo đảm chất lượng và nguồn gốc của dữ liệu. Các kỹ thuật chính gồm phân tầng dữ liệu theo kiến trúc medallion và biến đổi bằng dbt, kiểm định và cách ly bản ghi lỗi, lưu vết nguồn gốc (\emph{lineage}) và ghi idempotent.
 
 \subsection{Kiến trúc medallion}
 \label{sec:2-medallion}
@@ -14,16 +14,16 @@ Kiến trúc medallion chia kho dữ liệu thành ba tầng, mỗi tầng có m
   \item \textbf{Gold}: dữ liệu tổng hợp theo nhu cầu nghiệp vụ (theo ngày, theo thửa ruộng), sẵn sàng cho bảng điều khiển và phân tích.
 \end{itemize}
 
-Ưu điểm chính là \emph{tách bạch trách nhiệm}: lỗi ở tầng sau luôn có thể sửa bằng cách tính lại từ tầng trước, vì tầng bronze không bao giờ bị ghi đè bằng dữ liệu đã biến đổi. Trong đề tài, bronze được ghi bởi tác vụ Spark Structured Streaming, còn silver và gold được dựng bằng dbt.
+Ưu điểm chính của kiến trúc này là \emph{tách bạch trách nhiệm}: lỗi ở tầng sau luôn có thể sửa bằng cách tính lại từ tầng trước vì tầng bronze không bao giờ bị ghi đè bằng dữ liệu đã biến đổi. Trong đề tài, bronze được ghi bởi tác vụ Spark Structured Streaming, còn silver và gold được dựng bằng dbt.
 
 \subsection{dbt: biến đổi dữ liệu dưới dạng mã}
 \label{sec:2-dbt}
 
-dbt (data build tool) cho phép viết mỗi bước biến đổi thành một \emph{model}, tức một câu lệnh \code{SELECT} lưu trong tệp \code{.sql} \cite{dbt_docs}. dbt tự sinh câu lệnh tạo bảng, tự xác định thứ tự chạy nhờ hàm \code{ref()} và \code{source()}, và chạy câu lệnh trên một engine có sẵn. Đề tài dùng bộ chuyển đổi dbt-spark ở chế độ \code{session}: dbt mở một phiên Spark ngay trong container của nó (không qua Spark Thrift Server), nên Spark vẫn là engine thực thi và các bảng đích là bảng Iceberg.
+dbt (data build tool) cho phép viết mỗi bước biến đổi thành một \emph{model}, tức một câu lệnh \code{SELECT} lưu trong tệp \code{.sql} \cite{dbt_docs}. dbt tự sinh câu lệnh tạo bảng, tự xác định thứ tự chạy nhờ hàm \code{ref()} và \code{source()}, đồng thời chạy câu lệnh trên một engine có sẵn. Đề tài dùng bộ chuyển đổi dbt-spark ở chế độ \code{session}: dbt mở một phiên Spark ngay trong container của nó (không qua Spark Thrift Server), nên Spark vẫn là engine thực thi và các bảng đích là bảng Iceberg.
 
 Đoạn mã~\ref{lst:2-silver} là model silver của đề tài. Hàm cửa sổ \code{row\_number()} giữ lại đúng một bản ghi cho mỗi khóa \code{(device\_id, metric, measured\_at)}, ưu tiên bản ghi được nhận sau cùng.
 
-\begin{lstlisting}[language=SQL, caption={Model silver khử trùng lặp (\texttt{dbt/models/silver/sensor\_readings.sql}, rút gọn)}, label={lst:2-silver}]
+\begin{lstlisting}[language=SQL, caption={Model silver khử trùng lặp (rút gọn)}, label={lst:2-silver}]
 {{ config(materialized='table') }}
 with ranked as (
     select *,
@@ -47,7 +47,7 @@ where row_num = 1
 
 Mỗi model khai báo các \emph{test} trong tệp \code{schema.yml}. Một test là một câu truy vấn trả về các dòng vi phạm; test đạt khi kết quả rỗng. dbt cung cấp sẵn bốn test chung: \code{not\_null}, \code{unique}, \code{accepted\_values} và \code{relationships}. Đoạn mã~\ref{lst:2-silver-tests} là phần khai báo test của model silver.
 
-\begin{lstlisting}[caption={Test của model silver (\texttt{dbt/models/silver/schema.yml}, rút gọn)}, label={lst:2-silver-tests}]
+\begin{lstlisting}[caption={Test của model silver (rút gọn)}, label={lst:2-silver-tests}]
 models:
   - name: sensor_readings
     tests:
@@ -64,7 +64,7 @@ models:
                        relative_humidity, rainfall]
 \end{lstlisting}
 
-Lệnh \code{dbt build} chạy model và test theo đúng thứ tự phụ thuộc. Khi một test của model silver thất bại, các model gold phía sau bị bỏ qua (\emph{skip}) thay vì được dựng từ dữ liệu sai. Đây là cơ chế đề tài dùng để đáp ứng FR4.7: một test thất bại sẽ chặn lần làm mới tầng gold tương ứng.
+Lệnh \code{dbt build} chạy model và test theo đúng thứ tự phụ thuộc. Khi một test của model silver thất bại, các model gold phía sau bị bỏ qua (\emph{skip}) thay vì được dựng từ dữ liệu sai. Đây là cơ chế đề tài dùng để đáp ứng yêu cầu chức năng FR4.7 (xem Bảng~\ref{tab:3-fr}): một test thất bại sẽ chặn lần làm mới tầng gold tương ứng.
 
 \subsection{Kiểm định, cách ly và gắn cờ}
 \label{sec:2-validation}
@@ -72,13 +72,13 @@ Lệnh \code{dbt build} chạy model và test theo đúng thứ tự phụ thu�
 Không phải lỗi nào cũng nên xử lý giống nhau. Đề tài phân biệt hai mức:
 
 \begin{itemize}
-  \item \textbf{Lỗi cấu trúc} (payload không phải JSON, thiếu trường bắt buộc, thời gian không đọc được, giá trị không phải số, thiết bị không có trong danh mục, chỉ số không khai báo cho thiết bị): bản ghi không thể gán cho thửa ruộng và chỉ số nào, nên được \emph{cách ly} (quarantine) sang một bảng riêng kèm lý do và payload gốc. Tác vụ không dừng lại vì một bản ghi hỏng.
-  \item \textbf{Lỗi nội dung} (giá trị rỗng, ngoài khoảng vật lý, bước nhảy bất thường): bản ghi vẫn được lưu nhưng mang \emph{cờ chất lượng} (\code{quality\_flag}), để bảng điều khiển có thể loại bỏ hoặc đánh dấu. Bản ghi trùng trong cùng một lô được gắn cờ \code{duplicate}, chỉ một bản được ghi vào bronze, và số bản trùng được đếm trong \code{ops.quality\_counters}.
+  \item \textbf{Lỗi cấu trúc} (payload không phải JSON, thiếu trường bắt buộc, thời gian không đọc được, giá trị không phải số, thiết bị không có trong danh mục, chỉ số không khai báo cho thiết bị): bản ghi không thể gán cho thửa ruộng và chỉ số nào nên được \emph{cách ly} (quarantine) sang một bảng riêng kèm lý do và payload gốc. Tác vụ không dừng lại vì một bản ghi hỏng.
+  \item \textbf{Lỗi nội dung} (giá trị rỗng, ngoài khoảng vật lý, bước nhảy bất thường): bản ghi vẫn được lưu nhưng mang \emph{cờ chất lượng} (\code{quality\_flag}) để bảng điều khiển có thể loại bỏ hoặc đánh dấu. Bản ghi trùng trong cùng một lô được gắn cờ \code{duplicate}, chỉ một bản được ghi vào bronze và số bản trùng được đếm trong \code{ops.quality\_counters}.
 \end{itemize}
 
 Cách làm này giữ được toàn bộ bằng chứng: không có bản ghi nào bị xóa âm thầm, và số lượng của từng loại lỗi có thể đếm lại. Đoạn mã~\ref{lst:2-quarantine-ddl} là cấu trúc bảng cách ly.
 
-\begin{lstlisting}[language=SQL, caption={Bảng cách ly trên Iceberg (\texttt{src/streaming/ddl.py}, rút gọn)}, label={lst:2-quarantine-ddl}]
+\begin{lstlisting}[language=SQL, caption={Bảng cách ly trên Iceberg (rút gọn)}, label={lst:2-quarantine-ddl}]
 CREATE TABLE IF NOT EXISTS lakehouse.ops.quarantine (
     reason string NOT NULL,      -- invalid_json | missing_field | ...
     raw_payload string,          -- original payload, unchanged
@@ -99,7 +99,7 @@ Lineage là khả năng trả lời câu hỏi ``con số này đến từ đâu
 
 Mục~\ref{sec:2-checkpoint} cho thấy một lô có thể được chạy lại sau sự cố. Để kết quả không bị nhân đôi, mọi lệnh ghi phải \emph{idempotent}: chạy một lần hay nhiều lần cho cùng kết quả. Đề tài dùng lệnh \code{MERGE INTO} của Iceberg với khóa tự nhiên của từng bảng, như trong Đoạn mã~\ref{lst:2-merge}.
 
-\begin{lstlisting}[language=SQL, caption={Ghi idempotent bằng MERGE (\texttt{src/streaming/ddl.py})}, label={lst:2-merge}]
+\begin{lstlisting}[language=SQL, caption={Ghi idempotent bằng MERGE}, label={lst:2-merge}]
 MERGE INTO lakehouse.bronze.sensor_readings AS t
 USING src_bronze AS s
 ON t.device_id = s.device_id AND t.metric = s.metric

@@ -1,0 +1,25 @@
+Mỗi yêu cầu nghiệp vụ dẫn đến một nhu cầu cụ thể về dữ liệu, gồm nhóm người dùng đặt ra yêu cầu, câu hỏi họ cần trả lời, cách xử lý dữ liệu phù hợp và độ trễ họ có thể chấp nhận. Bảng~\ref{tab:3-needs} tóm tắt các nội dung trên của từng yêu cầu theo thứ tự từ BR1 đến BR8.
+
+{\small
+\begin{longtblr}[
+  caption = {Nhu cầu sử dụng dữ liệu theo yêu cầu nghiệp vụ},
+  label = {tab:3-needs},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[0.6,l]X[1.4,l]X[2.4,l]X[1.8,l]X[1.8,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+BR & Người dùng & Câu hỏi cần trả lời & Loại xử lý & Độ trễ chấp nhận \\
+BR1 & U1 quản lý trang trại, U2 nhân viên vận hành trang trại & Hiện có những trang trại, thửa ruộng và thiết bị nào? Tình trạng hiện tại của từng đơn vị là gì? Những thiết bị nào đang hoạt động? & Kết hợp danh mục tham chiếu (trang trại, thửa ruộng, thiết bị) với số đo và trạng thái mới nhất; lọc theo trang trại và thửa ruộng & Vài chục giây đến khoảng một phút; mỗi thông tin kèm thời điểm cập nhật \\
+BR2 & U2 nhân viên vận hành trang trại, U1 quản lý trang trại & Điều kiện hiện tại của từng thửa ruộng là gì? Số đo gần nhất được cập nhật lúc nào? Trong 24 giờ gần đây chỉ số thay đổi ra sao? & Xử lý luồng theo micro-batch; cập nhật giá trị mới nhất và chuỗi số đo gần đây theo thửa ruộng và chỉ số & Số đo phải xuất hiện trên API trong vòng 90 giây kể từ khi Kafka nhận sự kiện; giao diện phải cho biết thời điểm cập nhật \\
+BR3 & U4 nhóm quản lý dữ liệu, U2 nhân viên vận hành trang trại & Thiết bị nào đang ngừng báo cáo? Khoảng mất dữ liệu bắt đầu và kết thúc khi nào? Khi tác vụ xử lý dừng rồi chạy lại, dữ liệu có bị mất hoặc ghi trùng không? & Lưu đệm sự kiện trong Kafka để có thể phát lại; lưu checkpoint bền vững; ghi idempotent; phát hiện thiết bị ngừng báo cáo và lưu lại khoảng trống dữ liệu & Việc gián đoạn tạm thời không được làm mất dữ liệu; trạng thái thiết bị và khoảng trống dữ liệu phải được cập nhật ngay ở lô xử lý đầu tiên sau khi thiết bị vượt ngưỡng ngừng báo cáo \\
+BR4 & U4 nhóm dữ liệu, U3 nhà phân tích & Mỗi ngày có bao nhiêu bản ghi hợp lệ, trùng, ngoài khoảng, bị cách ly? Một giá trị cụ thể đến từ sự kiện và lô nào? & Kiểm định trong stream, đếm theo lô, tổng hợp theo ngày bằng dbt & Một lần làm mới bảng gold (theo giờ hoặc theo ngày) \\
+BR5 & U1 quản lý trang trại & Thửa ruộng nào đang thiếu nước? Mỗi thửa ruộng nằm trong khoảng mục tiêu bao nhiêu phần trăm thời gian? Thửa ruộng nào cần ưu tiên tưới? & Dùng dbt tổng hợp dữ liệu theo giờ và theo ngày, rồi so sánh với khoảng mục tiêu của từng loại cây trồng & Một lần làm mới gold (theo giờ cho trong ngày, theo ngày cho tổng kết) \\
+BR6 & U3 nhà phân tích, U1 quản lý & Tuần này khác tuần trước ra sao? Mùa này khác mùa trước thế nào? Báo cáo tôi xuất tháng trước nếu chạy lại có ra đúng số cũ không? & Truy vấn theo khoảng ngày trên toàn bộ lịch sử, so sánh giai đoạn, xem lại snapshot cũ & Vài giây cho một truy vấn tương tác; dữ liệu theo lần làm mới gần nhất \\
+BR7 & U1 quản lý trang trại, U3 nhà phân tích dữ liệu & Giá trị trung bình của từng chỉ số trong kỳ này so với kỳ trước như thế nào? Thửa ruộng nào cao nhất, thấp nhất? Hiện có điều gì cần chú ý ngay? & Tổng hợp theo khoảng thời gian, so sánh giữa các thửa ruộng và giữa hai kỳ liên tiếp, diễn đạt kết quả bằng câu mô tả; xuất bảng kết quả dưới dạng tệp CSV & Số liệu phân tích theo lần làm mới gần nhất (theo giờ hoặc theo ngày); phần cần chú ý theo trạng thái hiện tại \\
+BR8 & U2 vận hành viên, U1 quản lý & Thửa ruộng nào đang có điều kiện bất thường? Thiết bị nào mất kết nối? Ai đã xử lý cảnh báo, khi nào? & Luật đánh giá trên từng micro-batch, trạng thái cảnh báo trong Cassandra & Một đến hai chu kỳ trigger cộng thời gian debounce (khoảng 1--2 phút) \\
+\end{longtblr}
+}
+
+Các nhu cầu này khác nhau chủ yếu ở độ mới của dữ liệu. BR1, BR2, BR3 và BR8 cần số liệu trong vòng khoảng một đến hai phút. BR4, BR5 và BR6 chấp nhận độ trễ của một lần làm mới tầng gold, trong đó BR5, BR6 còn cần toàn bộ lịch sử. BR7 gồm cả hai loại: phần tóm tắt và so sánh theo kỳ dùng số liệu phân tích, còn phần cần chú ý ngay dựa trên trạng thái hiện tại.
