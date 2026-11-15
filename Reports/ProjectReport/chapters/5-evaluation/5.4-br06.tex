@@ -1,0 +1,37 @@
+% Phần BR6 của Mục 5.4 (người phụ trách: Khang).
+\subsection{BR6 -- Đánh giá lịch sử và lập kế hoạch}
+\label{sec:5-eff-br06}
+
+{\small
+\begin{longtblr}[
+  caption = {Tiêu chí chấp nhận của BR6 và bằng chứng},
+  label = {tab:5-eff-br06},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[2.0,l]X[3.6,l]X[0.9,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Lịch sử đầy đủ còn truy vấn được & Ngày 11/11, bronze có 41\,179 dòng trên 12 ngày có dữ liệu trong khoảng 24/10--10/11/2026 (bộ mô phỏng không chạy liên tục) và \code{field\_daily} có 480 dòng cho 12 ngày đó; sau các benchmark ngày 12/11 và \code{just batch-run}, bronze có 108\,837 dòng trên 13 ngày và \code{field\_daily} có 520 dòng. Dữ liệu mô phỏng chỉ trải trên một khoảng ngắn nên đây là bằng chứng về cơ chế, không phải về số lượng. & Đạt \\
+Bảng phân vùng theo ngày & \texttt{"sensor\_readings\$partitions"} của bronze: một phân vùng cho mỗi ngày có dữ liệu (12 ngày 11/11, 13 ngày 12/11). Ba bảng gold (\code{field\_hourly}, \code{field\_daily}, \code{field\_indicators}): mỗi bảng 12 phân vùng sau \code{just dbt-full-refresh}, và 13 sau lần \code{just batch-run} ngày 12/11 (phân vùng của ngày mới được thêm theo kiểu incremental). & Đạt \\
+So sánh hai giai đoạn cho ra chênh lệch đúng & Thửa ruộng F001, độ ẩm đất, 9--10/11 so với 7--8/11: truy vấn Trino (Đoạn mã~\ref{lst:4-period-sql}) cho 44,79 và 50,00, chênh $-5,21$ điểm phần trăm; giao diện hiển thị cùng ba số (Hình~\ref{fig:4-br06-ui}). & Đạt \\
+Tái tạo được một báo cáo cũ giống hệt & Sau lần đổi khoảng mục tiêu (Bảng~\ref{tab:5-target-change}) bảng \code{field\_indicators} có snapshot \code{696495655738651514}. Đọc bảng ở snapshot này (\code{FOR VERSION AS OF}) trả về 0,0\% và 18 giờ cho độ ẩm đất của F002 trong 12 ngày 24/10--10/11, trong khi đọc bản hiện tại cho cùng 12 ngày trả về 100,0\% và 0 giờ. Snapshot này vẫn đọc được sau khi \code{just batch-run} ngày 12/11 thêm snapshot mới, với cùng kết quả. & Đạt \\
+Lịch sử 90 ngày trong thời gian thỏa thuận & \code{GET /fields/F001/history} cho 90 ngày theo ngày: p50 53,0 ms, p95 83,2 ms (30 lần đo, trực tiếp trên FastAPI). Điểm cuối \code{/api/analytics} của ứng dụng web, gộp ba lời gọi lịch sử và indicator cùng 8 lời gọi so sánh, không dùng bộ nhớ đệm: p50 153 ms, p95 175 ms (11 lần đo). & Đạt \\
+\end{longtblr}
+}
+
+\paragraph{Trọng số của trung bình.} Giai đoạn 9--10/11 của F001 có số bản ghi hợp lệ khác nhau giữa hai ngày (581 bản ghi ngày 9/11 và 296 bản ghi ngày 10/11). Trung bình có trọng số theo \code{valid\_count} là 44,79, còn trung bình đơn giản của hai trung bình ngày là 44,51. Giá trị có trọng số (44,78565) trùng với trung bình tính thẳng từ silver, nên cách tính này được giữ cho cả giao diện và truy vấn đối chiếu.
+
+\paragraph{Time travel trên gold.} Kết quả ở dòng thứ tư của Bảng~\ref{tab:5-eff-br06} phụ thuộc vào việc các model gold là incremental \code{merge}: mỗi lần làm mới thêm một snapshot cho cùng một bảng. Nếu gold là bảng \code{materialized='table'} thì dbt xóa rồi tạo lại bảng ở mỗi lần chạy và lịch sử snapshot không được giữ, nên đây là lý do model được viết theo kiểu \code{merge} (Mục~\ref{sec:4-gold}); báo cáo chưa chạy thử phương án \code{table} để đo cụ thể. Ba snapshot sau \code{just dbt-full-refresh} (tạo bảng, đổi khoảng mục tiêu, trả lại khoảng mục tiêu) đều đọc được. Lưu ý một chi phí: chạy \code{just dbt-full-refresh} là việc duy nhất làm mất lịch sử snapshot của gold, nên chỉ nên chạy khi đổi cách phân vùng hoặc cột.
+
+\paragraph{Giới hạn của dữ liệu.} Bộ mô phỏng chỉ sinh dữ liệu trên một khoảng ngắn và thưa (nhiều ngày chỉ có một bản ghi), nên không có hai mùa vụ thật để so sánh và một số khoảng so sánh giai đoạn không có dữ liệu ở giai đoạn trước (giao diện hiển thị ``no data'' thay vì số 0). Tiêu chí về mùa vụ vì vậy chỉ chứng minh được \emph{cơ chế}: tổng hợp theo tuần và so sánh hai khoảng cùng độ dài. Báo cáo ghi nhận đây là một hạn chế (Mục~\ref{sec:6-limits}). Nếu cần minh họa tốt hơn, có thể nạp trước một lịch sử mô phỏng dài hơn trước khi dựng gold, nhưng đó vẫn là dữ liệu mô phỏng chứ không phải mùa vụ thật.
+
+\paragraph{Kịch bản minh họa.} Nhà phân tích chọn F001, so hai ngày gần nhất với hai ngày trước đó, và thấy độ ẩm đất trung bình giảm 5,2 điểm phần trăm. Họ chạy truy vấn time travel trên bảng \code{field\_indicators} tại snapshot đã ghi lúc xuất báo cáo và nhận lại đúng số liệu cũ, kể cả khi dữ liệu và khoảng mục tiêu đã đổi sau đó.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{analytics-period.png}
+\caption{Trang Analytics: so sánh 9--10/11 với 7--8/11 của F001 (độ ẩm đất trung bình 44,8\% so với 50,0\%)}
+\label{fig:4-br06-ui}
+\end{figure}

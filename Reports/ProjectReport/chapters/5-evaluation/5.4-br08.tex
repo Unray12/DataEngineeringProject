@@ -1,0 +1,30 @@
+% Phần BR8 của Mục 5.4 (người phụ trách: Tịnh).
+\subsection{BR8 -- Ứng phó sớm với rủi ro}
+\label{sec:5-eff-br08}
+
+Bảng~\ref{tab:5-eff-br08} đối chiếu các tiêu chí chấp nhận của BR8 với bằng chứng.
+
+{\small
+\begin{longtblr}[
+  caption = {Tiêu chí chấp nhận của BR8 và bằng chứng},
+  label = {tab:5-eff-br08},
+]{
+  width = \linewidth,
+  rowhead = 1,
+  colspec = {X[2.6,l]X[2.6,l]X[2,c]}, rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Một lần vượt ngưỡng mô phỏng tạo đúng một cảnh báo, trong một đến hai chu kỳ trigger cộng thời gian debounce & Số cảnh báo trong \code{alerts\_by\_field} cho điều kiện đó; thời điểm cảnh báo trừ thời điểm của số đo vi phạm đầu tiên & Đạt: gửi các số đo độ ẩm đất 24\% cho thửa lúa F001 trong 105 giây; có đúng 1 cảnh báo \code{low soil moisture}, xuất hiện sau 44 giây (lần đo thứ hai: 43 giây) \\
+Một lần mất kết nối mô phỏng tạo đúng một cảnh báo và cảnh báo tự đóng khi có dữ liệu lại & Cảnh báo \code{device\_offline} với \code{resolution = condition\_cleared}; bản ghi khoảng trống trong \code{ops.device\_gaps} & Đạt: 16 sự cố đã kết thúc trong benchmark \#1 tạo đúng 16 cảnh báo, cả 16 tự đóng với \code{condition\_cleared} \\
+Vận hành viên acknowledge và resolve cảnh báo qua API, lịch sử được giữ & \code{PATCH /alerts/\{id\}}; các cột \code{acknowledged\_by}, \code{resolved\_by}, \code{note} trong \code{alerts\_by\_field} & Đạt: cảnh báo chuyển từ open sang acknowledged rồi resolved; tên người thao tác, thời điểm và ghi chú được lưu \\
+Chuyển trạng thái không hợp lệ bị từ chối & API trả 409 khi acknowledge một cảnh báo đã đóng & Đạt: \code{PATCH} \code{acknowledge} lên một cảnh báo \code{resolved} trả 409 \\
+Không có bão cảnh báo khi điều kiện kéo dài & Số cảnh báo cho một điều kiện vi phạm liên tục trong tới 6,5 phút (thiết bị im lặng 391 giây, khoảng 13 lô) & Đạt: 1 cảnh báo cho mỗi sự cố \\
+\end{longtblr}
+}
+
+\paragraph{Cách đo độ trễ cảnh báo.} Với trigger 30 giây và debounce 2 lô, độ trễ lý thuyết từ số đo vi phạm đầu tiên đến khi cảnh báo xuất hiện nằm trong khoảng 30--90 giây cộng thời gian xử lý một lô. Benchmark \#1 (Mục~\ref{sec:5-bench-trigger}) đo giá trị này cho cảnh báo mất kết nối với trigger 10, 30 và 60 giây: p50 lần lượt 16,9, 48,0 và 95,1 giây, lớn nhất 130,5 giây, và không sự cố nào bị bỏ sót (13 sự cố). Với trigger 30 giây, cảnh báo xuất hiện sau khoảng 48 giây, trong khoảng lý thuyết.
+
+Với cảnh báo vượt ngưỡng, phép đo trực tiếp qua service tiếp nhận cho kết quả 44 và 43 giây ở hai lần đo khi tác vụ đã ổn định, mỗi lần chỉ có đúng một cảnh báo. Một lần đo khác ngay sau khi khởi động tác vụ, khi tác vụ còn đang xử lý lượng tồn đọng (lô đầu tiên mất 144,5 giây), cho 103 giây, vì các lô đầu chậm hơn nhiều so với chu kỳ trigger. Vì vậy tiêu chí về độ trễ chỉ có ý nghĩa khi tác vụ đã bắt kịp Kafka.
+
+\paragraph{Kịch bản minh họa.} Trong lúc bộ mô phỏng chạy bình thường, các số đo độ ẩm đất 24\% của thiết bị F001-S01 (thửa lúa F001, ngưỡng cảnh báo 32\%) được gửi qua service tiếp nhận mỗi 1,5 giây. Sau khoảng 45 giây, trang \emph{Alerts} hiện cảnh báo độ ẩm đất thấp của F001 (Hình~\ref{fig:4-br08-ui}). Vận hành viên acknowledge cảnh báo, rồi resolve kèm ghi chú; ghi chú được lưu ở bước resolve, còn bước acknowledge chỉ lưu người thao tác và thời điểm. Một lần acknowledge nữa lên cảnh báo đã đóng bị API từ chối với mã 409. Cảnh báo mất kết nối tự đóng khi thiết bị gửi dữ liệu trở lại, như đã đo ở benchmark \#1.

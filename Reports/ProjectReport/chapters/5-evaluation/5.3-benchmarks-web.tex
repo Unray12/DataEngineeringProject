@@ -8,7 +8,7 @@
 
 \begin{table}[H]
 \centering
-\caption{Độ trễ của các endpoint FastAPI, 30 lần đo tuần tự (\texttt{benchmarks/results/web.csv})}
+\caption{Độ trễ của các endpoint FastAPI, 30 lần đo tuần tự}
 \label{tab:5-bench-web-api}
 \small
 \begin{tblr}{
@@ -31,7 +31,7 @@ Endpoint & Kho & p50 (ms) & p95 (ms) \\
 
 \begin{table}[H]
 \centering
-\caption{Thời gian tới khi dữ liệu của trang sẵn sàng, p50 / p95 (ms) (\texttt{benchmarks/results/web\_pages.csv}); cột cuối là lần đo với máy chủ phát triển \code{next dev} trước khi sửa (\texttt{web\_pages\_dev\_mode.csv})}
+\caption[Thời gian tới khi dữ liệu của trang sẵn sàng, p50 / p95 (ms)]{Thời gian tới khi dữ liệu của trang sẵn sàng, p50 / p95 (ms); cột cuối là lần đo với máy chủ phát triển \code{next dev} trước khi sửa}
 \label{tab:5-bench-web-pages}
 \small
 \begin{tblr}{
@@ -50,7 +50,7 @@ Thửa ruộng F001 & 11 & 20 / 26 & 2\,674 \\
 \end{tblr}
 \end{table}
 
-\paragraph{Kết quả.} Các endpoint đọc một phân vùng Cassandra trả lời trong 3--10 ms ở p50 (tối đa 13 ms ở p95), đúng mục tiêu ``cỡ mười mili-giây''; riêng \code{/devices} mất khoảng 107 ms vì gửi tuần tự 32 truy vấn (một cho mỗi thiết bị và mỗi thửa ruộng). Các endpoint phân tích trên gold trả lời trong khoảng 25--80 ms, phù hợp với kết quả của benchmark \#2. Mọi trang có dữ liệu trong vòng khoảng 130 ms ở p95. Từ trang tổng quan, người quản lý tới tóm tắt của một thửa ruộng bằng \textbf{1 lần nhấp} (mỗi dòng thửa ruộng là một liên kết tới \code{/fields/\{id\}}), đạt tiêu chí ``trong vài lần nhấp'' của BR7; điều này được kiểm tra trực tiếp trên giao diện.
+\paragraph{Kết quả.} Các endpoint đọc một phân vùng Cassandra trả lời trong 3--10 ms ở p50 (tối đa 13 ms ở p95), đạt mục tiêu ``vài chục mili-giây'' của NFR2 (Bảng~\ref{tab:3-nfr}); riêng \code{/devices} mất khoảng 107 ms vì gửi tuần tự 32 truy vấn (một cho mỗi thiết bị và mỗi thửa ruộng). Các endpoint phân tích trên gold trả lời trong khoảng 25--80 ms, phù hợp với kết quả của benchmark \#2. Mọi trang có dữ liệu trong vòng khoảng 130 ms ở p95. Từ trang tổng quan, người quản lý tới tóm tắt của một thửa ruộng bằng \textbf{1 lần nhấp} (mỗi dòng thửa ruộng là một liên kết tới \code{/fields/\{id\}}), đạt tiêu chí ``trong vài lần nhấp'' của BR7; điều này được kiểm tra trực tiếp trên giao diện.
 
 \paragraph{Hai vấn đề được phát hiện và sửa.} Lần chạy đầu cho kết quả kém hơn nhiều, và cả hai nguyên nhân đều nằm ở cách triển khai chứ không ở thiết kế:
 

@@ -3,8 +3,8 @@
   "farms": [
     {"farm_id": "FM001", "name": "Suoi Tien Farm", "location": "HCMC"},
     {"farm_id": "FM002", "name": "Tan Lap Farm", "location": "Dong Nai"},
-    {"farm_id": "FM003", "name": "Binh Minh Farm", "location": "Long An"},
-    {"farm_id": "FM004", "name": "My Tho Farm", "location": "Tien Giang"}
+    {"farm_id": "FM003", "name": "Binh Minh Farm", "location": "Tay Ninh"},
+    {"farm_id": "FM004", "name": "My Tho Farm", "location": "Dong Thap"}
   ],
   "fields": [
     {"field_id": "F001", "farm_id": "FM001", "name": "F001 North Paddy", "crop_code": "RICE", "area_ha": 2.4},

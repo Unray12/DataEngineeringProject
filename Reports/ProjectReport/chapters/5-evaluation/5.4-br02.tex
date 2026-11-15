@@ -1,0 +1,31 @@
+% Phần BR2 của Mục 5.4 (người phụ trách: Nhân).
+
+\subsection{BR2 -- Nâng cao nhận biết điều kiện đồng ruộng}
+\label{sec:5-eff-br02}
+
+Bảng~\ref{tab:5-eff-br02} đối chiếu hai tiêu chí chấp nhận của BR2 với kết quả đo trên hệ thống.
+
+\begin{table}[H]
+\centering
+\caption{Tiêu chí chấp nhận của BR2 và bằng chứng}
+\label{tab:5-eff-br02}
+\small
+\begin{tblr}{
+  colspec = {X[2.5,l]X[3.7,l]X[0.8,c]},
+  rows = {abovesep=2pt, belowsep=2pt},
+  hlines, vlines,
+  row{1} = {font=\bfseries, bg=gray!20},
+}
+Tiêu chí chấp nhận & Bằng chứng & Kết quả \\
+Trong tải bình thường, số đo xuất hiện trên API trong vòng 90 giây kể từ khi Kafka nhận &
+Benchmark \#1 với trigger 30 giây: độ trễ đầu-cuối p50 22,7 s, p95 35,8 s và lớn nhất 36,9 s (Mục~\ref{sec:5-bench-trigger}) &
+Đạt \\
+Mỗi panel trên bảng điều khiển cho biết thời điểm dữ liệu được cập nhật &
+Trang Live hiển thị \emph{Data as of}; dữ liệu gần thời gian thực chưa được cập nhật trong 90 giây được đánh dấu stale (Mục~\ref{sec:4-ui}) &
+Đạt \\
+\end{tblr}
+\end{table}
+
+Kết quả benchmark cho thấy giới hạn 90 giây còn dư đáng kể. Ở trigger 30 giây, ngay cả giá trị lớn nhất 36,9 giây chỉ bằng khoảng 41\% mục tiêu. Endpoint \code{/fields/\{id\}/latest} có p50 3,7 ms và endpoint chuỗi 24 giờ có p50 10,1 ms, vì vậy thời gian chờ chủ yếu đến từ chu kỳ micro-batch chứ không phải từ lớp API hay Cassandra.
+
+Về mặt sử dụng, trang Live cung cấp đủ bốn thành phần của FR2.4: giá trị hiện tại, đơn vị và trạng thái so với khoảng mục tiêu, xu hướng gần đây và thời điểm cập nhật. Người vận hành không cần truy cập Kafka hay cơ sở dữ liệu để biết số liệu vừa được cập nhật khi nào.

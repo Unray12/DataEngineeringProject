@@ -1,8 +1,10 @@
-\section{So sánh, trường hợp sử dụng và đánh đổi}
+\subsection{So sánh, trường hợp sử dụng và đánh đổi}
 \label{sec:2-compare}
 
-\subsection{So sánh ba mô hình xử lý}
+\subsubsection{So sánh ba mô hình xử lý}
 \label{sec:2-three-models}
+
+Bảng~\ref{tab:2-compare} so sánh ba mô hình theo đơn vị xử lý, độ trễ, thông lượng và độ phức tạp. Micro-batch có vị trí cân bằng giữa hai mô hình còn lại: độ trễ thấp hơn xử lý theo lô nhưng đơn giản và ít tốn kém hơn xử lý luồng.
 
 \begin{table}[H]
 \centering
@@ -10,7 +12,7 @@
 \label{tab:2-compare}
 \small
 \begin{tblr}{
-  colspec = {X[1.2,l]X[2,l]X[2,l]X[2,l]}, rows = {abovesep=2pt, belowsep=2pt},
+  colspec = {X[1.1,l]X[2.2,l]X[2.2,l]X[2.2,l]}, rows = {abovesep=2pt, belowsep=2pt},
   hlines, vlines, row{1} = {font=\bfseries, bg=gray!20},
 }
 Tiêu chí & Xử lý theo lô & Micro-batch & Xử lý luồng \\
@@ -22,12 +24,14 @@ Phù hợp với & ETL, báo cáo, phân tích lịch sử & Dashboard, ETL tăn
 \end{tblr}
 \end{table}
 
-\subsection{Trường hợp sử dụng}
+\subsubsection{Trường hợp sử dụng}
 \label{sec:2-usecases}
-Micro-batch thường dùng cho: phân tích gần thời gian thực, xử lý nhật ký, giám sát IoT, ETL tăng dần vào kho dữ liệu, và các pipeline học máy.
+Micro-batch thường dùng cho: phân tích gần thời gian thực, xử lý nhật ký, giám sát IoT, ETL tăng dần vào kho dữ liệu và các pipeline học máy.
 
-\subsection{Được và mất}
+\subsubsection{Được và mất}
 \label{sec:2-tradeoffs}
+
+Bảng~\ref{tab:2-tradeoffs} tóm tắt những lợi ích và chi phí khi áp dụng micro-batch.
 
 \begin{table}[H]
 \centering
@@ -45,6 +49,6 @@ Rẻ và đơn giản hơn xử lý luồng thực sự & Chu kỳ càng ngắn 
 \end{tblr}
 \end{table}
 
-\subsection{Liên hệ với đề tài}
+\subsubsection{Liên hệ với đề tài}
 \label{sec:2-link}
-Dữ liệu nông nghiệp như độ ẩm đất hay nhiệt độ biến thiên chậm, kết nối LoRaWAN dễ gián đoạn, và yêu cầu nghiệp vụ thường chấp nhận độ trễ từ vài giây đến vài chục giây. Các đặc điểm này phù hợp với micro-batch: tránh chi phí của xử lý luồng thuần túy mà vẫn bảo đảm tính liên tục và đúng đắn của dữ liệu. Việc áp dụng cụ thể được trình bày ở Chương~\ref{chap:4-design}.
+Dữ liệu nông nghiệp có hai đặc điểm phù hợp với micro-batch. Độ ẩm đất hay nhiệt độ biến thiên chậm nên độ trễ từ vài giây đến vài chục giây vẫn đủ đáp ứng nhu cầu của người dùng. Mặt khác, kết nối LoRaWAN dễ gián đoạn nên hệ thống cần xử lý lại được những lô bị gián đoạn mà không làm mất hay trùng dữ liệu. Micro-batch đáp ứng được cả hai yêu cầu này mà không phải chịu chi phí của xử lý luồng thuần túy.

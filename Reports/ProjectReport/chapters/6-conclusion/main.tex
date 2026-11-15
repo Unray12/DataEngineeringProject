@@ -2,10 +2,45 @@
 \label{chap:6-conclusion}
 
 \section{Kết quả đạt được}
-% TODO
+\label{sec:6-results}
+
+Đề tài đã xây dựng và đánh giá một giải pháp kỹ thuật dữ liệu cho giám sát nông nghiệp, đáp ứng tám yêu cầu nghiệp vụ đã xác định ở Chương~\ref{chap:3-requirements}. Dữ liệu cảm biến mô phỏng đi qua service tiếp nhận vào Kafka, được Spark Structured Streaming xử lý theo micro-batch 30 giây rồi ghi vào Cassandra cho bảng điều khiển gần thời gian thực và vào Iceberg trên HDFS làm dữ liệu gốc. Từ đó dbt dựng các tầng silver và gold, Trino phục vụ truy vấn phân tích, và FastAPI cùng ứng dụng web chuyển kết quả thành thông tin mà người quản lý đọc được mà không phải chạm vào Kafka, Spark hay SQL (Chương~\ref{chap:4-design}).
+
+Kết quả đánh giá ở Chương~\ref{chap:5-evaluation} cho thấy cả 8 yêu cầu đạt tiêu chí chấp nhận (Mục~\ref{sec:5-effectiveness}), riêng FR7.4 chỉ đáp ứng một phần. Các kết quả chính gồm:
+
+\begin{itemize}
+  \item \textbf{Dữ liệu đáng tin cậy.} 601/601 lỗi do bộ mô phỏng sử dụng fault injection bị phát hiện và phân loại đúng; 520/520 dòng của bảng gold ngày khớp với tầng silver và không có giá trị phi lý nào lọt vào gold; khi một test silver thất bại, các model gold phụ thuộc không được làm mới (Mục~\ref{sec:5-correctness}).
+  \item \textbf{Liên tục và không mất dữ liệu.} Qua ba kịch bản dừng có trật tự hoặc dừng đột ngột tác vụ streaming trong khi dữ liệu vẫn đến, không message nào trong 9\,224 message bị mất hay trùng. Cơ chế nguồn phát lại được, checkpoint và ghi idempotent theo khóa tự nhiên cho kết quả tương đương exactly-once ở mức logic.
+  \item \textbf{Độ trễ đáp ứng yêu cầu.} Với trigger 30 giây, số đo xuất hiện trên API sau 35,8 giây ở p95, thấp hơn mục tiêu 90 giây; cảnh báo vượt ngưỡng xuất hiện sau khoảng 43--44 giây và cảnh báo mất kết nối sau khoảng 48 giây, mỗi sự cố chỉ có một cảnh báo.
+  \item \textbf{Phản hồi nhanh cho người dùng.} Các endpoint đọc Cassandra trả lời trong vài chục mili-giây, các endpoint phân tích trên gold trong khoảng 25--80 ms, và mọi trang của ứng dụng có dữ liệu sẵn sàng trong vòng khoảng 130 ms ở p95; từ trang tổng quan tới tóm tắt của một thửa ruộng chỉ cần một lần nhấp (Mục~\ref{sec:5-performance}).
+  \item \textbf{Lịch sử tái tạo được.} Nhờ Iceberg và các model gold dạng incremental, một báo cáo cũ được đọc lại đúng số liệu tại thời điểm đã xuất dù khoảng mục tiêu hay dữ liệu đã thay đổi sau đó.
+\end{itemize}
+
+Các phép so sánh với phương án thay thế (Mục~\ref{sec:5-comparison}) xác nhận các lựa chọn công nghệ của giải pháp chính.
 
 \section{Hạn chế}
-% TODO
+\label{sec:6-limits}
+
+Các kết quả trên có những giới hạn cần được nêu rõ, vì chúng quyết định phạm vi mà kết luận có thể áp dụng.
+
+\begin{itemize}
+  \item \textbf{Dữ liệu mô phỏng.} Mọi dữ liệu đều do bộ mô phỏng sinh ra, trải trên một khoảng ngắn và thưa, và lỗi do chính bộ mô phỏng tiêm vào. Tỷ lệ phát hiện 100\% chỉ chứng minh hệ thống bắt được các loại lỗi mà nhóm đã dự đoán. Không có hai mùa vụ thật để so sánh, nên bằng chứng cho BR5 và BR6 là bằng chứng về cơ chế chứ không phải về giá trị nông học.
+  \item \textbf{Quy mô thử nghiệm.} Các phép đo chạy trên một máy, với Kafka và HDFS một nút và không có tải đồng thời của nhiều người dùng thật. Mỗi kịch bản phục hồi chỉ chạy một lần. Trường hợp mất toàn bộ checkpoint chưa được kiểm tra.
+  \item \textbf{Hạ tầng của bản demo.} Hive Metastore dùng cơ sở dữ liệu Derby nhúng trên một nút nên không thể chạy thêm bản thứ hai để chịu lỗi. Thiết kế dự kiến backend Postgres cho môi trường thật (Mục~\ref{sec:4-storage}).
+  \item \textbf{Độ mới của dữ liệu phân tích.} Tầng gold chỉ làm mới theo giờ hoặc theo ngày và các route phân tích được lưu đệm vài phút, nên các biểu đồ phân tích không phản ánh dữ liệu của vài phút gần nhất.
+  \item \textbf{Chức năng chưa trọn vẹn.} FR7.4 chỉ đạt một phần vì bộ đệm đặt ở route handler của Next.js và kết quả chỉ được giới hạn bằng tham số \code{limit}, chưa có phân trang đầy đủ. Lịch sử cảnh báo chưa được đưa vào tầng gold (FR8.6) và chỉ được giữ 90 ngày trong Cassandra. Kiểm tra bước nhảy gắn nhầm cờ cho khoảng 0,17\% số đo bình thường vì mốc so sánh nhận cả số đo đã bị gắn cờ.
+  \item \textbf{Chưa đánh giá với người dùng.} Đề tài kiểm tra câu chữ do hệ thống sinh ra có đúng hay không, nhưng chưa khảo sát việc người quản lý trang trại có hiểu và hành động theo thông tin đó hay không.
+\end{itemize}
 
 \section{Hướng phát triển}
-% TODO
+\label{sec:6-future}
+
+Từ các hạn chế trên, nhóm đề xuất các hướng phát triển sau theo thứ tự ưu tiên.
+
+\begin{enumerate}
+  \item \textbf{Hoàn thiện các chức năng còn thiếu.} Đưa lịch sử cảnh báo vào tầng gold bằng một model dbt để truy vấn theo mùa vụ (FR8.6); chuyển bộ đệm Trino vào API và bổ sung phân trang bằng con trỏ (FR7.4); chỉ lấy số đo hợp lệ cuối cùng làm mốc so bước nhảy để loại cảnh báo giả.
+  \item \textbf{Kết nối dữ liệu thật.} Thay bộ mô phỏng bằng gateway LoRaWAN thực. Vì service tiếp nhận chỉ yêu cầu cùng hợp đồng sự kiện nên các tầng phía sau không phải thay đổi; đây cũng là cách thu được hai mùa vụ thật để đánh giá BR5 và BR6 đúng nghĩa.
+  \item \textbf{Mở rộng và kiểm tra tải.} Triển khai Kafka, HDFS và Spark nhiều nút cùng Hive Metastore với backend Postgres, đo lại các benchmark với số thiết bị và số người dùng lớn hơn, kiểm tra trường hợp mất checkpoint, và tìm nguyên nhân của độ trễ sau khi tiến trình bị dừng đột ngột. Khi đó cần xem lại chu kỳ trigger và chính sách gộp tệp.
+  \item \textbf{Làm giàu thông tin cho người dùng.} Thêm kênh thông báo ngoài ứng dụng cho cảnh báo mức cao, lưu thời điểm xác nhận và đóng cảnh báo trên giao diện, và bổ sung dữ liệu bên ngoài như thời tiết để giải thích các biến động của độ ẩm đất.
+  \item \textbf{Đánh giá với người dùng thật.} Khảo sát một nhóm quản lý và nhà phân tích để kiểm tra mức độ dễ hiểu của các trang Insights và Analytics, từ đó điều chỉnh câu chữ và cách trình bày.
+\end{enumerate}
